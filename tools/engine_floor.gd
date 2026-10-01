@@ -77,10 +77,16 @@ func _make_station(modules: PackedStringArray) -> void:
 	get_root().add_child(_st)
 	await _st.built
 	_make_cam()
+	# the composite among the compositor's effects (core/fog.gd's exact fog runs first, as scene fog)
 	var we = _st.get_node_or_null("SkyAndFog")
-	if we != null and we.compositor != null and not we.compositor.compositor_effects.is_empty():
-		_fx = we.compositor.compositor_effects[0]
-		_fx_on = {"outline": _fx.outline, "grade": _fx.grade, "vignette": _fx.vignette}
+	if we != null and we.compositor != null:
+		for e in we.compositor.compositor_effects:
+			if e != null and "outline" in e and "grade" in e:
+				_fx = e
+	if _fx != null:
+		for k in PORT_STAGES:
+			if k in _fx:
+				_fx_on[k] = _fx.get(k)
 
 
 func _make_cam() -> void:
@@ -118,34 +124,46 @@ func _teardown() -> void:
 
 # ------------------------------------------------------------------------------------- tiles
 
-## The port's composite (core/composite.gd) set for a tile's post stages {outline, bloom, grade,
-## leak, vignette, dither}. Its outline is the original's outline stage; its grade block is the
-## original's grading, light leak and vignette under one switch (vignette is its amount), so it runs
-## only when all three are on; the port has no bloom or dither. A tile whose stages the port cannot
-## run (bloom, dither, or grading, leak or vignette alone) is drawn with those off, so its measure
-## is the stage's whole contribution. Returns what the port ran, for the labels.
+## Each port composite switch and the original stage it follows; the port's grade block holds grading, leak and
+## vignette together, so it runs only when all three are on. The port has no dither.
+const PORT_STAGES := {"outline": "outline", "bloom": "bloom", "glow": "bloom", "grade": "block", "vignette": "block"}
+
+
+## Sets the port's composite for a tile's post stages; stages it cannot run stay off, so the tile measures their
+## whole contribution. Returns what the port ran, for the labels.
 func _set_post(p: Dictionary) -> String:
 	if _fx == null:
 		return "port: no composite"
 	var block: bool = bool(p.grade) and bool(p.leak) and bool(p.vignette)
-	_fx.outline = _fx_on.outline if p.outline else 0.0
-	_fx.grade = _fx_on.grade if block else 0.0
-	_fx.vignette = _fx_on.vignette if block else 0.0
-	return _port_label(p)
+	for k in _fx_on:
+		var on: bool = block if PORT_STAGES[k] == "block" else bool(p[PORT_STAGES[k]])
+		_fx.set(k, _fx_on[k] if on else 0.0)
+	return _port_label(p, _fx_on.has("bloom"))
 
 
-static func _port_label(p: Dictionary) -> String:
+## The port's switches as a key for reusing a render, [] without a composite.
+func _post_key() -> Array:
+	var out := []
+	for k in _fx_on:
+		out.append(_fx.get(k))
+	return out
+
+
+static func _port_label(p: Dictionary, has_bloom: bool = true) -> String:
 	var block: bool = bool(p.grade) and bool(p.leak) and bool(p.vignette)
 	var on := PackedStringArray()
 	if p.outline:
 		on.append("outline")
+	if p.bloom and has_bloom:
+		on.append("bloom")
 	if block:
 		on.append("grade block")
 	var s := "port composite: " + (" + ".join(on) if not on.is_empty() else "off")
 	var not_run := PackedStringArray()
-	for k in ["bloom", "dither"]:
-		if p[k]:
-			not_run.append(k + " (not in the port)")
+	if p.dither:
+		not_run.append("dither (not in the port)")
+	if p.bloom and not has_bloom:
+		not_run.append("bloom (not in the port)")
 	if not block:
 		for k in ["grade", "leak", "vignette"]:
 			if p[k]:
@@ -268,7 +286,7 @@ func _tiles() -> void:
 			continue
 		ports[t.id] = _set_post(t.post)
 		# a tile the port draws exactly as an earlier one (same camera, shadows and composite) reuses it
-		var same := JSON.stringify([t.cam, t.shadows, _fx.outline, _fx.grade, _fx.vignette] if _fx != null else [t.cam, t.shadows])
+		var same := JSON.stringify([t.cam, t.shadows, _post_key() if _fx != null else []])
 		if drawn.has(same):
 			renders[t.id] = renders[drawn[same]]
 			renders[t.id].save_png(out.path_join("godot_%s.png" % t.id))
