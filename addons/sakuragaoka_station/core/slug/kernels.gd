@@ -423,12 +423,12 @@ static func pack_stamps(r: Dictionary, stops: PackedInt32Array) -> Dictionary:
 
 
 ## Two RGB8 frames: [sum |a - b| over the pixels where m equals key (all when m is empty), their channel
-## count, the same over the rest, pixels that differ, largest channel difference].
+## count, the same over the rest, pixels that differ, largest channel difference, pixels that differ inside, outside].
 static func frame_diff(a: PackedByteArray, b: PackedByteArray, m: PackedByteArray, key: int) -> PackedInt64Array:
 	if _sgd():
 		return _sb.vmcall("frame_diff", a, b, m, key)
 	var out := PackedInt64Array()
-	out.resize(6)
+	out.resize(8)
 	var count := mini(a.size(), b.size())
 	var masked := m.size() >= count
 	var i := 0
@@ -437,12 +437,13 @@ static func frame_diff(a: PackedByteArray, b: PackedByteArray, m: PackedByteArra
 		var d1 := absi(a[i + 1] - b[i + 1])
 		var d2 := absi(a[i + 2] - b[i + 2])
 		var dd := maxi(d0, maxi(d1, d2))
-		if dd > 0:
-			out[4] += 1
-			out[5] = maxi(out[5], dd)
 		var o := 0
 		if masked and ((m[i] << 16) | (m[i + 1] << 8) | m[i + 2]) != key:
 			o = 2
+		if dd > 0:
+			out[4] += 1
+			out[5] = maxi(out[5], dd)
+			out[6 + o / 2] += 1
 		out[o] += d0 + d1 + d2
 		out[o + 1] += 3
 		i += 3
