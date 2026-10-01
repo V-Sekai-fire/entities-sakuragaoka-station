@@ -5,12 +5,14 @@ extends RefCounted
 
 class EnvTextures extends RefCounted:
 	var masonry
+	var path
 	var _rest
 
 	func _init(ctx) -> void:
 		var T = ctx.tex
 		_rest = T.bag()
 		masonry = T.draw(512, 512, null, {"key": "env-masonry2", "repeat": [1, 1]})
+		path = T.draw(512, 512, null, {"key": "env-path", "repeat": [1, 1]})
 
 	func _get(p: StringName):
 		return _rest.get(p)
