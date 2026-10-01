@@ -4,11 +4,9 @@
 #   high    4x    4096        +-75 m      min(dpr, 1.5)    1.0    (the original's desktop default)
 #   medium  4x    2048        +-60 m      min(dpr, 1.0)    0.6    (its touch default)
 #   low     off   2048        +-45 m      min(dpr, 0.75)   0.35
-# Applied here: MSAA on the 3D viewport and the directional shadow map size (Godot's default 4096 is
-# the original's high). Not applied: the shadow box (the original fits one +-S orthographic box in
-# front of the camera, Godot splits its directional shadow over a distance, so the numbers do not
-# carry over), the pixel ratio (shot mode, which every parity render uses, forces it to 1; at
-# dpr 1 it is 1 for high and medium anyway) and petals (no petal module is ported yet).
+# Applied here: MSAA on the 3D viewport, the directional shadow map size and its soft filter; the
+# station fits its one orthogonal shadow map to the box. Not applied: the pixel ratio (shot mode
+# forces it to 1) and petals (no petal module is ported yet).
 # The slug_runtime setting joins these when it lands.
 #   Quality.apply(get_viewport(), "high")
 #   tools: --q=high|medium|low (realize_check, engine_floor)
@@ -20,6 +18,9 @@ const LEVELS := {
 	"low": {"msaa": 0, "shadow_map": 2048, "shadow_size": 45.0, "pixel_ratio": 0.75, "petals": 0.35},
 }
 const DEFAULT := "high"
+## Soft Medium: 8 PCF taps on a disk of radius shadow_blur x FILTER_RADIUS texels.
+const FILTER := RenderingServer.SHADOW_QUALITY_SOFT_MEDIUM
+const FILTER_RADIUS := 2.0
 
 
 static func level(name: String) -> Dictionary:
@@ -43,4 +44,5 @@ static func apply(vp: Viewport, name: String) -> Dictionary:
 	if vp != null:
 		vp.msaa_3d = msaa_mode(int(q.msaa))
 	RenderingServer.directional_shadow_atlas_set_size(int(q.shadow_map), true)
+	RenderingServer.directional_soft_shadow_filter_set_quality(FILTER)
 	return q
