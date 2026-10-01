@@ -101,6 +101,7 @@ class Textures extends RefCounted:
 	var FONTS := {"sans": "sans", "serif": "serif", "round": "round", "hand": "hand", "brush": "brush", "en": "en"}
 	var pixels := 0
 	var _n := 0
+	var _keyed := {}
 
 	func _stub(w: int, h: int) -> T.Tex:
 		var t := T.Tex.new()
@@ -111,8 +112,19 @@ class Textures extends RefCounted:
 		pixels += w * h
 		return t
 
-	func draw(w: int, h: int, _fn = null, _opts = {}) -> T.Tex:
-		return _stub(w, h)
+	## opts.key returns the same texture for the same key; opts.repeat tiles it, as textures.js does.
+	func draw(w: int, h: int, _fn = null, opts = {}) -> T.Tex:
+		var key = opts.get("key")
+		if key != null and _keyed.has(key):
+			return _keyed[key]
+		var t := _stub(w, h)
+		if opts.get("repeat") != null:
+			t.wrap_s = "repeat"
+			t.wrap_t = "repeat"
+			t.repeat = Vector2(opts.repeat[0], opts.repeat[1])
+		if key != null:
+			_keyed[key] = t
+		return t
 
 	func canvas(w: int, h: int) -> Dictionary:
 		return {"canvas": {"width": w, "height": h}, "g": null}
