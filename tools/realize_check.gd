@@ -10,6 +10,12 @@
 extends SceneTree
 
 const Layout = preload("res://addons/sakuragaoka_station/world/layout.gd")
+const SlugAtlas = preload("res://addons/sakuragaoka_station/core/slug/atlas.gd")
+const Baked = preload("res://addons/sakuragaoka_station/core/slug/baked.gd")
+const Pack = preload("res://addons/sakuragaoka_station/core/slug/pack.gd")
+const SandboxUtil = preload("res://addons/sakuragaoka_station/core/slug/sandbox_util.gd")
+const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
+const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
 const EYE := 1.52
 
 var _out := ""
@@ -58,11 +64,20 @@ func _on_built(s: Dictionary) -> void:
 			",".join(s.modules), s.meshes, s.solids, s.surfaces, s.single, s.instanced, s.skipped])
 	print("realize: geometries %d manifold, %d open; CSG %d triangles in, %d out; %d cells kept raw, %d combiners failed" % [
 			s.manifold, s.open, s.csg_in, s.csg_out, s.csg_raw, s.csg_failed])
-	print("realize: %d palette colours; %d blossom masses; %d alpha-cut cards held for Slug; %d instance tints dropped" % [
+	print("realize: %d palette colours; %d blossom masses; %d alpha-cut cards held (no Slug or mesh form); %d instance tints dropped" % [
 			s.colours, s.blob, s.held, s.instance_tints_dropped])
+	var atlas = SlugAtlas.shared()
+	print("realize: canvas textures: %d surfaces drawn by Slug, %d on the mean-colour fallback; modes mesh %d, slug %d, mean %d" % [
+			s.slugged, s.fallback, s.mode_mesh, s.mode_slug, s.mode_mean])
+	print("realize: baked %d cards, %d decals, %d triangles, %d palette ramps; %d decals over the cap (%d triangles) went to Slug or the mean; atlas %s; pack %s" % [
+			s.baked_cards, s.baked_decals, s.baked_tris, s.ramps, s.decal_capped, Baked.DECAL_TRI_CAP,
+			"%d keys, %d layers" % [atlas.keys.size(), atlas.layer_count] if atlas != null else "none",
+			"%s in %d ms %s, binary translation %s" % [Pack.info.get("source", "?"), Pack.info.get("ms", 0), str(Pack.info.get("build", "")),
+			"on" if SandboxUtil.translated else "off (no res://bintr/ library)"] if Pack.shared() != null else "none (%s)" % Pack.reason])
 	print("realize: %d batches; %d draws, %d triangles; build %d ms, realize %d ms" % [
 			s.batches, draws, tris, s.build_ms, s.realize_ms])
 	if _out == "" or _cams.is_empty():
+		_teardown()
 		quit()
 		return
 	DirAccess.make_dir_recursive_absolute(_out)
@@ -78,12 +93,14 @@ func _on_built(s: Dictionary) -> void:
 func _process(_dt: float) -> bool:
 	if Time.get_ticks_msec() - _t0 > 600000:
 		print("realize: FAIL (no result in 600 s)")
+		_teardown()
 		quit(1)
 	if _frames < 0:
 		return false
 	_frames += 1
 	if _frames == 1:
 		if _view >= _cams.size():
+			_teardown()
 			quit()
 			return false
 		_place(_cams[_view])
@@ -102,6 +119,13 @@ func _process(_dt: float) -> bool:
 		_view += 1
 		_frames = 0
 	return false
+
+
+## The station frees its Sandboxes as it leaves the tree; the run frees them first, so nothing is left
+## loaded at exit.
+func _teardown() -> void:
+	Kernels.shutdown()
+	Guest.shutdown()
 
 
 ## The original's walking eye or free camera, as player.js sets it.

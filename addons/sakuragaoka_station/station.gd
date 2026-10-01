@@ -7,6 +7,8 @@ signal built(stats: Dictionary)
 
 const Ctx = preload("res://addons/sakuragaoka_station/core/ctx.gd")
 const Realize = preload("res://addons/sakuragaoka_station/core/realize.gd")
+const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
+const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
 const SKY := preload("res://addons/sakuragaoka_station/core/sky.gdshader")
 
 @export var world_seed := 1
@@ -16,6 +18,12 @@ const SKY := preload("res://addons/sakuragaoka_station/core/sky.gdshader")
 
 var stats := {}
 var sun_dir := Vector3.UP
+
+
+## The canvas-texture Sandboxes (slug.elf, slug_kernels.elf) go with the station.
+func _exit_tree() -> void:
+	Kernels.shutdown()
+	Guest.shutdown()
 
 
 func _ready() -> void:
