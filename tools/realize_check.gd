@@ -7,7 +7,7 @@
 # absolute difference of the two over every pixel and channel at full resolution (0..255).
 #   godot --path . --resolution 1920x1080 --script tools/realize_check.gd -- --shots=<dir>
 #       [--hammersley=8@-1,-11.4 | --cams="x,z,yaw,pitch;..."] [--original=<prefix>] [--modules=...]
-#       [--q=high|medium|low]   the original's ?q= level (core/quality.gd), default high
+#       [--q=high|medium|low] [--ramp-control=<engine_floor.gd RAMP_CONTROLS name>]   ?q= level (core/quality.gd), default high
 extends SceneTree
 
 const Layout = preload("res://addons/sakuragaoka_station/world/layout.gd")
@@ -19,6 +19,7 @@ const Realize = preload("res://addons/sakuragaoka_station/core/realize.gd")
 const SandboxUtil = preload("res://addons/sakuragaoka_station/core/slug/sandbox_util.gd")
 const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
+const EngineFloor = preload("res://tools/engine_floor.gd")
 const EYE := 1.52
 
 var _out := ""
@@ -32,6 +33,7 @@ var _last := PackedByteArray()
 var _t0 := Time.get_ticks_msec()
 var _layout = Layout.new("")
 var _quality := "high"
+var _control := ""
 
 
 func _initialize() -> void:
@@ -45,6 +47,8 @@ func _initialize() -> void:
 			mods = a.substr(10)
 		elif a.begins_with("--q="):
 			_quality = a.substr(4)
+		elif a.begins_with("--ramp-control="):
+			_control = a.substr(15)
 		elif a.begins_with("--hammersley="):
 			_cams = _hammersley(a.substr(13))
 		elif a.begins_with("--cams="):
@@ -84,6 +88,8 @@ func _on_built(s: Dictionary) -> void:
 	print("realize: %d batches; %d draws, %d triangles; build %d ms, realize %d ms" % [
 			s.batches, draws, tris, s.build_ms, s.realize_ms])
 	print("realize: quality %s (MSAA %s)" % [_quality, ["off", "2x", "4x", "8x"][get_root().msaa_3d]])
+	if _control != "":
+		print("realize: CONTROL %s on %d toon-ramp materials" % [_control, EngineFloor.ramp_control(_st, _control)])
 	if _out == "" or _cams.is_empty():
 		_teardown()
 		quit()

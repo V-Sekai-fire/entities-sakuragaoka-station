@@ -153,7 +153,99 @@ func _formula() -> Dictionary:
 		c.queue_free()
 	await process_frame
 	_check(worst <= 1, "formula: %d renders of the six palette ramp variants (G bands either side of 0, 0.125, 0.375; back faces) within one 8-bit level of the ramp (largest %d)" % [n_cases, worst])
-	return {"cases": n_cases, "largest_8bit": worst, "rows": rows}
+	return {"cases": n_cases, "largest_8bit": worst, "rows": rows, "sakura": await _sakura_formula()}
+
+
+## sakura/materials.js extend()'s rim chunk, toon light and SHADE, as mtoon_ramp_sakura.gdshaderinc has them.
+static func sakura(dc: Vector3, n: Vector3, ne: Vector3, v: Vector3, s: Vector3, p: Dictionary) -> Vector3:
+	var em := Vector3.ZERO
+	if p.rim > 0.0:
+		var nr := ne if p.env_rim else n
+		var back := clampf(-v.dot(s) * 1.15, 0.0, 1.0)
+		back *= back
+		var ndv := clampf(absf(nr.dot(v)), 0.0, 1.0)
+		var trans := clampf(0.45 - n.dot(s) * 0.55, 0.0, 1.0)
+		var glow: Vector3 = Vector3(1.0, 0.64, 0.75) * (0.62 * pow(1.0 - ndv, 2.2) + 0.26 * trans) * back + Vector3(0.9, 0.85, 1.0) * pow(1.0 - ndv, 4.0) * float(p.sheen)
+		em += glow * dc * float(p.rim)
+		em += dc * Vector3(0.13, 0.12, 0.17) * (0.75 + 0.25 * trans)
+		em += dc * Vector3(0.11, 0.055, 0.075) * clampf(-n.dot(s) + 0.2, 0.0, 1.0)
+	var sun := _lin(Color(SUN)) * SUN_I
+	var direct := sun * gradient(n.dot(s)) * dc / PI
+	var col := direct + hemisphere(n.y) * dc + em
+	if p.shade > 0.0:
+		var lt := clampf(direct.dot(Vector3.ONE) / maxf((dc * sun).dot(Vector3.ONE) / PI, 1e-4), 0.0, 1.0)
+		col = col.lerp(Vector3(0.97, 0.9, 1.1) * col.dot(Vector3(0.3, 0.52, 0.18)), (1.0 - lt) * p.shade)
+	return col
+
+
+## The extend() unit on quads: the cards' rim, sheen and shade (rim 1.0, sheen 0.05, shade 0.22) and the
+## masses' (0.7, 0, 0.28), front and back faces, at view angles 0 to 75 degrees off the normal, within one
+## 8-bit level; and EDGE: a double-sided card at |N.V| 0.2 is discarded, at 0.3 drawn.
+func _sakura_formula() -> Dictionary:
+	var sun_dir := Vector3(-0.776, 0.517, 0.362).normalized()
+	var env := Environment.new()
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0, 0, 0)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(1, 0, 0)
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	var we := WorldEnvironment.new()
+	we.environment = env
+	get_root().add_child(we)
+	var cam := Camera3D.new()
+	get_root().add_child(cam)
+	cam.make_current()
+	var albedo := Color("#f3bccd")
+	var img := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	img.fill(albedo)
+	var tex := ImageTexture.create_from_image(img)
+	var p1 := sun_dir.cross(Vector3.UP).normalized()
+	var p2 := sun_dir.cross(p1).normalized()
+	var worst := 0
+	var n_cases := 0
+	var edge := []
+	for opts in [{"v": "mtoon_ramp_sakura", "rim": 0.7, "sheen": 0.0, "shade": 0.28, "env_rim": false, "edge": false},
+			{"v": "mtoon_ramp_sakura_cull_off", "rim": 1.0, "sheen": 0.05, "shade": 0.22, "env_rim": false, "edge": false},
+			{"v": "mtoon_ramp_sakura_cull_off", "rim": 1.0, "sheen": 0.05, "shade": 0.22, "env_rim": false, "edge": true}]:
+		var sm := ShaderMaterial.new()
+		sm.shader = load(RAMP + opts.v + ".gdshader")
+		var params := {"_MainTex": tex, "_ShadeTexture": tex, "ramp_paint": 0.0, "ramp_rim_k": opts.rim, "ramp_sheen_k": opts.sheen,
+				"ramp_shade_k": opts.shade, "ramp_env_rim": opts.env_rim, "ramp_edge_fade": opts.edge, "ramp_sun_dir": sun_dir}
+		for k in params:
+			sm.set_shader_parameter(k, params[k])
+		var mi := MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(4, 4)
+		mi.mesh = q
+		mi.material_override = sm
+		get_root().add_child(mi)
+		for d in ([-0.6, -0.1, 0.06, 0.25, 0.7] if not opts.edge else [0.25]):
+			for ang in ([0.0, 50.0, 75.0] if not opts.edge else [rad_to_deg(acos(0.2)), rad_to_deg(acos(0.3))]):
+				var n: Vector3 = (sun_dir * d + p1 * sqrt(1.0 - d * d)).normalized()
+				var view := (n * cos(deg_to_rad(ang)) + p2 * sin(deg_to_rad(ang))).normalized()
+				for back in ([false, true] if opts.v.ends_with("cull_off") else [false]):
+					var up := Vector3.UP if absf(n.y) < 0.95 else Vector3.RIGHT
+					mi.transform = Transform3D(Basis.looking_at(n if back else -n, up), Vector3.ZERO)
+					cam.transform = Transform3D(Basis.looking_at(-view, Vector3.UP if absf(view.y) < 0.95 else Vector3.RIGHT), view * 3.0)
+					for i in 3:
+						await process_frame
+					await RenderingServer.frame_post_draw
+					var px := get_root().get_texture().get_image().get_pixel(get_root().size.x / 2, get_root().size.y / 2)
+					var w := sakura(_lin(albedo), n, -n if back else n, view, sun_dir, opts)
+					var want := Color(w.x, w.y, w.z).linear_to_srgb()
+					if opts.edge and absf(n.dot(view)) < 0.24:
+						want = Color(0, 0, 0)
+					var d8 := maxi(absi(px.r8 - want.r8), maxi(absi(px.g8 - want.g8), absi(px.b8 - want.b8)))
+					worst = maxi(worst, d8)
+					n_cases += 1
+					if opts.edge:
+						edge.append("|N.V| %.2f%s: %d,%d,%d want %d,%d,%d" % [absf(n.dot(view)), " back" if back else "", px.r8, px.g8, px.b8, want.r8, want.g8, want.b8])
+		mi.queue_free()
+	for c in [we, cam]:
+		c.queue_free()
+	await process_frame
+	_check(worst <= 1, "sakura formula: %d renders of extend()'s rim, sheen and shade on both sakura variants, with EDGE discarding at |N.V| 0.2 and drawing at 0.3, within one 8-bit level (largest %d)" % [n_cases, worst])
+	return {"cases": n_cases, "largest_8bit": worst, "edge": edge}
 
 
 static func _img(path: String):

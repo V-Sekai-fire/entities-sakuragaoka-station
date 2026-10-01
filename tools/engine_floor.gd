@@ -324,7 +324,9 @@ func _tiles() -> void:
 	quit()
 
 
-const RAMP_CONTROLS := {"step": "RAMP_CONTROL_STEP", "nohemi": "RAMP_CONTROL_NO_HEMI", "nopaint": "RAMP_CONTROL_NO_PAINT"}
+const RAMP_CONTROLS := {"step": "RAMP_CONTROL_STEP", "nohemi": "RAMP_CONTROL_NO_HEMI", "nopaint": "RAMP_CONTROL_NO_PAINT",
+		"oct": "RAMP_CONTROL_SAKURA_NO_OCT", "wobble": "RAMP_CONTROL_SAKURA_NO_WOBBLE", "speck": "RAMP_CONTROL_SAKURA_NO_SPECK",
+		"rim": "RAMP_CONTROL_SAKURA_NO_RIM", "shade": "RAMP_CONTROL_SAKURA_NO_SHADE"}
 
 
 ## Toon-ramp materials under root redrawn with a control's define (mtoon_ramp.gdshaderinc); returns the count.
