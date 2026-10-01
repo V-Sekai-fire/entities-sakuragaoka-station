@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(sakuragaoka_slug C CXX)
 
 # slug.elf: the port's canvas-texture compute (guest/slug/main.cpp, slug_api.cpp) on slughorn
-# (3-interactor/slughorn, branch feat/thorvg: ThorVG SVG loader + sw engine, Clipper2, earcut).
+# (3-interactor/slughorn, main: ThorVG SVG loader + sw engine, Clipper2, earcut).
 #
 # Two trees from this one file:
 #  - riscv64 (build.sh passes the sysroot's toolchain file): slug.elf, a godot-sandbox guest,
@@ -20,7 +20,7 @@ set(WEFT_ROOT "${CMAKE_SOURCE_DIR}/../../../.." CACHE PATH "Root of the manifest
 get_filename_component(WEFT_ROOT "${WEFT_ROOT}" ABSOLUTE)
 set(PORT_ROOT "${CMAKE_SOURCE_DIR}/../.." CACHE PATH "The port's project root (res://)")
 get_filename_component(PORT_ROOT "${PORT_ROOT}" ABSOLUTE)
-set(SLUGHORN_ROOT "${WEFT_ROOT}/3-interactor/slughorn" CACHE PATH "slughorn checkout (feat/thorvg)")
+set(SLUGHORN_ROOT "${WEFT_ROOT}/3-interactor/slughorn" CACHE PATH "slughorn checkout (main)")
 set(GUEST_RUNTIME_ROOT ${WEFT_ROOT}/2-contract/guest-runtime)
 
 set(SLUG_RISCV OFF)
@@ -73,11 +73,17 @@ if(SLUG_RISCV)
 	target_link_libraries(slug_core PUBLIC slughorn)
 	target_compile_options(slug_core PRIVATE $<TARGET_PROPERTY:sandbox_api,INTERFACE_COMPILE_OPTIONS> ${SLUG_FP_FLAGS})
 
+	# A host refuses a guest built for the other real_t, so DOUBLE_PRECISION=ON is slug.double.elf.
+	set(SLUG_ELF_NAME slug.elf)
+	if(DOUBLE_PRECISION)
+		set(SLUG_ELF_NAME slug.double.elf)
+	endif()
+
 	add_sandbox_program(slug main.cpp)
 	target_link_libraries(slug PRIVATE slug_core -lm -lstdc++)
 	add_custom_command(TARGET slug POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:slug> ${PORT_ROOT}/slug.elf
-		COMMENT "Installing slug.elf at the port root"
+		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:slug> ${PORT_ROOT}/${SLUG_ELF_NAME}
+		COMMENT "Installing ${SLUG_ELF_NAME} at the port root"
 	)
 else()
 	add_library(slug_core STATIC slug_api.cpp)

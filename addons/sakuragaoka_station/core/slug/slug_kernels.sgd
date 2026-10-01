@@ -1,7 +1,7 @@
 # The port's own canvas-texture compute, as SafeGDScript (plain GDScript, no --extensions), compiled
-# ahead of time to slug_kernels.elf by the godot-sandbox GDScript compiler
-# (4-entities/godot-sandbox-gdscript-compiler, unidot-compat branch):
+# ahead of time, once per real_t, by 4-entities/godot-sandbox-gdscript-compiler (unidot-compat):
 #   gdscript_to_riscv -o addons/sakuragaoka_station/core/slug/slug_kernels.elf addons/sakuragaoka_station/core/slug/slug_kernels.sgd
+#   gdscript_to_riscv --double-precision -o addons/sakuragaoka_station/core/slug/slug_kernels.double.elf addons/sakuragaoka_station/core/slug/slug_kernels.sgd
 # Each function is a port of a GDScript function the host also keeps (core/slug/kernels.gd chooses
 # which runs; tools/sgd_check.gd checks the two agree bit for bit):
 #   load_svgs       pack.gd _build's slug_load_svg loop (the guest reads the SVGs and calls slug.elf

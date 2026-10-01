@@ -72,7 +72,7 @@ func _run() -> void:
 		print("sgd_check: FAIL no kernel sandbox: ", Kernels.reason)
 		quit(1)
 		return
-	print("sgd_check: slug_kernels.elf in a Sandbox; binary translation %s" % ("on" if SandboxUtil.translated else "off (no res://bintr/ library)"))
+	print("sgd_check: %s in a Sandbox; binary translation %s" % [Kernels.ELF.get_file(), "on" if SandboxUtil.translated else "off (no res://bintr/ library)"])
 	var pack = Pack.shared()
 	if pack == null:
 		print("sgd_check: FAIL no pack: ", Pack.reason)

@@ -30,6 +30,11 @@ static func enable_native_translation() -> bool:
 	return false
 
 
+## A host refuses a guest built for the other real_t, so a double-precision engine loads <name>.double.elf.
+static func for_precision(elf: String, double: bool = OS.has_feature("double")) -> String:
+	return elf.get_basename() + ".double.elf" if double else elf
+
+
 static func make_sandbox(parent: Node, elf: String, mem_mb: int = 0, refs: int = 4096, timeout_units: int = 0,
 		extra: Dictionary = {}, required: PackedStringArray = PackedStringArray()) -> Dictionary:
 	enable_native_translation()
@@ -54,6 +59,9 @@ static func make_sandbox(parent: Node, elf: String, mem_mb: int = 0, refs: int =
 		sb.free()
 		return {"sandbox": null, "reason": "%s did not load" % elf.get_file()}
 	sb.program = prog
+	if sb.has_method("has_program_loaded") and not sb.has_program_loaded():
+		sb.free()
+		return {"sandbox": null, "reason": "the Sandbox refused %s (its log line says why)" % elf.get_file()}
 	for fn in required:
 		if sb.has_method("has_function") and not sb.has_function(fn):
 			sb.free()
