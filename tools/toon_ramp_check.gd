@@ -1,27 +1,13 @@
-# The toon ramp (core/ramp/mtoon_ramp.gdshaderinc) against the original's toon material, with tests
-# that can fail:
-#   formula   each palette ramp variant drawn on a quad at chosen N.L, on both sides of each break of
-#             the gradient map and on back faces for the double-sided variants, against the ramp
-#             written out here: albedo * (G(N.L) * 2.75 * sun + hemisphere(N.y) * 1.62) / pi, 8-bit
-#             sRGB, within one level; the environment's own ambient is pure red, so if any of it
-#             reached the ramp the test would fail
-#   chart     engine_floor.gd's chart-toon tile, three.js against the port before and after, dE00 per
-#             patch in the sun and in the cast shadow (each side's mean <= 1.0, every patch <= 2.0 after);
-#             the unlit chart's 8-bit codes (exact after); the tiles b-toon, b-toon-paint and c-shadow
-#             (MAD, every pixel and channel, full resolution)
-#   controls  engine_floor.gd --ramp-control runs, each of which must fail where it should:
-#             step     MToon's step in place of G: the chart's shadow dE00 must come back over the gate
-#             nohemi   no hemisphere light: every shadow patch must darken by its own hemisphere term,
-#                      the patch's colour times mix(ground, sky, 0.5) * 1.62 / pi (the chart is vertical),
-#                      within one 8-bit level and 2 %; the chart must fail its gate
-#             nopaint  no hand paint: b-toon-paint must regress (MAD at least 1.5x after's) while
-#                      b-toon, which has no paint, stays put
-# The contact sheet: per patch, the original | port before | port after, in the sun and in shadow,
-# with dE00 (toon-ramp-chart-NN on the desktop, Sheet.publish).
+# The toon ramp (core/ramp/) against the original's toon material, by tests that can fail: formula (each
+# palette variant on quads either side of every gradient-map break and on back faces, against the ramp
+# written out here, within one 8-bit level, a pure red environment ambient not reaching it); chart
+# (engine_floor.gd's chart-toon tile, dE00 three.js vs the port per patch, mean <= 1.0 and every patch
+# <= 2.0 after; the unlit chart's codes exact; tiles b-toon, b-toon-paint, c-shadow MAD before -> after);
+# controls (engine_floor.gd --ramp-control: step must bring the shadow dE00 back, nohemi darken each
+# shadow patch by its computed hemisphere term, nopaint regress b-toon-paint and leave b-toon).
+# Publishes toon-ramp-chart-NN: per patch original | before | after, sun and shadow, with dE00.
 #   godot --path . --resolution 1920x1080 --script tools/toon_ramp_check.gd -- --three=<prefix>
-#       --before=<engine floor dir> --after=<dir> [--step=<dir>] [--nohemi=<dir>] [--nopaint=<dir>]
-#       [--out=<dir>] [--no-formula]
-# <prefix>_<tile>.png are tools/oracle/calib.mjs' renders, <dir>/godot_<tile>.png engine_floor.gd's.
+#       --before=<dir> --after=<dir> [--step=<dir>] [--nohemi=<dir>] [--nopaint=<dir>] [--out=<dir>] [--no-formula]
 extends SceneTree
 
 const Chart = preload("res://tools/chart_calib.gd")
@@ -100,8 +86,6 @@ func _run() -> void:
 	quit(0 if _fails.is_empty() else 1)
 
 
-# ----------------------------------------------------------------------------------- formula
-
 func _formula() -> Dictionary:
 	var sun_dir := Vector3(-0.776, 0.517, 0.362).normalized()   # world/layout.gd SUN_DIR
 	var env := Environment.new()
@@ -171,8 +155,6 @@ func _formula() -> Dictionary:
 	_check(worst <= 1, "formula: %d renders of the six palette ramp variants (G bands either side of 0, 0.125, 0.375; back faces) within one 8-bit level of the ramp (largest %d)" % [n_cases, worst])
 	return {"cases": n_cases, "largest_8bit": worst, "rows": rows}
 
-
-# ------------------------------------------------------------------------------------- chart
 
 static func _img(path: String):
 	return Image.load_from_file(path) if FileAccess.file_exists(path) else null
@@ -258,7 +240,6 @@ func _chart() -> Dictionary:
 		res["unlit_" + k] = {"largest_code_diff": code, "largest_de00": de, "frame_mad": Sheet.mad(g, tu) if tu != null else -1.0}
 		if k == "after":
 			_check(code == 0.0, "unlit chart after: every patch's 8-bit code equals the chart's (largest difference %.2f, dE00 %.2f)" % [code, de])
-	# engine floor tiles
 	for t in ["b-toon", "b-toon-paint", "c-shadow", "chart-toon", "d-skyfog", "e-post-off"]:
 		var th = _img("%s_%s.png" % [three, t])
 		res.tiles[t] = {}
@@ -270,7 +251,6 @@ func _chart() -> Dictionary:
 	for t in ["b-toon", "b-toon-paint", "c-shadow"]:
 		if res.tiles[t].has("before") and res.tiles[t].has("after"):
 			_check(res.tiles[t].after < res.tiles[t].before, "tile %s: MAD %.2f before -> %.2f after" % [t, res.tiles[t].before, res.tiles[t].after])
-	# controls
 	if res.mean.has("step shadow"):
 		res.controls["step"] = {"lit": res.mean["step lit"], "shadow": res.mean["step shadow"], "b-toon": res.tiles["b-toon"].get("step", -1.0)}
 		_check(res.mean["step shadow"] > MEAN_MAX, "CONTROL step (MToon's step for G): the chart's shadow dE00 comes back, mean %.2f > %.1f (lit %.2f: N.L there is 0.856, where both are 1); b-toon MAD %.2f against after's %.2f" % [

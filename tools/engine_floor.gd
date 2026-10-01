@@ -26,8 +26,6 @@
 # first; also copied to the desktop as engine-floor-NN by Sheet.publish), then chart_calib.json and
 # chart-calib-sheet.png (chart-calib-NN). --chart-svg loads the SVG into a slug.elf of this run's own
 # for the textured chart tiles (no cache); --sheet-only re-measures the renders already in <dir>.
-# --ramp-control draws the toon-ramp materials with one of the ramp's calibration controls
-# (core/ramp/mtoon_ramp.gdshaderinc; tools/toon_ramp_check.gd reads the runs).
 extends SceneTree
 
 const T = preload("res://addons/sakuragaoka_station/core/three.gd")
@@ -326,12 +324,10 @@ func _tiles() -> void:
 	quit()
 
 
-## The calibration controls of core/ramp/mtoon_ramp.gdshaderinc, by --ramp-control name.
 const RAMP_CONTROLS := {"step": "RAMP_CONTROL_STEP", "nohemi": "RAMP_CONTROL_NO_HEMI", "nopaint": "RAMP_CONTROL_NO_PAINT"}
 
 
-## Every toon-ramp material under root (palette and Slug variants) redrawn with one control's define
-## before the ramp's include; returns how many materials were switched.
+## Toon-ramp materials under root redrawn with a control's define (mtoon_ramp.gdshaderinc); returns the count.
 static func ramp_control(root: Node, which: String) -> int:
 	var define: String = RAMP_CONTROLS[which]
 	var mats := []

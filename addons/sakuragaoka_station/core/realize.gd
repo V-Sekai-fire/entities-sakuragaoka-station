@@ -1,7 +1,5 @@
 # The port's three-shaped scene graph as Godot nodes, batched as src/core/batch2.js batches it
-# (48 m cells near the play area, 200 m beyond 150 m) and shaded with godot-vrm's MToon; a toon
-# material through the original's toon ramp (core/ramp/mtoon_ramp.gdshaderinc: the gradient map,
-# hemisphere light and hand paint, hooked into MToon), an unlit one through plain MToon. MToon
+# (48 m cells near the play area, 200 m beyond 150 m) and shaded with MToon, toon ones through core/ramp/. MToon
 # reads its colour from a texture, so each face's colour is an index into a palette texture carried
 # in UV; CSG keeps UV through a union where it would drop vertex colour, and every closed solid of
 # a cell goes through CSG. A cell keeps the union only when it comes out no larger than its solids.
@@ -468,18 +466,15 @@ func _mat_key(m) -> String:
 			_ramp_key(m)]
 
 
-## A toon material's hand-paint amount: materials.js toon()'s `paint` (0.05 unless given), carried in
-## user_data.toon; a toon material made elsewhere has no paint patch in the original, so 0.
+## materials.js toon()'s paint (0.05 unless given); other toon materials have no paint patch, so 0.
 static func _ramp_paint(m) -> float:
 	return float(m.user_data.get("toon", {}).get("paint", 0.0))
 
 
-## three.js flips a double-sided material's normal on back faces; the sakura NOFLIP materials do not.
 static func _ramp_flip(m) -> bool:
 	return not bool(m.user_data.get("sakura", {}).get("noFlip", false))
 
 
-## The ramp's per-material uniforms in the batch and material key, as batch2.js's signature keys paint.
 static func _ramp_key(m) -> String:
 	if m.type != "toon":
 		return ""
@@ -521,9 +516,8 @@ func _append(key: String, a: Array, xform: Transform3D) -> void:
 	b.idx.append_array(out)
 
 
-## MToon for a material: the palette is both its lit and its shade texture; a toon material is drawn
-## with the toon ramp variant (core/ramp/), an unlit ("basic") material with plain MToon, showing the
-## palette as emission with its lit and shade colours black.
+## MToon for a material: the palette is both its lit and its shade texture; an unlit ("basic")
+## material shows the palette as emission with its lit and shade colours black.
 func _mtoon(m) -> ShaderMaterial:
 	var k := _mat_key(m)
 	if _materials.has(k):
@@ -548,8 +542,7 @@ func _mtoon(m) -> ShaderMaterial:
 
 
 ## MToon for a material whose canvas texture Slug draws: the texture at the geometry's own UVs,
-## tinted per vertex (COLOR), shaded by the toon ramp the Slug variants include; an unlit material
-## shows it as emission.
+## tinted per vertex (COLOR); an unlit material shows it as emission.
 func _slug_mtoon(m) -> ShaderMaterial:
 	var k := _mat_key(m) + "|" + _slug_mat_key(m)
 	if _materials.has(k):
@@ -596,9 +589,6 @@ func _toon_params(sm: ShaderMaterial, m) -> void:
 	elif m.emissive != Color(0, 0, 0):
 		sm.set_shader_parameter("_EmissionColor", (m.emissive * m.emissive_intensity).linear_to_srgb())
 	if m.type == "toon":
-		# the toon ramp's own uniforms; it has no MToon rim, matcap or shade colour (the sakura rim glow
-		# is the original's sakura/materials.js extension, not yet ported). _ShadeColor and the step
-		# above stay for the ramp's MToon-step control.
 		sm.set_shader_parameter("ramp_paint", _ramp_paint(m))
 		sm.set_shader_parameter("ramp_flip", _ramp_flip(m))
 	if m.user_data.get("overlay", false):
