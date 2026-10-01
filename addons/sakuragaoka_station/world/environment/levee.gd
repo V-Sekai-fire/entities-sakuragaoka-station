@@ -86,7 +86,7 @@ static func build_levee(ctx, _C, tx) -> Dictionary:
 			if not near:
 				k.box(len, 0.01, 0.11, line_mat, [x + len / 2.0, PATH_Y + 0.006, z])
 			x += len + (0.3 + r.f() * 0.5 if r.f() < 0.25 else 0.02)
-	var mark = ctx.tex.draw(512, 128)
+	var mark = ctx.tex.draw(512, 128, null, {"key": "env-r5-mark"})
 	var mm = ctx.mat.decal("#ffffff", {"map": mark, "paint": 0.02})
 	for e in [[-30.0, -PI / 2.0], [72.0, PI / 2.0]]:
 		var p = k.plane(2.4, 0.6, mm, [e[0], PATH_Y + 0.007, R5.z], [-PI / 2.0, 0, e[1]])
@@ -208,7 +208,7 @@ static func build_levee(ctx, _C, tx) -> Dictionary:
 		ctx.physics.addBox(b.x, z, 1.9, 0.62, PI, y, y + 0.95)
 		bench_info.append({"x": b.x, "z": z, "y": y + 0.44, "rotY": PI, "len": 1.78})
 	# ------------------------------------------------------------ promenade signboard at the top of the R2 stairs
-	var board = ctx.tex.draw(1024, 512)
+	var board = ctx.tex.draw(1024, 512, null, {"key": "env-levee-sign"})
 	var sx := -8.9
 	var sz: float = R5.z - R5.halfW + 0.35
 	var sg = k.group([sx, PATH_Y, sz], 0.08)
@@ -245,9 +245,9 @@ static func build_levee(ctx, _C, tx) -> Dictionary:
 		var pg = k.group([e[0], PATH_Y, z], 0)
 		var kp = ctx.kit(pg)
 		kp.box(0.16, 0.8, 0.16, ctx.mat.toon("#e9e7e0", {"paint": 0.05}), [0, 0.4, 0])
-		kp.plane(0.14, 0.28, ctx.mat.toon("#ffffff", {"map": ctx.tex.draw(128, 256), "paint": 0.02}), [0, 0.52, 0.081])
+		kp.plane(0.14, 0.28, ctx.mat.toon("#ffffff", {"map": ctx.tex.draw(128, 256, null, {"key": "env-km-" + e[1]}), "paint": 0.02}), [0, 0.52, 0.081])
 		ctx.physics.addCylinder(e[0], z, 0.12, PATH_Y, PATH_Y + 0.8)
-	var notice = ctx.tex.draw(256, 192)
+	var notice = ctx.tex.draw(256, 192, null, {"key": "env-notice"})
 	var nx := 43.2
 	var nz: float = R5.z + R5.halfW - 0.18
 	var ng = k.group([nx, PATH_Y, nz], -0.1)

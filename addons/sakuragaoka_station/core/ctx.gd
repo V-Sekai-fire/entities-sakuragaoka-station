@@ -133,10 +133,10 @@ class Textures extends RefCounted:
 	func finish(c, _opts = {}) -> T.Tex:
 		return _stub(int(c.canvas.width), int(c.canvas.height))
 
-	func sign(opts = null, _b = null, _c = null, _d = null) -> T.Tex:
-		var t := _stub(256, 64)
-		if opts is Dictionary:
-			t.user_data["sign"] = opts
+	func sign(opts = {}, _b = null, _c = null, _d = null) -> T.Tex:
+		var o: Dictionary = opts if opts is Dictionary else {}
+		var t := draw(int(o.get("w", 512)), int(o.get("h", 128)), null, {"key": o.get("key")})
+		t.user_data["sign"] = o
 		return t
 
 	static func measure(text: String, size: float) -> float:

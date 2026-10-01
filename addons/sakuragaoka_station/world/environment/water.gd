@@ -198,7 +198,7 @@ static func build_bridge(ctx, C, tx) -> void:
 			k.cyl(0.07, 0.09, 6.2, ctx.mat.toon("#8f979c"), [xr + s * 0.1, top + 3.1, zlmp], null, 8)
 			k.box(0.9, 0.1, 0.12, ctx.mat.toon("#8f979c"), [xr - s * 0.4, top + 6.1, zlmp])
 			k.box(0.5, 0.12, 0.26, ctx.mat.toon("#e9ecef"), [xr - s * 0.8, top + 6.02, zlmp])
-	var pm = ctx.mat.toon("#ffffff", {"map": ctx.tex.draw(256, 128), "paint": 0.02})
+	var pm = ctx.mat.toon("#ffffff", {"map": ctx.tex.draw(256, 128, null, {"key": "env-bridge-plate"}), "paint": 0.02})
 	for s in [-1, 1]:
 		var pl = k.plane(0.44, 0.22, pm, [X + s * 4.45, top + 1.1, z0 - 0.3 + 0.281], [0, 0, 0])
 		pl.rotation.y = 0.0

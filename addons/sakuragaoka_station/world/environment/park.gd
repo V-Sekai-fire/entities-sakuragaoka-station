@@ -155,7 +155,7 @@ static func build_park(ctx, C, tx) -> Dictionary:
 			grp.add(m)
 		ctx.physics.addCylinder(tx0, tz0, 0.2, y, y + 3)
 	# ------------------------------------------------------------ entrance sign + low log fence along R3
-	var sign_tex = ctx.tex.draw(512, 256)
+	var sign_tex = ctx.tex.draw(512, 256, null, {"key": "env-park-sign"})
 	var ex := 68.6
 	var ez := -7.3
 	var ey: float = C.terrain_h(ex, ez)
@@ -236,7 +236,7 @@ static func build_park(ctx, C, tx) -> Dictionary:
 	k.boxb(2.7, 0.08, 2.1, ctx.mat.toon("#7b8691", {"paint": 0.04}), [shx, shy + 2.1, shz], [0.08, 0, 0])
 	k.box(0.9, 1.8, 0.03, ctx.mat.toon("#8f98a0"), [shx + 0.4, shy + 0.95, shz + 0.91])
 	ctx.physics.addBox(shx, shz, 2.5, 1.9, 0, shy, shy + 2.3)
-	var at = ctx.tex.sign()
+	var at = ctx.tex.sign({"w": 512, "h": 160, "key": "env-allot-sign"})
 	var asx: float = A.x1 - 0.5
 	var asz: float = A.z0 - 1.2
 	var asy: float = L.height_at(asx, asz)
@@ -252,7 +252,7 @@ static func build_park(ctx, C, tx) -> Dictionary:
 		var wz := -11.9
 		k.boxb(1.6, 0.12, 0.16, stop, [wx, L.height_at(wx, wz), wz])
 		k.box(0.08, 0.01, 4.6, line_y, [wx + 1.7, L.height_at(wx, wz) + 0.006, -9.4])
-	var pk = ctx.tex.sign()
+	var pk = ctx.tex.sign({"w": 512, "h": 256, "key": "env-parking-sign"})
 	var ppx := -77.4
 	var ppz := -6.9
 	var ppy: float = L.height_at(ppx, ppz)
@@ -260,7 +260,7 @@ static func build_park(ctx, C, tx) -> Dictionary:
 	k.plane(0.9, 0.45, ctx.mat.toon("#ffffff", {"map": pk, "paint": 0.02}), [ppx, ppy + 1.6, ppz + 0.05])
 	k.box(0.92, 0.47, 0.02, ctx.mat.toon("#e9ecee"), [ppx, ppy + 1.6, ppz + 0.035])
 	ctx.physics.addCylinder(ppx, ppz, 0.08, ppy, ppy + 2)
-	var sale = ctx.tex.sign()
+	var sale = ctx.tex.sign({"w": 512, "h": 256, "key": "env-sale-sign"})
 	var vx := -68.5
 	var vz := -7.0
 	var vy: float = L.height_at(vx, vz)
