@@ -50,11 +50,12 @@ vec3 ramp_hemisphere(float up) {
 #define RAMP_VERTEX ramp_world = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz; ramp_normal = normalize(transpose(inverse(mat3(MODEL_MATRIX))) * NORMAL); RAMP_VERTEX_EXTRA
 
 #define METALLIC RAMP_FRAGMENT float ramp_unused_metallic
+#define RAMP_GEOMETRIC_NORMAL NORMAL = mat3(VIEW_MATRIX) * normalize(ramp_normal) * (FRONT_FACING ? 1.0 : -1.0);
 #ifdef RAMP_SAKURA
 #define RAMP_FRAGMENT RAMP_SAKURA_FRAGMENT
 #else
 #define RAMP_VERTEX_EXTRA
-#define RAMP_FRAGMENT { vec3 ramp_nw = normalize(ramp_normal) * (ramp_flip && !FRONT_FACING ? -1.0 : 1.0); vec3 ramp_albedo = RAMP_ALBEDO; ALBEDO = ramp_albedo; EMISSION = texture(_EmissionMap, mainUv).rgb * _EmissionColor.rgb * _EmissionMultiplier RAMP_HEMI; ramp_n = mat3(VIEW_MATRIX) * ramp_nw; lit = vec4(0.0); shade = vec4(0.0); rim = vec3(0.0); }
+#define RAMP_FRAGMENT { vec3 ramp_nw = normalize(ramp_normal) * (ramp_flip && !FRONT_FACING ? -1.0 : 1.0); vec3 ramp_albedo = RAMP_ALBEDO; ALBEDO = ramp_albedo; EMISSION = texture(_EmissionMap, mainUv).rgb * _EmissionColor.rgb * _EmissionMultiplier RAMP_HEMI; ramp_n = mat3(VIEW_MATRIX) * ramp_nw; lit = vec4(0.0); shade = vec4(0.0); rim = vec3(0.0); RAMP_GEOMETRIC_NORMAL }
 #endif
 #ifdef RAMP_CONTROL_NO_PAINT
 #define RAMP_ALBEDO lit.rgb
