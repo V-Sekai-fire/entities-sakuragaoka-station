@@ -29,13 +29,17 @@ const FAR_CELL := 200.0
 const FAR_R := 150.0
 const WELD := 10000.0
 const PALETTE := 512
+## Baked canvas triangles one object may add, its instances counted (a MultiMesh of cards adds its
+## card's triangles times its instance count); past it the object's texture is drawn by Slug
+## instead, which shows the same vector content on the original geometry's own triangles.
+const BAKE_TRI_BUDGET := 4096
 const SHADE := Color(0.72, 0.68, 0.82)
 
 var stats := {"meshes": 0, "solids": 0, "surfaces": 0, "single": 0, "instanced": 0, "skipped": 0,
 		"held": 0, "blob": 0, "batches": 0, "csg_in": 0, "csg_out": 0, "csg_failed": 0, "csg_raw": 0,
 		"manifold": 0, "open": 0, "colours": 0, "instance_tints_dropped": 0,
 		"slugged": 0, "fallback": 0, "mode_mesh": 0, "mode_slug": 0, "mode_mean": 0, "baked_cards": 0,
-		"baked_decals": 0, "baked_tris": 0, "decal_capped": 0, "ramps": 0}
+		"baked_decals": 0, "baked_tris": 0, "decal_capped": 0, "ramps": 0, "bake_replaced": 0}
 var _root: Node3D
 var _palette := {}
 var _palette_img: Image
@@ -52,6 +56,14 @@ var _slug = null
 var _baked = null
 var _ramps := {}
 var _twins := {}
+## Triangles drawn, by where they come from (instanced ones times their instance count), and per
+## object for the Slug and baked categories; in stats as "tris" and "tri_objects" after finish()
+## (tools/tri_budget.gd prints them).
+var tris := {}
+var tri_objects := {}
+## Instanced bakes: [object, texture key, triangles an instance, instances].
+var tri_instanced := []
+var _mult := 1
 
 
 func realize(ctx, root: Node3D) -> void:
@@ -78,6 +90,23 @@ func realize_part(objs: Array, root: Node3D) -> void:
 		_walk(o, false)
 
 
+func _tally(cat: String, n: int, o = null) -> void:
+	tris[cat] = tris.get(cat, 0) + n
+	if o != null:
+		var k := "%s|%s" % [cat, _path(o)]
+		tri_objects[k] = tri_objects.get(k, 0) + n
+
+
+## An object's name with up to two ancestors', for the triangle report.
+static func _path(o) -> String:
+	var parts := PackedStringArray()
+	var n = o
+	while n != null and parts.size() < 3:
+		parts.insert(0, n.name if n.name != "" else "?")
+		n = n.parent()
+	return "/".join(parts)
+
+
 func finish() -> void:
 	_palette_tex.update(_palette_img)
 	if _baked != null:
@@ -98,10 +127,12 @@ func finish() -> void:
 			stats.csg_failed += 1 if surfaces.is_empty() else 0
 			stats.csg_raw += 0 if surfaces.is_empty() else 1
 			stats.csg_out += e[2]
+			_tally("palette CSG cells kept raw", e[2])
 			for s in comb.get_children():
 				_append(e[1], s.mesh.surface_get_arrays(0), s.transform)
 		else:
 			stats.csg_out += out
+			_tally("palette CSG unions", out)
 			for a in surfaces:
 				_append(e[1], a, Transform3D.IDENTITY)
 		comb.queue_free()
@@ -126,6 +157,9 @@ func finish() -> void:
 		_root.add_child(mi)
 		stats.batches += 1
 	_batches.clear()
+	stats["tris"] = tris
+	stats["tri_objects"] = tri_objects
+	stats["tri_instanced"] = tri_instanced
 
 
 func _walk(o, alone: bool) -> void:
@@ -183,6 +217,7 @@ func _mesh(o, alone: bool) -> void:
 		_solid(o, r, key)
 	else:
 		_append(key, r.a, o.matrix_world)
+		_tally("palette open surfaces", _tri_count(r.a))
 		stats.surfaces += 1
 
 
@@ -222,18 +257,25 @@ func _instanced(o) -> void:
 		return
 	var gd := _geo_data(o.geometry)
 	var mesh: ArrayMesh = null
+	var base_tris := 0
 	if md == "mesh":
 		var am := ArrayMesh.new()
-		if not card:
-			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _coloured(gd, gd.idx, _mean_colour(m), gd.cols if m.vertex_colors else null, "g%d" % gd.id).a)
+		if not card and not m.transparent:
+			var ba: Array = _coloured(gd, gd.idx, _mean_colour(m), gd.cols if m.vertex_colors else null, "g%d" % gd.id).a
+			base_tris = _tri_count(ba)
+			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, ba)
 			am.surface_set_material(0, _mtoon(m))
+		_mult = o.count
 		if _bake(o, gd, gd.idx, m, card, am):
 			mesh = am
+			_tally("palette instanced (under decals)", base_tris * o.count, o if base_tris > 0 else null)
+		_mult = 1
 	if mesh == null and (md == "slug" or md == "mesh") and _slug_ok(m, gd):
 		mesh = ArrayMesh.new()
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _slug_arrays(gd, gd.idx, m))
 		mesh.surface_set_material(0, _slug_mtoon(m))
 		stats.slugged += 1
+		_tally("Slug instanced" + (" cards" if card else ""), gd.idx.size() / 3 * o.count, o)
 	if mesh == null and card:
 		stats.held += 1
 		return
@@ -246,6 +288,7 @@ func _instanced(o) -> void:
 		if md != "":
 			stats.fallback += 1
 		mm.mesh = _array_mesh(_coloured(gd, gd.idx, _mean_colour(m), gd.cols if m.vertex_colors else null, "g%d" % gd.id))
+		_tally("palette instanced", gd.idx.size() / 3 * o.count)
 	mm.instance_count = o.count
 	for i in o.count:
 		mm.set_instance_transform(i, o.instance_matrix[i])
@@ -289,11 +332,17 @@ func _single(o, alone: bool = false) -> void:
 		if md == "mesh" and card and _bake(o, gd, gidx, m, true, am if alone else null):
 			continue
 		if md == "mesh" and not card and _bake(o, gd, gidx, m, false, am if alone else null):
+			if m.transparent:
+				# a transparent decal surface: its texture's alpha is its shape, which the baked
+				# triangles already are, so nothing is drawn under them
+				stats.bake_replaced += 1
+				continue
 			md = "under"
 		if (md == "slug" or md == "mesh") and _slug_ok(m, gd):
 			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _slug_arrays(gd, gidx, m))
 			am.surface_set_material(am.get_surface_count() - 1, _slug_mtoon(m))
 			stats.slugged += 1
+			_tally("Slug single surfaces" + (" (cards)" if card else ""), gidx.size() / 3, o)
 			continue
 		if card and md != "":
 			stats.held += 1
@@ -305,6 +354,7 @@ func _single(o, alone: bool = false) -> void:
 		stats.blob += 1 if blob else 0
 		var cols = _blob_cols(g, gd) if blob else (gd.cols if m.vertex_colors else null)
 		var r := _coloured(gd, gidx, colour, cols, "g%d:%d" % [gd.id, start])
+		_tally("palette single surfaces" + (" (under decals)" if md == "under" else ""), _tri_count(r.a), o if md == "under" else null)
 		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, r.a)
 		am.surface_set_material(am.get_surface_count() - 1, _mtoon(m))
 	if am.get_surface_count() == 0:
@@ -529,15 +579,19 @@ static func _wraps(t) -> bool:
 
 
 ## How a material's canvas texture is drawn: "" untextured, else "mesh", "slug" or "mean". The
-## bake's recommendation wins; "mesh" needs a bake without radial paints (else Slug, else mean);
-## with no recommendation a key in the atlas is drawn by Slug.
+## bake's recommendation wins; "mesh" needs a bake without radial paints, and a material without an
+## alpha map or an opacity under 1 (else Slug, else mean); with no recommendation, or another one
+## ("stamp"), a key in the atlas is drawn by Slug.
 func _mode(m) -> String:
 	if m == null or (m.map == null and m.alpha_map == null):
 		return ""
 	var key := _tex_key(m.map if m.map != null else m.alpha_map)
 	var in_atlas := _in_atlas(m.map) or _in_atlas(m.alpha_map)
 	var want: String = _baked.mode(key) if _baked != null and key != "" else ""
-	if want == "mesh":
+	# a bake carries one key's colours and shape: an alpha map (another texture's green) or a
+	# material opacity under 1 cannot be laid on it, so those surfaces are drawn by Slug
+	var bakeable: bool = m.alpha_map == null and not (m.transparent and m.opacity < 0.999)
+	if want == "mesh" and bakeable:
 		var bm = _baked.get_mesh(key)
 		if bm != null and not bm.radial:
 			return "mesh"
@@ -605,6 +659,7 @@ func _slug_batch(o, gd: Dictionary, m) -> void:
 		_batches[key] = {"pos": PackedVector3Array(), "nor": PackedVector3Array(), "uv": PackedVector2Array(),
 				"idx": PackedInt32Array(), "tint": PackedColorArray(), "mat": _slug_mtoon(m)}
 	_append(key, _slug_arrays(gd, gd.idx, m), o.matrix_world)
+	_tally("Slug cards (batched)", gd.idx.size() / 3, o)
 	stats.slugged += 1
 	stats.surfaces += 1
 
@@ -622,13 +677,18 @@ func _bake(o, gd: Dictionary, idx: PackedInt32Array, m, card: bool, am) -> bool:
 		return false
 	var src := {"pos": gd.arrays[Mesh.ARRAY_VERTEX], "nor": gd.nor, "uv": gd.uv, "idx": idx}
 	var xf := Vector4(t.repeat.x, t.repeat.y, t.offset.x, t.offset.y)
+	# the guest stops at the cap: the per-decal cap, or this object's share of the budget per instance
+	var cap := mini(Baked.DECAL_TRI_CAP, BAKE_TRI_BUDGET / maxi(_mult, 1))
+	if cap < 1:
+		stats.decal_capped += 1
+		return false
 	var r: Dictionary
 	if card:
 		# replaced, not overlaid: no lift, and a cutout bake at the card's alpha_test
-		r = _baked.map_decal(_tex_key(t), src, xf, _wraps(t), 0.0, m.alpha_test)
+		r = _baked.map_decal(_tex_key(t), src, xf, _wraps(t), 0.0, m.alpha_test, cap)
 	else:
 		var det := absf(o.matrix_world.basis.determinant())
-		r = _baked.map_decal(_tex_key(t), src, xf, _wraps(t), 1.0 / pow(det, 1.0 / 3.0) if det > 1e-12 else 1.0)
+		r = _baked.map_decal(_tex_key(t), src, xf, _wraps(t), 1.0 / pow(det, 1.0 / 3.0) if det > 1e-12 else 1.0, 0.0, cap)
 	if r.get("capped", false):
 		stats.decal_capped += 1
 		return false
@@ -651,6 +711,9 @@ func _bake(o, gd: Dictionary, idx: PackedInt32Array, m, card: bool, am) -> bool:
 	else:
 		stats.baked_decals += 1
 	stats.baked_tris += r.tri_paint.size()
+	_tally(("baked cards" if card else "baked decals") + (" (instanced)" if _mult > 1 else ""), r.tri_paint.size() * _mult, o)
+	if _mult > 1:
+		tri_instanced.append([_path(o), _tex_key(t), r.tri_paint.size(), _mult])
 	return true
 
 

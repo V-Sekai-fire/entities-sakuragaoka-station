@@ -13,6 +13,7 @@ const Layout = preload("res://addons/sakuragaoka_station/world/layout.gd")
 const SlugAtlas = preload("res://addons/sakuragaoka_station/core/slug/atlas.gd")
 const Baked = preload("res://addons/sakuragaoka_station/core/slug/baked.gd")
 const Pack = preload("res://addons/sakuragaoka_station/core/slug/pack.gd")
+const Realize = preload("res://addons/sakuragaoka_station/core/realize.gd")
 const SandboxUtil = preload("res://addons/sakuragaoka_station/core/slug/sandbox_util.gd")
 const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
@@ -69,8 +70,8 @@ func _on_built(s: Dictionary) -> void:
 	var atlas = SlugAtlas.shared()
 	print("realize: canvas textures: %d surfaces drawn by Slug, %d on the mean-colour fallback; modes mesh %d, slug %d, mean %d" % [
 			s.slugged, s.fallback, s.mode_mesh, s.mode_slug, s.mode_mean])
-	print("realize: baked %d cards, %d decals, %d triangles, %d palette ramps; %d decals over the cap (%d triangles) went to Slug or the mean; atlas %s; pack %s" % [
-			s.baked_cards, s.baked_decals, s.baked_tris, s.ramps, s.decal_capped, Baked.DECAL_TRI_CAP,
+	print("realize: baked %d cards, %d decals, %d triangles, %d palette ramps; %d bakes over budget (%d a decal, %d an object with its instances) went to Slug or the mean; atlas %s; pack %s" % [
+			s.baked_cards, s.baked_decals, s.baked_tris, s.ramps, s.decal_capped, Baked.DECAL_TRI_CAP, Realize.BAKE_TRI_BUDGET,
 			"%d keys, %d layers" % [atlas.keys.size(), atlas.layer_count] if atlas != null else "none",
 			"%s in %d ms %s, binary translation %s" % [Pack.info.get("source", "?"), Pack.info.get("ms", 0), str(Pack.info.get("build", "")),
 			"on" if SandboxUtil.translated else "off (no res://bintr/ library)"] if Pack.shared() != null else "none (%s)" % Pack.reason])

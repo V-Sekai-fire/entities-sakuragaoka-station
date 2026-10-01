@@ -137,8 +137,9 @@ static func face_normal(a: Vector3, b: Vector3, c: Vector3) -> Vector3:
 ##          guest bakes a cutout (composite alpha >= alpha_test opaque, the rest dropped, no overlay),
 ##          as three.js alphaTest draws it.
 ## Returns unindexed triangles in Godot winding: {pos, nor, param (per vertex), tri_paint (per
-## triangle), overlay_from (first overlay triangle)}, or {"capped": true} past DECAL_TRI_CAP.
-func map_decal(key: String, src: Dictionary, xf: Vector4, wrap: bool, lift_scale: float = 1.0, alpha_test: float = 0.0) -> Dictionary:
+## triangle), overlay_from (first overlay triangle)}, or {"capped": true} past cap triangles.
+func map_decal(key: String, src: Dictionary, xf: Vector4, wrap: bool, lift_scale: float = 1.0, alpha_test: float = 0.0,
+		cap: int = DECAL_TRI_CAP) -> Dictionary:
 	var pos: PackedVector3Array = src.pos
 	var v := PackedFloat32Array()
 	v.resize(pos.size() * 3)
@@ -166,7 +167,7 @@ func map_decal(key: String, src: Dictionary, xf: Vector4, wrap: bool, lift_scale
 		f[t + 1] = idx[t + 2]
 		f[t + 2] = idx[t + 1]
 	var r = guest.call_fn("slug_decal", [key, v, nv, uv, f, PackedFloat32Array([xf.x, xf.y, xf.z, xf.w, 1.0 if wrap else 0.0]),
-			PackedFloat32Array([DECAL_LIFT * lift_scale, OVERLAY_LIFT * lift_scale, DECAL_TRI_CAP, alpha_test])])
+			PackedFloat32Array([DECAL_LIFT * lift_scale, OVERLAY_LIFT * lift_scale, cap, alpha_test])])
 	if not (r is Dictionary):
 		return {}
 	if r.get("capped", false):

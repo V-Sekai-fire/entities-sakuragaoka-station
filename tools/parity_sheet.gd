@@ -12,7 +12,10 @@
 #       --before=<dir> --before2=<dir> --after=<dir> --after2=<dir> [--out=<png>]
 # <prefix>_<i>.png are the originals; <dir>/port-view_<i>.png the port renders (realize_check
 # --shots). The *2 arguments are optional; without them the floors read "n/a". --out defaults to
-# <after>/parity-contact-sheet.png; the sheet is also copied to the desktop (Sheet.publish).
+# <after>/parity-contact-sheet.png; the sheet is also copied to the desktop (Sheet.publish) as
+# <topic>-NN.png (--topic, default parity-hammersley). For other comparisons (one port render
+# against another) --names=a,b,c renames the three image columns (default original, HEAD,
+# feat/slug) and --title the sheet.
 extends SceneTree
 
 const Sheet = preload("res://tools/sheet.gd")
@@ -66,6 +69,7 @@ func _make() -> void:
 	var before: String = _a.get("before", "")
 	var after: String = _a.get("after", "")
 	var out: String = _a.get("out", after.path_join("parity-contact-sheet.png"))
+	var names: PackedStringArray = str(_a.get("names", "original,HEAD,feat/slug")).split(",")
 	var rows := []
 	var table := []
 	var i := 0
@@ -83,23 +87,24 @@ func _make() -> void:
 		var fa := _floor(f, f2)
 		table.append([i, fo, fb, fa, mb, ma])
 		rows.append({"view": i, "mb": mb, "ma": ma, "cells": [
-			{"image": o, "label": "view %d original\nfloor orig %s" % [i, fo.text]},
-			{"image": b, "label": "before (HEAD): residual %.1f\nfloor port %s" % [mb, fb.text] if b != null else "(no before)"},
-			{"image": f, "label": "after (feat/slug): residual %.1f (delta %+.1f)\nfloor port %s" % [ma, ma - mb, fa.text]},
-			{"image": Sheet.heat(f, o), "label": "|after - original|\nblack 0, red 85, yellow 170, white 255"}]})
+			{"image": o, "label": "view %d %s\nfloor %s" % [i, names[0], fo.text]},
+			{"image": b, "label": "%s: residual %.1f\nfloor %s" % [names[1], mb, fb.text] if b != null else "(no before)"},
+			{"image": f, "label": "%s: residual %.1f (delta %+.1f)\nfloor %s" % [names[2], ma, ma - mb, fa.text]},
+			{"image": Sheet.heat(f, o), "label": "|%s - %s|\nblack 0, red 85, yellow 170, white 255" % [names[2], names[0]]}]})
 		i += 1
 	rows.sort_custom(func(x, y): return x.ma > y.ma)
 	for r in rows.size():
 		var row: Dictionary = rows[r]
 		var t: Array = table[row.view]
-		row["label"] = "#%d worst: view %d   residual HEAD %.1f -> feat/slug %.1f (delta %+.1f)   floors: orig %s, port %s" % [
-				r + 1, row.view, row.mb, row.ma, row.ma - row.mb, t[1].text.split(" ")[0], t[3].text.split(" ")[0]]
+		row["label"] = "#%d worst: view %d   residual %s %.1f -> %s %.1f (delta %+.1f)   floors: %s %s, %s %s" % [
+				r + 1, row.view, names[1], row.mb, names[2], row.ma, row.ma - row.mb, names[0], t[1].text.split(" ")[0],
+				names[2], t[3].text.split(" ")[0]]
 		row["color"] = Color(1, 0.55, 0.45) if r < 3 else Color(1, 0.95, 0.7)
-	print("parity_sheet: view | floor orig | floor port HEAD | floor port feat/slug | residual HEAD | residual feat/slug")
+	print("parity_sheet: view | floor %s | floor %s | floor %s | residual %s | residual %s" % [names[0], names[1], names[2], names[1], names[2]])
 	for t in table:
 		print("parity_sheet: %d | %s | %s | %s | %.1f | %.1f" % [t[0], t[1].text, t[2].text, t[3].text, t[4], t[5]])
-	var img: Image = await Sheet.render(self, "Hammersley parity 8@-1,-11.4, 1920x1080 (MAD 0..255; floors = same side rendered twice): original | port HEAD | port feat/slug | heat map, worst first",
-			["original (shot.mjs)", "port before (HEAD)", "port after (feat/slug)", "|after - original|"], rows, CELL)
-	for p in Sheet.publish(img, out, "parity-hammersley"):
+	var title: String = _a.get("title", "Hammersley parity 8@-1,-11.4, 1920x1080 (MAD 0..255; floors = same side rendered twice): %s | %s | %s | heat map, worst first" % [names[0], names[1], names[2]])
+	var img: Image = await Sheet.render(self, title, [names[0], names[1], names[2], "|%s - %s|" % [names[2], names[0]]], rows, CELL)
+	for p in Sheet.publish(img, out, _a.get("topic", "parity-hammersley")):
 		print("parity_sheet: %d views, saved %s" % [rows.size(), p])
 	quit()
