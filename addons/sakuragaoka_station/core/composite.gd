@@ -10,8 +10,8 @@ const GLSL := """
 #version 450
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(rgba16f, set = 0, binding = 0) uniform image2D color_image;
-layout(set = 0, binding = 1) uniform sampler2D depth_tex;
-layout(set = 0, binding = 2) uniform sampler2D normal_tex;
+layout(set = 0, binding = 1) uniform ND_SAMPLER depth_tex;
+layout(set = 0, binding = 2) uniform ND_SAMPLER normal_tex;
 layout(set = 0, binding = 3) uniform sampler2D bloom_tex;
 layout(set = 0, binding = 4) uniform sampler2D glow_tex;
 layout(push_constant, std430) uniform Params {
@@ -31,17 +31,45 @@ layout(push_constant, std430) uniform Params {
 
 const vec3 LINE = vec3(0.0272, 0.0203, 0.0513);
 
+#ifdef ND_MS
+int nd_sample(ivec2 c) {
+	int n = min(textureSamples(depth_tex), 8);
+	float d[8];
+	for (int i = 0; i < n; i++) {
+		d[i] = texelFetch(depth_tex, c, i).r;
+	}
+	int best = 0;
+	int votes = 0;
+	for (int i = 0; i < n; i++) {
+		int v = 0;
+		for (int j = 0; j < n; j++) {
+			v += abs(d[i] - d[j]) <= 0.01 * max(d[i], d[j]) ? 1 : 0;
+		}
+		if (v > votes || (v == votes && d[i] > d[best])) {
+			votes = v;
+			best = i;
+		}
+	}
+	return best;
+}
+#else
+int nd_sample(ivec2 c) {
+	return 0;
+}
+#endif
+
 float lin_depth(ivec2 c) {
 	c = clamp(c, ivec2(0), ivec2(p.raster) - 1);
-	return p.depth_b / (texelFetch(depth_tex, c, 0).r + p.depth_a);
+	return p.depth_b / (texelFetch(depth_tex, c, nd_sample(c)).r + p.depth_a);
 }
 
 vec3 nrm(ivec2 c) {
 	c = clamp(c, ivec2(0), ivec2(p.raster) - 1);
-	if (texelFetch(depth_tex, c, 0).r == 0.0) {
+	int s = nd_sample(c);
+	if (texelFetch(depth_tex, c, s).r == 0.0) {
 		return vec3(0.0, 0.0, 1.0);
 	}
-	return normalize(texelFetch(normal_tex, c, 0).xyz * 2.0 - 1.0);
+	return normalize(texelFetch(normal_tex, c, s).xyz * 2.0 - 1.0);
 }
 
 float lum(vec3 c) {
@@ -157,6 +185,8 @@ const CONTEXT := &"sakuragaoka_composite"
 var _rd: RenderingDevice
 var _shader := RID()
 var _pipeline := RID()
+var _shader_ms := RID()
+var _pipeline_ms := RID()
 var _bloom_shader := RID()
 var _bloom_pipeline := RID()
 var _nearest := RID()
@@ -179,7 +209,7 @@ func _init() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE and _rd != null and _shader.is_valid():
-		for r in [_nearest, _linear, _bloom_shader, _shader]:
+		for r in [_nearest, _linear, _bloom_shader, _shader, _shader_ms]:
 			_rd.free_rid(r)
 
 
@@ -197,11 +227,13 @@ func _create() -> void:
 	_rd = RenderingServer.get_rendering_device()
 	if _rd == null:
 		return
-	_shader = _compile(GLSL)
+	_shader = _compile(GLSL.replace("#version 450", "#version 450\n#define ND_SAMPLER sampler2D"))
+	_shader_ms = _compile(GLSL.replace("#version 450", "#version 450\n#define ND_SAMPLER sampler2DMS\n#define ND_MS"))
 	_bloom_shader = _compile(BLOOM_GLSL)
-	if not _shader.is_valid() or not _bloom_shader.is_valid():
+	if not _shader.is_valid() or not _shader_ms.is_valid() or not _bloom_shader.is_valid():
 		return
 	_pipeline = _rd.compute_pipeline_create(_shader)
+	_pipeline_ms = _rd.compute_pipeline_create(_shader_ms)
 	_bloom_pipeline = _rd.compute_pipeline_create(_bloom_shader)
 	_nearest = _rd.sampler_create(RDSamplerState.new())
 	var ls := RDSamplerState.new()
@@ -271,6 +303,8 @@ func _render_callback(type: int, data: RenderData) -> void:
 	var qy := Vector2(0.0, 1.0 / quarter.y)
 	var sxd := Vector2(1.0 / sixteenth.x, 0.0)
 	var syd := Vector2(0.0, 1.0 / sixteenth.y)
+	var ms := buffers.get_msaa_3d() != RenderingServer.VIEWPORT_MSAA_DISABLED
+	var shader := _shader_ms if ms else _shader
 	for view in views:
 		var color := buffers.get_color_layer(view)
 		var b := {}
@@ -284,15 +318,15 @@ func _render_callback(type: int, data: RenderData) -> void:
 		_pass(b.b3, b.b4, sixteenth, syd, 1.0)
 		_pass(b.b4, b.b3, sixteenth, sxd * 1.6, 1.0)
 		_pass(b.b3, b.b4, sixteenth, syd * 1.6, 1.0)
-		var set := UniformSetCacheRD.get_cache(_shader, 0, [
+		var set := UniformSetCacheRD.get_cache(shader, 0, [
 				_uniform(RenderingDevice.UNIFORM_TYPE_IMAGE, 0, [color]),
-				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 1, [_nearest, buffers.get_depth_layer(view)]),
-				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 2,
-						[_nearest, buffers.get_texture_slice("forward_clustered", "normal_roughness", view, 0, 1, 1)]),
+				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 1, [_nearest, buffers.get_depth_layer(view, ms)]),
+				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 2, [_nearest, buffers.get_texture_slice("forward_clustered",
+						"normal_roughness_msaa" if ms else "normal_roughness", view, 0, 1, 1)]),
 				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 3, [_linear, b.b2]),
 				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 4, [_linear, b.b4])])
 		var list := _rd.compute_list_begin()
-		_rd.compute_list_bind_compute_pipeline(list, _pipeline)
+		_rd.compute_list_bind_compute_pipeline(list, _pipeline_ms if ms else _pipeline)
 		_rd.compute_list_bind_uniform_set(list, set, 0)
 		_rd.compute_list_set_push_constant(list, bytes, bytes.size())
 		_rd.compute_list_dispatch(list, (size.x + 7) / 8, (size.y + 7) / 8, 1)
