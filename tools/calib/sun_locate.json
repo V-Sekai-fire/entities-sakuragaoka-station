@@ -1,0 +1,3882 @@
+{
+  "inputs": {
+    "oracle": "release oracle-4112f57-h8 (V-Sekai-fire/entities-sakuragaoka-station): the original at upstream 4112f57, sphere-Hammersley 8@-1,-11.4, 1920x1080, --only environment,station,plaza,sakura; local copies pixel-identical to the release PNGs",
+    "oracle_sha256_of_files_read": {
+      "original_0.png": "f84ed0a69acf456261e5ab6e4edfc17f7cb80b40fb43f39f77fe44deedf67952",
+      "original_1.png": "065beca03128bac2d4307e53ffcb986f3ccd30782d67cc07b22ea1d5c58c82dc",
+      "original_2.png": "2a48a0ec17110f5792814d483b2d4624f9d73127d763beb056fe9420b58120a7",
+      "original_3.png": "9f8349da94436ab8eabe087e8bba4f27da74b1a2934414bf3d70e7b1d27bb71b",
+      "original_4.png": "40a777ba414e9c528bc4b7bebda9553f46a18bd791150248dff74410ab73639e",
+      "original_5.png": "538014d794ff9727200799e83fbccdad6c9311971d31c03d6ea11a8cc4b9cd2c",
+      "original_6.png": "750efc896c5fff47a3297098fb9a95181a50455e5f82ac5b22835bceee33f09d",
+      "original_7.png": "d2c0c5f496db99e5a9e96c4f1259a4ae14859306bbc171f64bc975a729fbf55a"
+    },
+    "port_images": "tools/sun_locate.gd's beauty pass, pixel-identical to tools/realize_check.gd --hammersley=8@-1,-11.4 renders at this commit",
+    "control": "tools/sun_locate.gd --sun-yaw=2.0: the port's light, sky disc and light leak turned about +Y",
+    "godot": "4.7.2-stable (official)",
+    "renderer": "Forward+ (Vulkan), the analysis as GLSL compute on a local RenderingDevice",
+    "bootstrap_replicates": 200
+  },
+  "about": "Where the sun is in the rendered images of the three.js original (oracle-4112f57-h8) and the Godot port, measured from pixels: tools/sun_locate.gd (port buffers and --analyze), tools/sun_locate_gpu.gd (GLSL compute), tools/sun_locate_fit.gd, tools/oracle/sun_cams.mjs (the original's live cameras and sun). Azimuth is the shadow's direction atan2(-Lz, -Lx) in degrees, elevation asin(Ly), L pointing at the sun.",
+  "SUN_DIR": {
+    "code": [
+      -0.776,
+      0.517,
+      0.362
+    ],
+    "normalized": [
+      -0.775802552700043,
+      0.516868472099304,
+      0.361907869577408
+    ],
+    "azimuth_deg": -25.0088081359863,
+    "elevation_deg": 31.1224327087402
+  },
+  "live_lights": {
+    "port": {
+      "to_sun": [
+        -0.775802552700043,
+        0.516868531703949,
+        0.36190789937973
+      ],
+      "azimuth_deg": -25.008810043335,
+      "elevation_deg": 31.1224327087402
+    },
+    "original": {
+      "to_sun": [
+        -0.775802612304688,
+        0.516868472099304,
+        0.36190789937973
+      ],
+      "azimuth_deg": -25.0088081359863,
+      "elevation_deg": 31.122428894043
+    },
+    "control": {
+      "to_sun": [
+        -0.762699544429779,
+        0.516868531703949,
+        0.388762593269348
+      ],
+      "azimuth_deg": -27.0088119506836,
+      "elevation_deg": 31.1224327087402
+    }
+  },
+  "cameras": [
+    {
+      "view": 0,
+      "cam": [
+        -1.0,
+        -11.4,
+        0.0,
+        -85.0
+      ],
+      "eye_original": [
+        -1.0,
+        1.52,
+        -11.4
+      ],
+      "eye_port": [
+        -1.0,
+        1.51999998092651,
+        -11.3999996185303
+      ],
+      "eye_diff_m": 0.0,
+      "axes_diff_deg": 0.00000341509458500638,
+      "fov_aspect_near_far_original": [
+        58.0,
+        1.77777777777778,
+        0.1,
+        2500.0
+      ],
+      "fov_near_far_port": [
+        58.0,
+        0.100000001490116,
+        2500.0
+      ],
+      "projection_p00_p11_original": [
+        1.01477686234018,
+        1.80404775527142
+      ],
+      "projection_p00_p11_port": [
+        1.01477694511414,
+        1.80404782295227
+      ],
+      "depth_vs_original": {
+        "pixels": 2073600,
+        "median_m": 0.000169244913409336,
+        "p95_m": 0.00347548665286645
+      }
+    },
+    {
+      "view": 1,
+      "cam": [
+        -1.0,
+        -11.4,
+        180.0,
+        -30.0
+      ],
+      "eye_original": [
+        -1.0,
+        1.52,
+        -11.4
+      ],
+      "eye_port": [
+        -1.0,
+        1.51999998092651,
+        -11.3999996185303
+      ],
+      "eye_diff_m": 0.0,
+      "axes_diff_deg": 0.00000500895613097533,
+      "fov_aspect_near_far_original": [
+        58.0,
+        1.77777777777778,
+        0.1,
+        2500.0
+      ],
+      "fov_near_far_port": [
+        58.0,
+        0.100000001490116,
+        2500.0
+      ],
+      "projection_p00_p11_original": [
+        1.01477686234018,
+        1.80404775527142
+      ],
+      "projection_p00_p11_port": [
+        1.01477694511414,
+        1.80404782295227
+      ],
+      "depth_vs_original": {
+        "pixels": 2073600,
+        "median_m": 0.000140114917363941,
+        "p95_m": 0.000493582069989551
+      }
+    },
+    {
+      "view": 2,
+      "cam": [
+        -1.0,
+        -11.4,
+        90.0,
+        0.0
+      ],
+      "eye_original": [
+        -1.0,
+        1.52,
+        -11.4
+      ],
+      "eye_port": [
+        -1.0,
+        1.51999998092651,
+        -11.3999996185303
+      ],
+      "eye_diff_m": 0.0,
+      "axes_diff_deg": 0.00000250447806548767,
+      "fov_aspect_near_far_original": [
+        58.0,
+        1.77777777777778,
+        0.1,
+        2500.0
+      ],
+      "fov_near_far_port": [
+        58.0,
+        0.100000001490116,
+        2500.0
+      ],
+      "projection_p00_p11_original": [
+        1.01477686234018,
+        1.80404775527142
+      ],
+      "projection_p00_p11_port": [
+        1.01477694511414,
+        1.80404782295227
+      ],
+      "depth_vs_original": {
+        "pixels": 1695833,
+        "median_m": 0.000191956633610178,
+        "p95_m": 3.32264830807806
+      }
+    },
+    {
+      "view": 3,
+      "cam": [
+        -1.0,
+        -11.4,
+        270.0,
+        9.59406822686046
+      ],
+      "eye_original": [
+        -1.0,
+        1.52,
+        -11.4
+      ],
+      "eye_port": [
+        -1.0,
+        1.51999998092651,
+        -11.3999996185303
+      ],
+      "eye_diff_m": 0.0,
+      "axes_diff_deg": 0.0000315968096062233,
+      "fov_aspect_near_far_original": [
+        58.0,
+        1.77777777777778,
+        0.1,
+        2500.0
+      ],
+      "fov_near_far_port": [
+        58.0,
+        0.100000001490116,
+        2500.0
+      ],
+      "projection_p00_p11_original": [
+        1.01477686234018,
+        1.80404775527142
+      ],
+      "projection_p00_p11_port": [
+        1.01477694511414,
+        1.80404782295227
+      ],
+      "depth_vs_original": {
+        "pixels": 1348297,
+        "median_m": 0.000338296009553368,
+        "p95_m": 2.13834672094338
+      }
+    },
+    {
+      "view": 4,
+      "cam": [
+        -1.0,
+        -11.4,
+        45.0,
+        19.4712206344907
+      ],
+      "eye_original": [
+        -1.0,
+        1.52,
+        -11.4
+      ],
+      "eye_port": [
+        -1.0,
+        1.51999998092651,
+        -11.3999996185303
+      ],
+      "eye_diff_m": 0.0,
+      "axes_diff_deg": 0.0000193186919849864,
+      "fov_aspect_near_far_original": [
+        58.0,
+        1.77777777777778,
+        0.1,
+        2500.0
+      ],
+      "fov_near_far_port": [
+        58.0,
+        0.100000001490116,
+        2500.0
+      ],
+      "projection_p00_p11_original": [
+        1.01477686234018,
+        1.80404775527142
+      ],
+      "projection_p00_p11_port": [
+        1.01477694511414,
+        1.80404782295227
+      ],
+      "depth_vs_original": {
+        "pixels": 1704165,
+        "median_m": 0.000246932427036519,
+        "p95_m": 1.06978591353472
+      }
+    },
+    {
+      "view": 5,
+      "cam": [
+        -1.0,
+        -11.4,
+        225.0,
+        30.0
+      ],
+      "eye_original": [
+        -1.0,
+        1.52,
+        -11.4
+      ],
+      "eye_port": [
+        -1.0,
+        1.51999998092651,
+        -11.3999996185303
+      ],
+      "eye_diff_m": 0.0,
+      "axes_diff_deg": 0.00000418261973051666,
+      "fov_aspect_near_far_original": [
+        58.0,
+        1.77777777777778,
+        0.1,
+        2500.0
+      ],
+      "fov_near_far_port": [
+        58.0,
+        0.100000001490116,
+        2500.0
+      ],
+      "projection_p00_p11_original": [
+        1.01477686234018,
+        1.80404775527142
+      ],
+      "projection_p00_p11_port": [
+        1.01477694511414,
+        1.80404782295227
+      ],
+      "depth_vs_original": {
+        "pixels": 801242,
+        "median_m": 0.05548053304129,
+        "p95_m": 1.37616933090768
+      }
+    },
+    {
+      "view": 6,
+      "cam": [
+        -1.0,
+        -11.4,
+        135.0,
+        41.8103148957786
+      ],
+      "eye_original": [
+        -1.0,
+        1.52,
+        -11.4
+      ],
+      "eye_port": [
+        -1.0,
+        1.51999998092651,
+        -11.3999996185303
+      ],
+      "eye_diff_m": 0.0,
+      "axes_diff_deg": 0.0000169038577259736,
+      "fov_aspect_near_far_original": [
+        58.0,
+        1.77777777777778,
+        0.1,
+        2500.0
+      ],
+      "fov_near_far_port": [
+        58.0,
+        0.100000001490116,
+        2500.0
+      ],
+      "projection_p00_p11_original": [
+        1.01477686234018,
+        1.80404775527142
+      ],
+      "projection_p00_p11_port": [
+        1.01477694511414,
+        1.80404782295227
+      ],
+      "depth_vs_original": {
+        "pixels": 1257392,
+        "median_m": 0.251414675735281,
+        "p95_m": 1.7703000229956
+      }
+    },
+    {
+      "view": 7,
+      "cam": [
+        -1.0,
+        -11.4,
+        315.0,
+        56.4426902380793
+      ],
+      "eye_original": [
+        -1.0,
+        1.52,
+        -11.4
+      ],
+      "eye_port": [
+        -1.0,
+        1.51999998092651,
+        -11.3999996185303
+      ],
+      "eye_diff_m": 0.0,
+      "axes_diff_deg": 0.0000137666880494757,
+      "fov_aspect_near_far_original": [
+        58.0,
+        1.77777777777778,
+        0.1,
+        2500.0
+      ],
+      "fov_near_far_port": [
+        58.0,
+        0.100000001490116,
+        2500.0
+      ],
+      "projection_p00_p11_original": [
+        1.01477686234018,
+        1.80404775527142
+      ],
+      "projection_p00_p11_port": [
+        1.01477694511414,
+        1.80404782295227
+      ],
+      "depth_vs_original": {
+        "pixels": 1889831,
+        "median_m": 0.125779358381529,
+        "p95_m": 0.88565713351452
+      }
+    }
+  ],
+  "verdict": "Same sun. Both images put the sun within 0.5 deg of SUN_DIR and of each other, by the post shadows and, independently, by the toon bands; the 2 deg control is detected and fails the gate, and the original measured twice agrees with itself. No axis flip, sign slip or wrong vector: the remaining shadow differences belong to the shadow-map setup (see shadow_setup).",
+  "gates": {
+    "post shadows": {
+      "oracle_under_0.5deg": true,
+      "port_under_0.5deg": true,
+      "oracle_vs_port_under_0.5deg": true,
+      "oracle_bootstrap_p68_under_0.5deg": true,
+      "port_bootstrap_p68_under_0.5deg": true,
+      "control_detected_2deg_pm_0.5": true,
+      "control_fails_0.5deg_gate": true,
+      "original_floor_under_0.05deg": true
+    },
+    "toon bands": {
+      "oracle_under_0.5deg": true,
+      "port_under_0.5deg": true,
+      "oracle_vs_port_under_0.5deg": true,
+      "oracle_bootstrap_p68_under_0.5deg": true,
+      "port_bootstrap_p68_under_0.5deg": true,
+      "control_detected_2deg_pm_0.5": true,
+      "control_fails_0.5deg_gate": true,
+      "original_floor_under_0.05deg": true
+    }
+  },
+  "pairs": {
+    "post shadows": {
+      "oracle_vs_port_deg": 0.167815440050326,
+      "original_floor_oracle_vs_rerender_deg": 0.0,
+      "control_vs_port_deg": 1.70927372953761,
+      "control_shadow_azimuth_turn_deg": -1.99480056762695,
+      "control_elevation_change_deg": -0.07958984375,
+      "control_vs_oracle_deg": 1.77293696229595
+    },
+    "toon bands": {
+      "oracle_vs_port_deg": 0.0899681588819071,
+      "original_floor_oracle_vs_rerender_deg": 0.00488374825728943,
+      "control_vs_port_deg": 1.74420321023135,
+      "control_shadow_azimuth_turn_deg": -2.0166015625,
+      "control_elevation_change_deg": -0.244138717651367,
+      "control_vs_oracle_deg": 1.67832059287959
+    }
+  },
+  "table": [
+    {
+      "image": "oracle",
+      "method": "post shadows",
+      "azimuth_deg": -24.9566089200126,
+      "elevation_deg": 31.01953125,
+      "angle_to_SUN_DIR_deg": 0.11219219371874,
+      "angle_to_live_light_deg": 0.112190446150808,
+      "live_light": "original",
+      "bootstrap_angle_p68_deg": 0.137815274864073,
+      "bootstrap_angle_p95_deg": 0.746388184821037,
+      "residual_se_az_el_deg": [
+        0.00842334110272811,
+        0.0259962604721146
+      ]
+    },
+    {
+      "image": "oracle",
+      "method": "toon bands",
+      "azimuth_deg": -25.0048828125,
+      "elevation_deg": 31.13671875,
+      "angle_to_SUN_DIR_deg": 0.0146773544873167,
+      "angle_to_live_light_deg": 0.0146806395148228,
+      "live_light": "original",
+      "bootstrap_angle_p68_deg": 0.0273442121099498,
+      "bootstrap_angle_p95_deg": 0.0547894629948482
+    },
+    {
+      "image": "port",
+      "method": "post shadows",
+      "azimuth_deg": -25.0295475740031,
+      "elevation_deg": 31.17529296875,
+      "angle_to_SUN_DIR_deg": 0.0557621513017667,
+      "angle_to_live_light_deg": 0.0557605671514465,
+      "live_light": "port",
+      "bootstrap_angle_p68_deg": 0.039204912309903,
+      "bootstrap_angle_p95_deg": 0.227768559408237,
+      "residual_se_az_el_deg": [
+        0.00422506399280335,
+        0.0151447147471809
+      ]
+    },
+    {
+      "image": "port",
+      "method": "toon bands",
+      "azimuth_deg": -24.9365234375,
+      "elevation_deg": 31.205078125,
+      "angle_to_SUN_DIR_deg": 0.103230712053312,
+      "angle_to_live_light_deg": 0.103229704867214,
+      "live_light": "port",
+      "bootstrap_angle_p68_deg": 0.269238079634396,
+      "bootstrap_angle_p95_deg": 1.02040731683316
+    },
+    {
+      "image": "control",
+      "method": "post shadows",
+      "azimuth_deg": -27.0243459204456,
+      "elevation_deg": 31.095703125,
+      "angle_to_SUN_DIR_deg": 1.72585817589435,
+      "angle_to_live_light_deg": 0.0298536096037886,
+      "live_light": "control",
+      "bootstrap_angle_p68_deg": 0.0246810369757132,
+      "bootstrap_angle_p95_deg": 0.111825891473965,
+      "residual_se_az_el_deg": [
+        0.00384499726513079,
+        0.0100218755042434
+      ]
+    },
+    {
+      "image": "control",
+      "method": "toon bands",
+      "azimuth_deg": -26.953125,
+      "elevation_deg": 30.9609375,
+      "angle_to_SUN_DIR_deg": 1.67366240386564,
+      "angle_to_live_light_deg": 0.16839357821097,
+      "live_light": "control",
+      "bootstrap_angle_p68_deg": 0.216201820811805,
+      "bootstrap_angle_p95_deg": 0.721167284423942
+    },
+    {
+      "image": "original_rerender",
+      "method": "post shadows",
+      "azimuth_deg": -24.9566089200126,
+      "elevation_deg": 31.01953125,
+      "angle_to_SUN_DIR_deg": 0.11219219371874,
+      "angle_to_live_light_deg": 0.112190446150808,
+      "live_light": "original",
+      "bootstrap_angle_p68_deg": 0.139750486235434,
+      "bootstrap_angle_p95_deg": 0.746388184821037,
+      "residual_se_az_el_deg": [
+        0.00842049827334504,
+        0.0259483088910209
+      ]
+    },
+    {
+      "image": "original_rerender",
+      "method": "toon bands",
+      "azimuth_deg": -25.0048828125,
+      "elevation_deg": 31.1318359375,
+      "angle_to_SUN_DIR_deg": 0.00998602421490626,
+      "angle_to_live_light_deg": 0.00998916250006689,
+      "live_light": "original",
+      "bootstrap_angle_p68_deg": 0.023437927539031,
+      "bootstrap_angle_p95_deg": 0.0508893382673849
+    },
+    {
+      "image": "port_true_mask",
+      "method": "post shadows",
+      "azimuth_deg": -25.0177858960109,
+      "elevation_deg": 31.1572265625,
+      "angle_to_SUN_DIR_deg": 0.0356334237351805,
+      "angle_to_live_light_deg": 0.0356315227547962,
+      "live_light": "port",
+      "bootstrap_angle_p68_deg": 0.093987598476434,
+      "bootstrap_angle_p95_deg": 0.211361017619051,
+      "residual_se_az_el_deg": [
+        0.00376080460149624,
+        0.0101536737223405
+      ]
+    },
+    {
+      "image": "original_true_mask",
+      "method": "post shadows",
+      "azimuth_deg": -24.9407944419842,
+      "elevation_deg": 31.0751953125,
+      "angle_to_SUN_DIR_deg": 0.074986399071642,
+      "angle_to_live_light_deg": 0.0749839578126222,
+      "live_light": "original",
+      "bootstrap_angle_p68_deg": 0.261601154409954,
+      "bootstrap_angle_p95_deg": 3.09942608001342,
+      "residual_se_az_el_deg": [
+        0.00639548399661221,
+        0.019536364725661
+      ]
+    }
+  ],
+  "engines": {
+    "oracle": {
+      "engine": "oracle",
+      "windows": [
+        {
+          "azimuth_deg": -25.7024585293876,
+          "elevation_deg": 30.76611328125,
+          "sun_dir": [
+            -0.774245798587799,
+            0.511534750461578,
+            0.372660249471664
+          ],
+          "angle_to_code_sun_deg": 0.693463877067811,
+          "cost": 647.5185546875,
+          "se_curvature_deg": [
+            0.00967955938700468,
+            0.0167920355176887
+          ],
+          "post": "bollard0",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -2.35,
+            0.02,
+            -5.62
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 334.162825067102,
+          "strip_dir_se_deg": 0.101965833056177,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.464130192995071,
+            0.168684303760529
+          ],
+          "window_px": 16641,
+          "window_entries": 16641,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.27400004863739,
+          "tip_observed_m": 1.27929532527924,
+          "elevation_from_tip_raw_deg": 32.4922695159821
+        },
+        {
+          "azimuth_deg": -24.5418139981376,
+          "elevation_deg": 30.81201171875,
+          "sun_dir": [
+            -0.781262397766113,
+            0.512222945690155,
+            0.356730580329895
+          ],
+          "angle_to_code_sun_deg": 0.506656388998964,
+          "cost": 1221.77416992188,
+          "se_curvature_deg": [
+            0.01394177521457,
+            0.0260004256093935
+          ],
+          "post": "bollard1",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -1.2,
+            0.02,
+            -5.65
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 336.426978135448,
+          "strip_dir_se_deg": 0.328451123983352,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.568971276283264,
+            0.177459716796875
+          ],
+          "window_px": 16320,
+          "window_entries": 16320,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.27400004863739,
+          "tip_observed_m": 1.25448405742645,
+          "elevation_from_tip_raw_deg": 32.9975032806742
+        },
+        {
+          "azimuth_deg": -24.2886401700126,
+          "elevation_deg": 31.55322265625,
+          "sun_dir": [
+            -0.776725888252258,
+            0.52329033613205,
+            0.350519806146622
+          ],
+          "angle_to_code_sun_deg": 0.750952832259868,
+          "cost": 1030.91333007813,
+          "se_curvature_deg": [
+            0.0176366511456736,
+            0.0269831583287722
+          ],
+          "post": "bollard2",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            1.2,
+            0.02,
+            -5.65
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 335.351496548737,
+          "strip_dir_se_deg": 0.20939078818798,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.34999990463257,
+          "levels_log": [
+            -0.481931865215302,
+            0.166649237275124
+          ],
+          "window_px": 10577,
+          "window_entries": 10577,
+          "slices_dropped": [
+            61,
+            91
+          ],
+          "window_end_m": 2.70374965667725,
+          "tip_model_m": 1.27400004863739,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        },
+        {
+          "azimuth_deg": -25.0257007168876,
+          "elevation_deg": 31.04638671875,
+          "sun_dir": [
+            -0.77631676197052,
+            0.515731871128082,
+            0.362426489591599
+          ],
+          "angle_to_code_sun_deg": 0.0774079612665693,
+          "cost": 16713.3359375,
+          "se_curvature_deg": [
+            0.032224202291701,
+            0.032810031539783
+          ],
+          "post": "postbox",
+          "kind": "postbox",
+          "view": 1,
+          "base": [
+            -2.9,
+            0.02,
+            -6.35
+          ],
+          "top": 1.37,
+          "strip_dir_deg": 334.611513854058,
+          "strip_dir_se_deg": 0.0704385269509382,
+          "strip_centre_bins": 35,
+          "strip_shaft_m": 1.70000016689301,
+          "levels_log": [
+            -0.734047889709473,
+            0.147421047091484
+          ],
+          "window_px": 79536,
+          "window_entries": 19963,
+          "slices_dropped": [
+            0,
+            148
+          ],
+          "window_end_m": 3.72947239875793,
+          "tip_model_m": 2.20800018310547,
+          "tip_observed_m": 2.1818265914917,
+          "elevation_from_tip_raw_deg": 32.3438701629475
+        },
+        {
+          "azimuth_deg": -25.0650073575126,
+          "elevation_deg": 30.91845703125,
+          "sun_dir": [
+            -0.777109086513519,
+            0.513817667961121,
+            0.363445907831192
+          ],
+          "angle_to_code_sun_deg": 0.209582046824954,
+          "cost": 33115.6640625,
+          "se_curvature_deg": [
+            0.0352894565248635,
+            0.0676470096332106
+          ],
+          "post": "taxi",
+          "kind": "taxi",
+          "view": 1,
+          "base": [
+            -6.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 335.67554804372,
+          "strip_dir_se_deg": 0.040273193249722,
+          "strip_centre_bins": 70,
+          "strip_shaft_m": 3.45000004768372,
+          "levels_log": [
+            -0.240716382861137,
+            0.105242386460304
+          ],
+          "window_px": 163761,
+          "window_entries": 20098,
+          "slices_dropped": [
+            0,
+            264
+          ],
+          "window_end_m": 6.66576480865479,
+          "tip_model_m": 3.87000012397766,
+          "tip_observed_m": 3.8857479095459,
+          "elevation_from_tip_raw_deg": 31.4470129012934
+        },
+        {
+          "azimuth_deg": -24.7315112637626,
+          "elevation_deg": 30.87060546875,
+          "sun_dir": [
+            -0.779600858688354,
+            0.513100981712341,
+            0.359095931053162
+          ],
+          "angle_to_code_sun_deg": 0.346288456485531,
+          "cost": 368.883178710938,
+          "se_curvature_deg": [
+            0.0127995006483431,
+            0.021800355065976
+          ],
+          "post": "bollard4",
+          "kind": "bollard",
+          "view": 2,
+          "base": [
+            -8.6,
+            0.02,
+            -5.75
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 335.383024701946,
+          "strip_dir_se_deg": 0.0341574858895962,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.473728477954865,
+            0.0446693748235703
+          ],
+          "window_px": 9152,
+          "window_entries": 9152,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.27400004863739,
+          "tip_observed_m": 1.27575290203094,
+          "elevation_from_tip_raw_deg": 32.5754947662554
+        },
+        {
+          "azimuth_deg": -24.9163257168876,
+          "elevation_deg": 31.037109375,
+          "sun_dir": [
+            -0.777082920074463,
+            0.515593111515045,
+            0.360979050397873
+          ],
+          "angle_to_code_sun_deg": 0.116419814010714,
+          "cost": 2111.31640625,
+          "se_curvature_deg": [
+            0.00593458379670229,
+            0.0118039224645722
+          ],
+          "post": "lamp0",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            5.8,
+            0.02,
+            -9.2
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 335.089381209149,
+          "strip_dir_se_deg": 0.0153894383938769,
+          "strip_centre_bins": 127,
+          "strip_shaft_m": 6.85000038146973,
+          "levels_log": [
+            -0.884781360626221,
+            0.137043386697769
+          ],
+          "window_px": 16254,
+          "window_entries": 16254,
+          "slices_dropped": [
+            2,
+            494
+          ],
+          "window_end_m": 12.6000003814697,
+          "tip_model_m": 7.38800048828125,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        },
+        {
+          "azimuth_deg": -25.5840503262626,
+          "elevation_deg": 33.15771484375,
+          "sun_dir": [
+            -0.755086183547974,
+            0.546945512294769,
+            0.361518263816834
+          ],
+          "angle_to_code_sun_deg": 2.09274498881275,
+          "cost": 1668.25732421875,
+          "se_curvature_deg": [
+            0.0509029361835339,
+            0.0680818881300866
+          ],
+          "post": "bus_stop",
+          "kind": "bus_stop",
+          "view": 3,
+          "base": [
+            8.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 334.326449078859,
+          "strip_dir_se_deg": 0.157915681157987,
+          "strip_centre_bins": 35,
+          "strip_shaft_m": 2.94999980926514,
+          "levels_log": [
+            -0.701215505599976,
+            0.199315950274467
+          ],
+          "window_px": 3490,
+          "window_entries": 3490,
+          "slices_dropped": [
+            61,
+            263
+          ],
+          "window_end_m": 5.84499931335449,
+          "tip_model_m": 3.85000014305115,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        }
+      ],
+      "views": {
+        "1": {
+          "azimuth_deg": -24.9993335293876,
+          "elevation_deg": 30.998046875,
+          "sun_dir": [
+            -0.776877522468567,
+            0.515008866786957,
+            0.362252950668335
+          ],
+          "angle_to_code_sun_deg": 0.124648124227529,
+          "cost": 53222.43359375,
+          "se_curvature_deg": [
+            0.0145031559426419,
+            0.0205188218899721
+          ],
+          "posts": 5,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.188998318293053,
+            "elevation_sd_deg": 0.102014545406475,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.3118335293876,
+              -25.1087085293876,
+              -25.0149585293876,
+              -24.8899585293876,
+              -24.3899585293876
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              30.873046875,
+              30.935546875,
+              30.998046875,
+              31.060546875,
+              31.310546875
+            ],
+            "angle_p68_deg": 0.112704137741374,
+            "angle_p95_deg": 0.298439059326904
+          }
+        },
+        "2": {
+          "azimuth_deg": -24.7315112637626,
+          "elevation_deg": 30.87060546875,
+          "sun_dir": [
+            -0.779600858688354,
+            0.513100981712341,
+            0.359095931053162
+          ],
+          "angle_to_code_sun_deg": 0.346288456485531,
+          "cost": 368.883178710938,
+          "se_curvature_deg": [
+            0.0127995006483431,
+            0.021800355065976
+          ],
+          "posts": 1
+        },
+        "3": {
+          "azimuth_deg": -24.9390307950126,
+          "elevation_deg": 31.0595703125,
+          "sun_dir": [
+            -0.776756465435028,
+            0.515928983688354,
+            0.361201703548431
+          ],
+          "angle_to_code_sun_deg": 0.0867294219157046,
+          "cost": 3868.18408203125,
+          "se_curvature_deg": [
+            0.00717120765146071,
+            0.0134846755408366
+          ],
+          "posts": 2,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.298256553088879,
+            "elevation_sd_deg": 0.972587650488455,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.5796557950126,
+              -25.5796557950126,
+              -24.9390307950126,
+              -24.9390307950126,
+              -24.9234057950126
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.0283203125,
+              31.0595703125,
+              31.0595703125,
+              33.1533203125,
+              33.1533203125
+            ],
+            "angle_p68_deg": 0.0339982504344636,
+            "angle_p95_deg": 2.16291045493924
+          }
+        }
+      },
+      "rejected": [
+        {
+          "post": "bollard3",
+          "view": 1,
+          "why": "centre line over 5 bins",
+          "strip_dir_deg": 337.900932958336
+        },
+        {
+          "post": "lamp1",
+          "view": 3,
+          "why": "centre line direction unsure",
+          "strip_dir_deg": 129.879612426539
+        }
+      ],
+      "joint": {
+        "azimuth_deg": -24.9566089200126,
+        "elevation_deg": 31.01953125,
+        "sun_dir": [
+          -0.77697229385376,
+          0.515330255031586,
+          0.361592024564743
+        ],
+        "angle_to_code_sun_deg": 0.11219219371874,
+        "cost": 57481.60546875,
+        "se_curvature_deg": [
+          0.00842327179913161,
+          0.0141592931458756
+        ],
+        "se_curvature_b_profiled_deg": [
+          0.00842334110272811,
+          0.0259962604721146
+        ],
+        "bootstrap": {
+          "replicates": 200,
+          "azimuth_sd_deg": 0.103702537367478,
+          "elevation_sd_deg": 0.540757005761725,
+          "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+            -25.2027026700126,
+            -25.0503589200126,
+            -24.9527026700126,
+            -24.8941089200126,
+            -24.7300464200126
+          ],
+          "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+            30.81640625,
+            30.92578125,
+            31.01171875,
+            31.20703125,
+            32.60546875
+          ],
+          "angle_p68_deg": 0.137815274864073,
+          "angle_p95_deg": 0.746388184821037
+        }
+      },
+      "edge_model": {
+        "units": "m",
+        "dilation": 0.008154296875,
+        "normal_bias": 0.05734375,
+        "blur_m": 0.0250506438576223
+      },
+      "start": {
+        "azimuth_deg": -24.6485034512626,
+        "elevation_deg": 32.0
+      },
+      "toon_bands": {
+        "model": "MeshToonMaterial steps at N.L = 0, 0.125, 0.375 (16-texel nearest gradient map), one level per band and region",
+        "regions": 40,
+        "pixels": 61716,
+        "views": {
+          "1": {
+            "azimuth_deg": -25.0,
+            "elevation_deg": 31.1171875,
+            "pixels": 31493,
+            "angle_to_code_sun_deg": 0.00918557306843237,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 0.0111160512151177,
+              "elevation_sd_deg": 0.0593789064168849,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -25.0,
+                -25.0,
+                -24.9951171875,
+                -24.98046875,
+                -24.9609375
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                30.90234375,
+                31.0537109375,
+                31.1123046875,
+                31.1171875,
+                31.1171875
+              ],
+              "angle_p68_deg": 0.0174185281807397,
+              "angle_p95_deg": 0.0977445026747385
+            }
+          },
+          "2": {
+            "pixels": 1319,
+            "note": "too few post-surface pixels for a band fit"
+          },
+          "3": {
+            "azimuth_deg": -25.0048828125,
+            "elevation_deg": 31.1318359375,
+            "pixels": 18696,
+            "angle_to_code_sun_deg": 0.00998602421490626,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 11.7807712546633,
+              "elevation_sd_deg": 13.7263208394375,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -27.783203125,
+                -25.25390625,
+                -25.0048828125,
+                -25.0048828125,
+                -25.0048828125
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                28.109375,
+                30.4921875,
+                31.1318359375,
+                31.1318359375,
+                64.9453125
+              ],
+              "angle_p68_deg": 0.648873947566735,
+              "angle_p95_deg": 33.8329390724971
+            }
+          },
+          "5": {
+            "azimuth_deg": -25.029296875,
+            "elevation_deg": 31.05859375,
+            "pixels": 10208,
+            "angle_to_code_sun_deg": 0.0662019553758924,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 1.37408390639309,
+              "elevation_sd_deg": 6.57623675890007,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -25.478515625,
+                -25.1953125,
+                -25.0390625,
+                -25.029296875,
+                -25.029296875
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                30.609375,
+                30.716796875,
+                31.05859375,
+                31.05859375,
+                31.8154296875
+              ],
+              "angle_p68_deg": 0.451170813667837,
+              "angle_p95_deg": 0.756879782273
+            }
+          }
+        },
+        "joint": {
+          "azimuth_deg": -25.0048828125,
+          "elevation_deg": 31.13671875,
+          "angle_to_code_sun_deg": 0.0146773544873167,
+          "bootstrap": {
+            "replicates": 200,
+            "azimuth_sd_deg": 0.00737006367561102,
+            "elevation_sd_deg": 0.0225843787118489,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.0166015625,
+              -25.0087890625,
+              -25.0048828125,
+              -25.0048828125,
+              -24.9775390625
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.06640625,
+              31.109375,
+              31.125,
+              31.14453125,
+              31.14453125
+            ],
+            "angle_p68_deg": 0.0273442121099498,
+            "angle_p95_deg": 0.0547894629948482
+          }
+        }
+      }
+    },
+    "port": {
+      "engine": "port",
+      "windows": [
+        {
+          "azimuth_deg": -24.9677799958781,
+          "elevation_deg": 31.2685546875,
+          "sun_dir": [
+            -0.774864017963409,
+            0.519050061702728,
+            0.36079466342926
+          ],
+          "angle_to_code_sun_deg": 0.150278062242459,
+          "cost": 2247.23681640625,
+          "se_curvature_deg": [
+            0.0123228012635223,
+            0.0205567761843805
+          ],
+          "post": "bollard0",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -2.35,
+            0.02,
+            -5.62
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 334.988075843379,
+          "strip_dir_se_deg": 0.0304937163899058,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.04999995231628,
+          "levels_log": [
+            -0.497458398342133,
+            0.0358150787651539
+          ],
+          "window_px": 16795,
+          "window_entries": 16795,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.24499988555908,
+          "tip_model_m": 1.3160001039505,
+          "tip_observed_m": 1.30032479763031,
+          "elevation_from_tip_raw_deg": 32.04126167295
+        },
+        {
+          "azimuth_deg": -25.1794499177531,
+          "elevation_deg": 31.12548828125,
+          "sun_dir": [
+            -0.774696290493011,
+            0.516914188861847,
+            0.364205092191696
+          ],
+          "angle_to_code_sun_deg": 0.146110646332759,
+          "cost": 303.220458984375,
+          "se_curvature_deg": [
+            0.00425652005835227,
+            0.00991730901869989
+          ],
+          "post": "bollard1",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -1.2,
+            0.02,
+            -5.65
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 334.797650169319,
+          "strip_dir_se_deg": 0.0278297741934089,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.04999995231628,
+          "levels_log": [
+            -0.462276309728622,
+            0.0454953499138355
+          ],
+          "window_px": 17065,
+          "window_entries": 17065,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.24499988555908,
+          "tip_model_m": 1.3160001039505,
+          "tip_observed_m": 1.29346263408661,
+          "elevation_from_tip_raw_deg": 32.2039546966607
+        },
+        {
+          "azimuth_deg": -25.0224674958781,
+          "elevation_deg": 31.10205078125,
+          "sun_dir": [
+            -0.775882840156555,
+            0.516563951969147,
+            0.362170577049255
+          ],
+          "angle_to_code_sun_deg": 0.0234992591693223,
+          "cost": 5856.8837890625,
+          "se_curvature_deg": [
+            0.0134492114837866,
+            0.0169345299065311
+          ],
+          "post": "postbox",
+          "kind": "postbox",
+          "view": 1,
+          "base": [
+            -2.9,
+            0.02,
+            -6.35
+          ],
+          "top": 1.37,
+          "strip_dir_deg": 334.635665402963,
+          "strip_dir_se_deg": 0.0695547911857885,
+          "strip_centre_bins": 36,
+          "strip_shaft_m": 1.75000011920929,
+          "levels_log": [
+            -0.499218642711639,
+            0.00990313105285168
+          ],
+          "window_px": 84104,
+          "window_entries": 20000,
+          "slices_dropped": [
+            0,
+            148
+          ],
+          "window_end_m": 3.81697225570679,
+          "tip_model_m": 2.24600005149841,
+          "tip_observed_m": 2.23848128318787,
+          "elevation_from_tip_raw_deg": 31.6168317795109
+        },
+        {
+          "azimuth_deg": -25.0476139802531,
+          "elevation_deg": 31.1982421875,
+          "sun_dir": [
+            -0.774937033653259,
+            0.518000781536102,
+            0.362143397331238
+          ],
+          "angle_to_code_sun_deg": 0.0827655576494634,
+          "cost": 24401.06640625,
+          "se_curvature_deg": [
+            0.0129937891348732,
+            0.0252728499763891
+          ],
+          "post": "taxi",
+          "kind": "taxi",
+          "view": 1,
+          "base": [
+            -6.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 335.610114831471,
+          "strip_dir_se_deg": 0.0501643543746384,
+          "strip_centre_bins": 70,
+          "strip_shaft_m": 3.45000004768372,
+          "levels_log": [
+            -0.436865657567978,
+            -0.034925788640976
+          ],
+          "window_px": 167971,
+          "window_entries": 20099,
+          "slices_dropped": [
+            0,
+            264
+          ],
+          "window_end_m": 6.66576480865479,
+          "tip_model_m": 3.89800024032593,
+          "tip_observed_m": 3.8962550163269,
+          "elevation_from_tip_raw_deg": 31.3677167892656
+        },
+        {
+          "azimuth_deg": -24.9199284333781,
+          "elevation_deg": 31.09521484375,
+          "sun_dir": [
+            -0.776585638523102,
+            0.516461789608002,
+            0.36080738902092
+          ],
+          "angle_to_code_sun_deg": 0.0808192672310205,
+          "cost": 579.700439453125,
+          "se_curvature_deg": [
+            0.00950032623163331,
+            0.0127797515585041
+          ],
+          "post": "bollard4",
+          "kind": "bollard",
+          "view": 2,
+          "base": [
+            -8.6,
+            0.02,
+            -5.75
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 335.147137288771,
+          "strip_dir_se_deg": 0.0484401051351804,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.04999995231628,
+          "levels_log": [
+            -0.326233714818954,
+            0.0460078530013561
+          ],
+          "window_px": 9462,
+          "window_entries": 9462,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.24499988555908,
+          "tip_model_m": 1.3160001039505,
+          "tip_observed_m": 1.31148183345795,
+          "elevation_from_tip_raw_deg": 31.8399667739704
+        },
+        {
+          "azimuth_deg": -25.0151432771281,
+          "elevation_deg": 31.18310546875,
+          "sun_dir": [
+            -0.775266110897064,
+            0.517774760723114,
+            0.361762017011642
+          ],
+          "angle_to_code_sun_deg": 0.0609173566397529,
+          "cost": 1901.37243652344,
+          "se_curvature_deg": [
+            0.00312826789109406,
+            0.00537311276560028
+          ],
+          "post": "lamp0",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            5.8,
+            0.02,
+            -9.2
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 334.993157504122,
+          "strip_dir_se_deg": 0.017876254241783,
+          "strip_centre_bins": 133,
+          "strip_shaft_m": 6.85000038146973,
+          "levels_log": [
+            -0.53965026140213,
+            0.00192177179269493
+          ],
+          "window_px": 16401,
+          "window_entries": 16401,
+          "slices_dropped": [
+            1,
+            494
+          ],
+          "window_end_m": 12.6000003814697,
+          "tip_model_m": 7.36800050735474,
+          "tip_observed_m": 7.35085344314575,
+          "elevation_from_tip_raw_deg": 31.4189023971903
+        },
+        {
+          "azimuth_deg": -25.1523503083781,
+          "elevation_deg": 31.5087890625,
+          "sun_dir": [
+            -0.771721005439758,
+            0.522629380226135,
+            0.362360715866089
+          ],
+          "angle_to_code_sun_deg": 0.405352970900466,
+          "cost": 268.074157714844,
+          "se_curvature_deg": [
+            0.00621715332561062,
+            0.0159988550116654
+          ],
+          "post": "lamp1",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            12.6,
+            0.02,
+            -12.8
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 334.867809872474,
+          "strip_dir_se_deg": 0.119153250380467,
+          "strip_centre_bins": 41,
+          "strip_shaft_m": 5.45000028610229,
+          "levels_log": [
+            -0.50677478313446,
+            0.0398729518055916
+          ],
+          "window_px": 1715,
+          "window_entries": 1715,
+          "slices_dropped": [
+            351,
+            494
+          ],
+          "window_end_m": 10.1500005722046,
+          "tip_model_m": 7.36800050735474,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        },
+        {
+          "azimuth_deg": -24.8540104646281,
+          "elevation_deg": 31.9306640625,
+          "sun_dir": [
+            -0.770084619522095,
+            0.528892636299133,
+            0.356710344552994
+          ],
+          "angle_to_code_sun_deg": 0.818933384903888,
+          "cost": 3248.8359375,
+          "se_curvature_deg": [
+            0.031919794412019,
+            0.0308738018626755
+          ],
+          "post": "bus_stop",
+          "kind": "bus_stop",
+          "view": 3,
+          "base": [
+            8.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 335.290817148151,
+          "strip_dir_se_deg": 0.144215842467249,
+          "strip_centre_bins": 30,
+          "strip_shaft_m": 3.0,
+          "levels_log": [
+            -0.556024849414825,
+            0.0264729354530573
+          ],
+          "window_px": 4257,
+          "window_entries": 4257,
+          "slices_dropped": [
+            23,
+            263
+          ],
+          "window_end_m": 5.93249988555908,
+          "tip_model_m": 3.85200023651123,
+          "tip_observed_m": 4.06357145309448,
+          "elevation_from_tip_raw_deg": 30.1719255447188
+        }
+      ],
+      "views": {
+        "1": {
+          "azimuth_deg": -25.0490788240031,
+          "elevation_deg": 31.16650390625,
+          "sun_dir": [
+            -0.775187611579895,
+            0.517526865005493,
+            0.362284630537033
+          ],
+          "angle_to_code_sun_deg": 0.0559498114162235,
+          "cost": 32841.6171875,
+          "se_curvature_deg": [
+            0.00645287710708022,
+            0.0113930313177451
+          ],
+          "posts": 4,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.0279223138769855,
+            "elevation_sd_deg": 0.0272942792279157,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.1272038240031,
+              -25.0803288240031,
+              -25.0490788240031,
+              -25.0334538240031,
+              -25.0334538240031
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.10400390625,
+              31.13525390625,
+              31.16650390625,
+              31.19775390625,
+              31.19775390625
+            ],
+            "angle_p68_deg": 0.0339865877530537,
+            "angle_p95_deg": 0.0679822802016319
+          }
+        },
+        "2": {
+          "azimuth_deg": -24.9199284333781,
+          "elevation_deg": 31.09521484375,
+          "sun_dir": [
+            -0.776585638523102,
+            0.516461789608002,
+            0.36080738902092
+          ],
+          "angle_to_code_sun_deg": 0.0808192672310205,
+          "cost": 579.700439453125,
+          "se_curvature_deg": [
+            0.00950032623163331,
+            0.0127797515585041
+          ],
+          "posts": 1
+        },
+        "3": {
+          "azimuth_deg": -25.0158756990031,
+          "elevation_deg": 31.18798828125,
+          "sun_dir": [
+            -0.775221467018127,
+            0.517847657203674,
+            0.36175325512886
+          ],
+          "angle_to_code_sun_deg": 0.0658377141940603,
+          "cost": 5504.51220703125,
+          "se_curvature_deg": [
+            0.00455714731841379,
+            0.00718937441521927
+          ],
+          "posts": 3,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.05092417582714,
+            "elevation_sd_deg": 0.249508445319421,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.1565006990031,
+              -25.0315006990031,
+              -25.0158756990031,
+              -25.0158756990031,
+              -24.8596256990031
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.18798828125,
+              31.18798828125,
+              31.18798828125,
+              31.75048828125,
+              31.93798828125
+            ],
+            "angle_p68_deg": 0.013365349519446,
+            "angle_p95_deg": 0.593748718075179
+          }
+        }
+      },
+      "rejected": [],
+      "joint": {
+        "azimuth_deg": -25.0295475740031,
+        "elevation_deg": 31.17529296875,
+        "sun_dir": [
+          -0.775239109992981,
+          0.517658114433289,
+          0.361986756324768
+        ],
+        "angle_to_code_sun_deg": 0.0557621513017667,
+        "cost": 38943.6328125,
+        "se_curvature_deg": [
+          0.00422339233491907,
+          0.00719517589054636
+        ],
+        "se_curvature_b_profiled_deg": [
+          0.00422506399280335,
+          0.0151447147471809
+        ],
+        "bootstrap": {
+          "replicates": 200,
+          "azimuth_sd_deg": 0.0178865345032184,
+          "elevation_sd_deg": 0.0886899935900245,
+          "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+            -25.0725163240031,
+            -25.0412663240031,
+            -25.0256413240031,
+            -25.0178288240031,
+            -24.9982975740031
+          ],
+          "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+            30.94091796875,
+            31.13623046875,
+            31.17529296875,
+            31.21435546875,
+            31.25341796875
+          ],
+          "angle_p68_deg": 0.039204912309903,
+          "angle_p95_deg": 0.227768559408237
+        }
+      },
+      "edge_model": {
+        "units": "texels of each pixel's PSSM split",
+        "dilation": 0.32666015625,
+        "normal_bias": 1.806640625,
+        "blur_m": 0.00327511712452725
+      },
+      "start": {
+        "azimuth_deg": -25.0068424958781,
+        "elevation_deg": 32.0
+      },
+      "toon_bands": {
+        "model": "MToon ramp: I = a + c clamp(N.L / 0.1, 0, 1) per region",
+        "regions": 40,
+        "pixels": 61716,
+        "views": {
+          "1": {
+            "azimuth_deg": -24.70703125,
+            "elevation_deg": 31.01953125,
+            "pixels": 31493,
+            "angle_to_code_sun_deg": 0.278208919459399,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 0.0259136693664757,
+              "elevation_sd_deg": 0.0663587337000062,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -24.765625,
+                -24.74609375,
+                -24.7265625,
+                -24.70703125,
+                -24.677734375
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                30.921875,
+                31.01953125,
+                31.0634765625,
+                31.1171875,
+                31.17578125
+              ],
+              "angle_p68_deg": 0.0834340223938387,
+              "angle_p95_deg": 0.159790528064516
+            }
+          },
+          "2": {
+            "pixels": 1319,
+            "note": "too few post-surface pixels for a band fit"
+          },
+          "3": {
+            "azimuth_deg": -26.09375,
+            "elevation_deg": 21.91796875,
+            "pixels": 18696,
+            "angle_to_code_sun_deg": 9.25531955181206,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 12.8245819690093,
+              "elevation_sd_deg": 9.02350780844802,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -50.0,
+                -26.38671875,
+                -25.46875,
+                -25.0390625,
+                -24.84375
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                22.03515625,
+                24.125,
+                24.65234375,
+                31.15625,
+                50.9609375
+              ],
+              "angle_p68_deg": 4.81509937663822,
+              "angle_p95_deg": 34.4999582713677
+            }
+          },
+          "5": {
+            "azimuth_deg": -26.23046875,
+            "elevation_deg": 13.96875,
+            "pixels": 10208,
+            "angle_to_code_sun_deg": 17.1903259710202,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 1.62414488482442,
+              "elevation_sd_deg": 6.48422179960995,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -26.328125,
+                -26.23046875,
+                -26.171875,
+                -25.0,
+                -25.0
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                13.96875,
+                13.96875,
+                23.8125,
+                28.65625,
+                28.65625
+              ],
+              "angle_p68_deg": 12.8462804088889,
+              "angle_p95_deg": 14.7318096245579
+            }
+          }
+        },
+        "joint": {
+          "azimuth_deg": -24.9365234375,
+          "elevation_deg": 31.205078125,
+          "angle_to_code_sun_deg": 0.103230712053312,
+          "bootstrap": {
+            "replicates": 200,
+            "azimuth_sd_deg": 0.185355803249292,
+            "elevation_sd_deg": 0.337534867641585,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.3740234375,
+              -25.0615234375,
+              -24.9052734375,
+              -24.7177734375,
+              -24.6552734375
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              30.205078125,
+              30.919921875,
+              31.095703125,
+              31.244140625,
+              31.431640625
+            ],
+            "angle_p68_deg": 0.269238079634396,
+            "angle_p95_deg": 1.02040731683316
+          }
+        }
+      }
+    },
+    "control": {
+      "engine": "control",
+      "windows": [
+        {
+          "azimuth_deg": -27.0006642798206,
+          "elevation_deg": 31.11572265625,
+          "sun_dir": [
+            -0.762808740139008,
+            0.516768276691437,
+            0.388681590557098
+          ],
+          "angle_to_code_sun_deg": 1.70520784599075,
+          "cost": 353.992889404297,
+          "se_curvature_deg": [
+            0.00441849445400782,
+            0.00719004740626416
+          ],
+          "post": "bollard0",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -2.35,
+            0.02,
+            -5.62
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 332.976530491297,
+          "strip_dir_se_deg": 0.0237891236598579,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.04999995231628,
+          "levels_log": [
+            -0.498038500547409,
+            0.035860400646925
+          ],
+          "window_px": 17321,
+          "window_entries": 17321,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.24499988555908,
+          "tip_model_m": 1.3160001039505,
+          "tip_observed_m": 1.31076729297638,
+          "elevation_from_tip_raw_deg": 31.8399667739704
+        },
+        {
+          "azimuth_deg": -27.2008595923206,
+          "elevation_deg": 31.0751953125,
+          "sun_dir": [
+            -0.761770904064178,
+            0.516162574291229,
+            0.391511529684067
+          ],
+          "angle_to_code_sun_deg": 1.87756927052161,
+          "cost": 281.349670410156,
+          "se_curvature_deg": [
+            0.0035299251905644,
+            0.00716888723791086
+          ],
+          "post": "bollard1",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -1.2,
+            0.02,
+            -5.65
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 332.781733496169,
+          "strip_dir_se_deg": 0.0300079091800287,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.04999995231628,
+          "levels_log": [
+            -0.462841957807541,
+            0.0454922802746296
+          ],
+          "window_px": 17420,
+          "window_entries": 17420,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.24499988555908,
+          "tip_model_m": 1.3160001039505,
+          "tip_observed_m": 1.29100942611694,
+          "elevation_from_tip_raw_deg": 32.2448520660382
+        },
+        {
+          "azimuth_deg": -27.0492482641956,
+          "elevation_deg": 31.05078125,
+          "sun_dir": [
+            -0.763000011444092,
+            0.515797555446625,
+            0.389594405889511
+          ],
+          "angle_to_code_sun_deg": 1.7488540354476,
+          "cost": 2732.33959960938,
+          "se_curvature_deg": [
+            0.00761937765583551,
+            0.00820893689036374
+          ],
+          "post": "postbox",
+          "kind": "postbox",
+          "view": 1,
+          "base": [
+            -2.9,
+            0.02,
+            -6.35
+          ],
+          "top": 1.37,
+          "strip_dir_deg": 332.653298619016,
+          "strip_dir_se_deg": 0.0785813597515298,
+          "strip_centre_bins": 36,
+          "strip_shaft_m": 1.75000011920929,
+          "levels_log": [
+            -0.49965226650238,
+            0.0115945218130946
+          ],
+          "window_px": 87528,
+          "window_entries": 20041,
+          "slices_dropped": [
+            0,
+            148
+          ],
+          "window_end_m": 3.81697225570679,
+          "tip_model_m": 2.2480001449585,
+          "tip_observed_m": 2.23960661888123,
+          "elevation_from_tip_raw_deg": 31.6168317795109
+        },
+        {
+          "azimuth_deg": -27.0172658423206,
+          "elevation_deg": 31.1171875,
+          "sun_dir": [
+            -0.762684285640717,
+            0.516790151596069,
+            0.388896614313126
+          ],
+          "angle_to_code_sun_deg": 1.71940236646821,
+          "cost": 26160.880859375,
+          "se_curvature_deg": [
+            0.0224425696715036,
+            0.0353929892687996
+          ],
+          "post": "taxi",
+          "kind": "taxi",
+          "view": 1,
+          "base": [
+            -6.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 333.623130839644,
+          "strip_dir_se_deg": 0.0567223464990023,
+          "strip_centre_bins": 71,
+          "strip_shaft_m": 3.5,
+          "levels_log": [
+            -0.442448437213898,
+            -0.0349322557449341
+          ],
+          "window_px": 191629,
+          "window_entries": 20192,
+          "slices_dropped": [
+            0,
+            264
+          ],
+          "window_end_m": 6.75326442718506,
+          "tip_model_m": 3.9060001373291,
+          "tip_observed_m": 3.9060001373291,
+          "elevation_from_tip_raw_deg": 31.301928520219
+        },
+        {
+          "azimuth_deg": -26.9486623266956,
+          "elevation_deg": 31.0751953125,
+          "sun_dir": [
+            -0.763486802577972,
+            0.516162574291229,
+            0.388154655694962
+          ],
+          "angle_to_code_sun_deg": 1.66170445017624,
+          "cost": 426.42431640625,
+          "se_curvature_deg": [
+            0.00822289921072681,
+            0.0139698881637168
+          ],
+          "post": "bollard4",
+          "kind": "bollard",
+          "view": 2,
+          "base": [
+            -8.6,
+            0.02,
+            -5.75
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 333.047810345476,
+          "strip_dir_se_deg": 0.041934423321916,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.04999995231628,
+          "levels_log": [
+            -0.330447524785995,
+            0.0476944968104362
+          ],
+          "window_px": 9334,
+          "window_entries": 9334,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.24499988555908,
+          "tip_model_m": 1.3160001039505,
+          "tip_observed_m": 1.30599212646484,
+          "elevation_from_tip_raw_deg": 31.9604520797493
+        },
+        {
+          "azimuth_deg": -27.0028615454456,
+          "elevation_deg": 31.0986328125,
+          "sun_dir": [
+            -0.762931108474731,
+            0.516512870788574,
+            0.388780832290649
+          ],
+          "angle_to_code_sun_deg": 1.70739628128951,
+          "cost": 1718.91552734375,
+          "se_curvature_deg": [
+            0.00319184430780023,
+            0.00412253424489027
+          ],
+          "post": "lamp0",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            5.8,
+            0.02,
+            -9.2
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 332.994452907679,
+          "strip_dir_se_deg": 0.0161134317757917,
+          "strip_centre_bins": 135,
+          "strip_shaft_m": 6.95000028610229,
+          "levels_log": [
+            -0.551102340221405,
+            0.00356139894574881
+          ],
+          "window_px": 16800,
+          "window_entries": 16800,
+          "slices_dropped": [
+            0,
+            494
+          ],
+          "window_end_m": 12.7750005722046,
+          "tip_model_m": 7.38200044631958,
+          "tip_observed_m": 7.35009288787842,
+          "elevation_from_tip_raw_deg": 31.4189157485798
+        },
+        {
+          "azimuth_deg": -27.0306935766956,
+          "elevation_deg": 32.14013671875,
+          "sun_dir": [
+            -0.754253268241882,
+            0.531991899013519,
+            0.384820312261581
+          ],
+          "angle_to_code_sun_deg": 1.99977245383054,
+          "cost": 183.664733886719,
+          "se_curvature_deg": [
+            0.00671048709548058,
+            0.145319617156603
+          ],
+          "post": "lamp1",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            12.6,
+            0.02,
+            -12.8
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 332.821020744274,
+          "strip_dir_se_deg": 0.212633433836657,
+          "strip_centre_bins": 33,
+          "strip_shaft_m": 3.00000023841858,
+          "levels_log": [
+            -0.50694340467453,
+            0.0403736382722855
+          ],
+          "window_px": 1829,
+          "window_entries": 1829,
+          "slices_dropped": [
+            0,
+            494
+          ],
+          "window_end_m": 5.86250019073486,
+          "tip_model_m": 7.38200044631958,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        },
+        {
+          "azimuth_deg": -27.1361623266956,
+          "elevation_deg": 31.24755859375,
+          "sun_dir": [
+            -0.76082718372345,
+            0.518736839294434,
+            0.389941096305847
+          ],
+          "angle_to_code_sun_deg": 1.82421951668829,
+          "cost": 4932.19970703125,
+          "se_curvature_deg": [
+            0.036468127890153,
+            0.0381487063121371
+          ],
+          "post": "bus_stop",
+          "kind": "bus_stop",
+          "view": 3,
+          "base": [
+            8.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 333.021063324686,
+          "strip_dir_se_deg": 0.125231425050691,
+          "strip_centre_bins": 36,
+          "strip_shaft_m": 3.40000009536743,
+          "levels_log": [
+            -0.558689832687378,
+            0.0264551341533661
+          ],
+          "window_px": 4884,
+          "window_entries": 4884,
+          "slices_dropped": [
+            21,
+            263
+          ],
+          "window_end_m": 6.63249969482422,
+          "tip_model_m": 3.85600018501282,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        }
+      ],
+      "views": {
+        "1": {
+          "azimuth_deg": -27.0470509985706,
+          "elevation_deg": 31.0888671875,
+          "sun_dir": [
+            -0.762709438800812,
+            0.516366958618164,
+            0.389409154653549
+          ],
+          "angle_to_code_sun_deg": 1.74547629345962,
+          "cost": 29568.392578125,
+          "se_curvature_deg": [
+            0.00644285089975169,
+            0.00923309494001479
+          ],
+          "posts": 4,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.0426905710118326,
+            "elevation_sd_deg": 0.0213260194866003,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -27.1720509985706,
+              -27.0939259985706,
+              -27.0470509985706,
+              -27.0158009985706,
+              -27.0158009985706
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.0576171875,
+              31.0576171875,
+              31.0888671875,
+              31.1201171875,
+              31.1201171875
+            ],
+            "angle_p68_deg": 0.0339955023505398,
+            "angle_p95_deg": 0.0861638035451695
+          }
+        },
+        "2": {
+          "azimuth_deg": -26.9486623266956,
+          "elevation_deg": 31.0751953125,
+          "sun_dir": [
+            -0.763486802577972,
+            0.516162574291229,
+            0.388154655694962
+          ],
+          "angle_to_code_sun_deg": 1.66170445017624,
+          "cost": 426.42431640625,
+          "se_curvature_deg": [
+            0.00822289921072681,
+            0.0139698881637168
+          ],
+          "posts": 1
+        },
+        "3": {
+          "azimuth_deg": -27.0145802954456,
+          "elevation_deg": 31.1181640625,
+          "sun_dir": [
+            -0.762694656848907,
+            0.516804754734039,
+            0.38885685801506
+          ],
+          "angle_to_code_sun_deg": 1.71709258858999,
+          "cost": 6859.712890625,
+          "se_curvature_deg": [
+            0.00486347848380143,
+            0.0101084201979863
+          ],
+          "posts": 3,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.0480496942614877,
+            "elevation_sd_deg": 0.0568946899086015,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -27.1395802954456,
+              -27.1239552954456,
+              -27.0145802954456,
+              -26.9989552954456,
+              -26.9989552954456
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.0869140625,
+              31.0869140625,
+              31.1181640625,
+              31.2431640625,
+              31.2431640625
+            ],
+            "angle_p68_deg": 0.0339968096914356,
+            "angle_p95_deg": 0.156143113666237
+          }
+        }
+      },
+      "rejected": [
+        {
+          "post": "lamp3",
+          "view": 3,
+          "why": "centre line over 2 bins",
+          "strip_dir_deg": 208.749992433211
+        }
+      ],
+      "joint": {
+        "azimuth_deg": -27.0243459204456,
+        "elevation_deg": 31.095703125,
+        "sun_dir": [
+          -0.762808799743652,
+          0.516469120979309,
+          0.389078885316849
+        ],
+        "angle_to_code_sun_deg": 1.72585817589435,
+        "cost": 36867.1484375,
+        "se_curvature_deg": [
+          0.00384497943413827,
+          0.00573262916958252
+        ],
+        "se_curvature_b_profiled_deg": [
+          0.00384499726513079,
+          0.0100218755042434
+        ],
+        "bootstrap": {
+          "replicates": 200,
+          "azimuth_sd_deg": 0.0206216415382496,
+          "elevation_sd_deg": 0.0794215590213032,
+          "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+            -27.0790334204456,
+            -27.0438771704456,
+            -27.0243459204456,
+            -27.0126271704456,
+            -27.0048146704456
+          ],
+          "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+            30.978515625,
+            31.072265625,
+            31.095703125,
+            31.111328125,
+            31.181640625
+          ],
+          "angle_p68_deg": 0.0246810369757132,
+          "angle_p95_deg": 0.111825891473965
+        }
+      },
+      "edge_model": {
+        "units": "texels of each pixel's PSSM split",
+        "dilation": 0.4267578125,
+        "normal_bias": 2.16015625,
+        "blur_m": 0.00327959788604356
+      },
+      "start": {
+        "azimuth_deg": -27.0055470923206,
+        "elevation_deg": 32.0
+      },
+      "toon_bands": {
+        "model": "MToon ramp: I = a + c clamp(N.L / 0.1, 0, 1) per region",
+        "regions": 40,
+        "pixels": 61781,
+        "views": {
+          "1": {
+            "azimuth_deg": -26.796875,
+            "elevation_deg": 31.05859375,
+            "pixels": 31540,
+            "angle_to_code_sun_deg": 1.53252988488055,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 0.0516652835693354,
+              "elevation_sd_deg": 0.168816372098819,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -26.796875,
+                -26.796875,
+                -26.748046875,
+                -26.6943359375,
+                -26.66015625
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                30.775390625,
+                30.98046875,
+                31.05859375,
+                31.234375,
+                31.46875
+              ],
+              "angle_p68_deg": 0.128816607354287,
+              "angle_p95_deg": 0.402577432817781
+            }
+          },
+          "2": {
+            "pixels": 1319,
+            "note": "too few post-surface pixels for a band fit"
+          },
+          "3": {
+            "azimuth_deg": -27.51953125,
+            "elevation_deg": 24.75,
+            "pixels": 18716,
+            "angle_to_code_sun_deg": 6.74674048005447,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 11.2207288962245,
+              "elevation_sd_deg": 10.7180765030574,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -30.1953125,
+                -28.7646484375,
+                -27.51953125,
+                -27.16796875,
+                -25.1953125
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                4.76953125,
+                10.482421875,
+                24.75,
+                30.1015625,
+                43.6171875
+              ],
+              "angle_p68_deg": 8.43889764881033,
+              "angle_p95_deg": 20.0368175529068
+            }
+          },
+          "5": {
+            "azimuth_deg": -28.125,
+            "elevation_deg": 9.26171875,
+            "pixels": 10206,
+            "angle_to_code_sun_deg": 22.0521536599783,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 11.3310083760454,
+              "elevation_sd_deg": 15.3625466737953,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -28.2421875,
+                -28.125,
+                -27.939453125,
+                -26.71875,
+                -25.0390625
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                -1.763671875,
+                9.203125,
+                14.75,
+                32.572265625,
+                42.875
+              ],
+              "angle_p68_deg": 19.8978505240537,
+              "angle_p95_deg": 33.7216821211068
+            }
+          }
+        },
+        "joint": {
+          "azimuth_deg": -26.953125,
+          "elevation_deg": 30.9609375,
+          "angle_to_code_sun_deg": 1.67366240386564,
+          "bootstrap": {
+            "replicates": 200,
+            "azimuth_sd_deg": 0.154128179927517,
+            "elevation_sd_deg": 0.48017063818671,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -27.25,
+              -27.109375,
+              -26.93359375,
+              -26.75,
+              -26.703125
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              29.5234375,
+              30.90234375,
+              31.03125,
+              31.1171875,
+              31.2890625
+            ],
+            "angle_p68_deg": 0.216201820811805,
+            "angle_p95_deg": 0.721167284423942
+          }
+        }
+      }
+    },
+    "original_rerender": {
+      "engine": "original_rerender",
+      "windows": [
+        {
+          "azimuth_deg": -25.7024585293876,
+          "elevation_deg": 30.765625,
+          "sun_dir": [
+            -0.774249732494354,
+            0.511527419090271,
+            0.372662127017975
+          ],
+          "angle_to_code_sun_deg": 0.693714139467869,
+          "cost": 647.70361328125,
+          "se_curvature_deg": [
+            0.00972476819293722,
+            0.0168824614869953
+          ],
+          "post": "bollard0",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -2.35,
+            0.02,
+            -5.62
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 334.162825067102,
+          "strip_dir_se_deg": 0.101965833056177,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.464130192995071,
+            0.168684303760529
+          ],
+          "window_px": 16641,
+          "window_entries": 16641,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.27400004863739,
+          "tip_observed_m": 1.27929532527924,
+          "elevation_from_tip_raw_deg": 32.4922695159821
+        },
+        {
+          "azimuth_deg": -24.5418139981376,
+          "elevation_deg": 30.81103515625,
+          "sun_dir": [
+            -0.781270325183868,
+            0.51220828294754,
+            0.356734216213226
+          ],
+          "angle_to_code_sun_deg": 0.507257125480808,
+          "cost": 1221.65905761719,
+          "se_curvature_deg": [
+            0.0139193046069926,
+            0.0260715310023982
+          ],
+          "post": "bollard1",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -1.2,
+            0.02,
+            -5.65
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 336.426978135448,
+          "strip_dir_se_deg": 0.328451123983352,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.568971276283264,
+            0.177459716796875
+          ],
+          "window_px": 16320,
+          "window_entries": 16320,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.27400004863739,
+          "tip_observed_m": 1.25448405742645,
+          "elevation_from_tip_raw_deg": 32.9975032806742
+        },
+        {
+          "azimuth_deg": -24.2893725918876,
+          "elevation_deg": 31.552734375,
+          "sun_dir": [
+            -0.776725471019745,
+            0.523283123970032,
+            0.350531548261642
+          ],
+          "angle_to_code_sun_deg": 0.750163785328173,
+          "cost": 1031.26611328125,
+          "se_curvature_deg": [
+            0.0175884423059029,
+            0.026911331132393
+          ],
+          "post": "bollard2",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            1.2,
+            0.02,
+            -5.65
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 335.351496548737,
+          "strip_dir_se_deg": 0.20939078818798,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.34999990463257,
+          "levels_log": [
+            -0.481931865215302,
+            0.166649237275124
+          ],
+          "window_px": 10577,
+          "window_entries": 10577,
+          "slices_dropped": [
+            61,
+            91
+          ],
+          "window_end_m": 2.70374965667725,
+          "tip_model_m": 1.27400004863739,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        },
+        {
+          "azimuth_deg": -25.0247241543876,
+          "elevation_deg": 31.04638671875,
+          "sun_dir": [
+            -0.776322901248932,
+            0.515731871128082,
+            0.362413257360458
+          ],
+          "angle_to_code_sun_deg": 0.0772547155671738,
+          "cost": 16713.28125,
+          "se_curvature_deg": [
+            0.0322722785069157,
+            0.0328351004416624
+          ],
+          "post": "postbox",
+          "kind": "postbox",
+          "view": 1,
+          "base": [
+            -2.9,
+            0.02,
+            -6.35
+          ],
+          "top": 1.37,
+          "strip_dir_deg": 334.611513854058,
+          "strip_dir_se_deg": 0.0704385269509382,
+          "strip_centre_bins": 35,
+          "strip_shaft_m": 1.70000016689301,
+          "levels_log": [
+            -0.734047889709473,
+            0.147421047091484
+          ],
+          "window_px": 79536,
+          "window_entries": 19963,
+          "slices_dropped": [
+            0,
+            148
+          ],
+          "window_end_m": 3.72947239875793,
+          "tip_model_m": 2.20800018310547,
+          "tip_observed_m": 2.1818265914917,
+          "elevation_from_tip_raw_deg": 32.3438701629475
+        },
+        {
+          "azimuth_deg": -25.0650073575126,
+          "elevation_deg": 30.91796875,
+          "sun_dir": [
+            -0.777113020420074,
+            0.513810336589813,
+            0.36344775557518
+          ],
+          "angle_to_code_sun_deg": 0.210057171859093,
+          "cost": 33115.98046875,
+          "se_curvature_deg": [
+            0.0354870620660457,
+            0.0678787175655095
+          ],
+          "post": "taxi",
+          "kind": "taxi",
+          "view": 1,
+          "base": [
+            -6.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 335.67554804372,
+          "strip_dir_se_deg": 0.040273193249722,
+          "strip_centre_bins": 70,
+          "strip_shaft_m": 3.45000004768372,
+          "levels_log": [
+            -0.240716382861137,
+            0.105242386460304
+          ],
+          "window_px": 163761,
+          "window_entries": 20098,
+          "slices_dropped": [
+            0,
+            264
+          ],
+          "window_end_m": 6.66576480865479,
+          "tip_model_m": 3.87000012397766,
+          "tip_observed_m": 3.8857479095459,
+          "elevation_from_tip_raw_deg": 31.4470129012934
+        },
+        {
+          "azimuth_deg": -24.7317554043876,
+          "elevation_deg": 30.873046875,
+          "sun_dir": [
+            -0.77957946062088,
+            0.513137519359589,
+            0.359090119600296
+          ],
+          "angle_to_code_sun_deg": 0.344371120999888,
+          "cost": 368.869018554688,
+          "se_curvature_deg": [
+            0.0127953314390858,
+            0.0217426425528872
+          ],
+          "post": "bollard4",
+          "kind": "bollard",
+          "view": 2,
+          "base": [
+            -8.6,
+            0.02,
+            -5.75
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 335.383024701946,
+          "strip_dir_se_deg": 0.0341574858895962,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.473728477954865,
+            0.0446693748235703
+          ],
+          "window_px": 9152,
+          "window_entries": 9152,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.27400004863739,
+          "tip_observed_m": 1.27575290203094,
+          "elevation_from_tip_raw_deg": 32.5754947662554
+        },
+        {
+          "azimuth_deg": -24.9163257168876,
+          "elevation_deg": 31.037109375,
+          "sun_dir": [
+            -0.777082920074463,
+            0.515593111515045,
+            0.360979050397873
+          ],
+          "angle_to_code_sun_deg": 0.116419814010714,
+          "cost": 2110.66796875,
+          "se_curvature_deg": [
+            0.0059321889358127,
+            0.0118045018722966
+          ],
+          "post": "lamp0",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            5.8,
+            0.02,
+            -9.2
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 335.089381209149,
+          "strip_dir_se_deg": 0.015389433391297,
+          "strip_centre_bins": 127,
+          "strip_shaft_m": 6.85000038146973,
+          "levels_log": [
+            -0.884780943393707,
+            0.137043282389641
+          ],
+          "window_px": 16254,
+          "window_entries": 16254,
+          "slices_dropped": [
+            2,
+            494
+          ],
+          "window_end_m": 12.6000003814697,
+          "tip_model_m": 7.38800048828125,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        },
+        {
+          "azimuth_deg": -25.5835620450126,
+          "elevation_deg": 33.15771484375,
+          "sun_dir": [
+            -0.755089282989502,
+            0.546945512294769,
+            0.361511826515198
+          ],
+          "angle_to_code_sun_deg": 2.09264744517367,
+          "cost": 1668.29272460938,
+          "se_curvature_deg": [
+            0.050635087472282,
+            0.0680882758438004
+          ],
+          "post": "bus_stop",
+          "kind": "bus_stop",
+          "view": 3,
+          "base": [
+            8.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 334.326449078859,
+          "strip_dir_se_deg": 0.15791573451884,
+          "strip_centre_bins": 35,
+          "strip_shaft_m": 2.94999980926514,
+          "levels_log": [
+            -0.701217234134674,
+            0.199314683675766
+          ],
+          "window_px": 3490,
+          "window_entries": 3490,
+          "slices_dropped": [
+            61,
+            263
+          ],
+          "window_end_m": 5.84499931335449,
+          "tip_model_m": 3.85000014305115,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        }
+      ],
+      "views": {
+        "1": {
+          "azimuth_deg": -24.9986011075126,
+          "elevation_deg": 30.99853515625,
+          "sun_dir": [
+            -0.776878178119659,
+            0.515016138553619,
+            0.362241148948669
+          ],
+          "angle_to_code_sun_deg": 0.124205349210455,
+          "cost": 53223.03125,
+          "se_curvature_deg": [
+            0.01452585342239,
+            0.0205426589149876
+          ],
+          "posts": 5,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.188861975165107,
+            "elevation_sd_deg": 0.102014545406475,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.3111011075126,
+              -25.1079761075126,
+              -25.0142261075126,
+              -24.8892261075126,
+              -24.3892261075126
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              30.87353515625,
+              30.93603515625,
+              30.99853515625,
+              31.06103515625,
+              31.31103515625
+            ],
+            "angle_p68_deg": 0.112703137225382,
+            "angle_p95_deg": 0.298439859739697
+          }
+        },
+        "2": {
+          "azimuth_deg": -24.7317554043876,
+          "elevation_deg": 30.873046875,
+          "sun_dir": [
+            -0.77957946062088,
+            0.513137519359589,
+            0.359090119600296
+          ],
+          "angle_to_code_sun_deg": 0.344371120999888,
+          "cost": 368.869018554688,
+          "se_curvature_deg": [
+            0.0127953314390858,
+            0.0217426425528872
+          ],
+          "posts": 1
+        },
+        "3": {
+          "azimuth_deg": -24.9382983731376,
+          "elevation_deg": 31.0595703125,
+          "sun_dir": [
+            -0.776761054992676,
+            0.515928983688354,
+            0.361191779375076
+          ],
+          "angle_to_code_sun_deg": 0.0871606776586608,
+          "cost": 3867.60107421875,
+          "se_curvature_deg": [
+            0.0071726742956653,
+            0.01346414028962
+          ],
+          "posts": 2,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.298256553088879,
+            "elevation_sd_deg": 0.972587650488455,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.5789233731376,
+              -25.5789233731376,
+              -24.9382983731376,
+              -24.9382983731376,
+              -24.9226733731376
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.0283203125,
+              31.0595703125,
+              31.0595703125,
+              33.1533203125,
+              33.1533203125
+            ],
+            "angle_p68_deg": 0.0339989974864041,
+            "angle_p95_deg": 2.16290917427877
+          }
+        }
+      },
+      "rejected": [
+        {
+          "post": "bollard3",
+          "view": 1,
+          "why": "centre line over 5 bins",
+          "strip_dir_deg": 337.900932958336
+        },
+        {
+          "post": "lamp1",
+          "view": 3,
+          "why": "centre line direction unsure",
+          "strip_dir_deg": 129.879612426539
+        }
+      ],
+      "joint": {
+        "azimuth_deg": -24.9566089200126,
+        "elevation_deg": 31.01953125,
+        "sun_dir": [
+          -0.77697229385376,
+          0.515330255031586,
+          0.361592024564743
+        ],
+        "angle_to_code_sun_deg": 0.11219219371874,
+        "cost": 57481.6015625,
+        "se_curvature_deg": [
+          0.0084204603751013,
+          0.0141525881260437
+        ],
+        "se_curvature_b_profiled_deg": [
+          0.00842049827334504,
+          0.0259483088910209
+        ],
+        "bootstrap": {
+          "replicates": 200,
+          "azimuth_sd_deg": 0.103652719628044,
+          "elevation_sd_deg": 0.541003611250472,
+          "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+            -25.1987964200126,
+            -25.0503589200126,
+            -24.9527026700126,
+            -24.8941089200126,
+            -24.7300464200126
+          ],
+          "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+            30.81640625,
+            30.92578125,
+            31.01953125,
+            31.20703125,
+            32.62890625
+          ],
+          "angle_p68_deg": 0.139750486235434,
+          "angle_p95_deg": 0.746388184821037
+        }
+      },
+      "edge_model": {
+        "units": "m",
+        "dilation": 0.00814453125,
+        "normal_bias": 0.05732421875,
+        "blur_m": 0.0250463631075259
+      },
+      "start": {
+        "azimuth_deg": -24.6485034512626,
+        "elevation_deg": 32.0
+      },
+      "toon_bands": {
+        "model": "MeshToonMaterial steps at N.L = 0, 0.125, 0.375 (16-texel nearest gradient map), one level per band and region",
+        "regions": 40,
+        "pixels": 61716,
+        "views": {
+          "1": {
+            "azimuth_deg": -25.0,
+            "elevation_deg": 31.1171875,
+            "pixels": 31493,
+            "angle_to_code_sun_deg": 0.00918557306843237,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 0.0111160512151177,
+              "elevation_sd_deg": 0.0593789064168849,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -25.0,
+                -25.0,
+                -24.9951171875,
+                -24.98046875,
+                -24.9609375
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                30.90234375,
+                31.0537109375,
+                31.1123046875,
+                31.1171875,
+                31.1171875
+              ],
+              "angle_p68_deg": 0.0174185281807397,
+              "angle_p95_deg": 0.0977445026747385
+            }
+          },
+          "2": {
+            "pixels": 1319,
+            "note": "too few post-surface pixels for a band fit"
+          },
+          "3": {
+            "azimuth_deg": -25.0048828125,
+            "elevation_deg": 31.1318359375,
+            "pixels": 18696,
+            "angle_to_code_sun_deg": 0.00998602421490626,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 11.7807712546633,
+              "elevation_sd_deg": 13.7263208394375,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -27.783203125,
+                -25.25390625,
+                -25.0048828125,
+                -25.0048828125,
+                -25.0048828125
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                28.109375,
+                30.4921875,
+                31.1318359375,
+                31.1318359375,
+                64.9453125
+              ],
+              "angle_p68_deg": 0.648873947566735,
+              "angle_p95_deg": 33.8329390724971
+            }
+          },
+          "5": {
+            "azimuth_deg": -25.029296875,
+            "elevation_deg": 31.05859375,
+            "pixels": 10208,
+            "angle_to_code_sun_deg": 0.0662019553758924,
+            "bootstrap": {
+              "replicates": 30,
+              "azimuth_sd_deg": 1.37408390639309,
+              "elevation_sd_deg": 6.57623675890007,
+              "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+                -25.478515625,
+                -25.1953125,
+                -25.0390625,
+                -25.029296875,
+                -25.029296875
+              ],
+              "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+                30.609375,
+                30.716796875,
+                31.05859375,
+                31.05859375,
+                31.8154296875
+              ],
+              "angle_p68_deg": 0.451170813667837,
+              "angle_p95_deg": 0.756879782273
+            }
+          }
+        },
+        "joint": {
+          "azimuth_deg": -25.0048828125,
+          "elevation_deg": 31.1318359375,
+          "angle_to_code_sun_deg": 0.00998602421490626,
+          "bootstrap": {
+            "replicates": 200,
+            "azimuth_sd_deg": 0.00729385127823869,
+            "elevation_sd_deg": 0.0228013727288236,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.0166015625,
+              -25.0087890625,
+              -25.0048828125,
+              -25.0048828125,
+              -24.9814453125
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.0615234375,
+              31.1083984375,
+              31.1279296875,
+              31.1435546875,
+              31.1435546875
+            ],
+            "angle_p68_deg": 0.023437927539031,
+            "angle_p95_deg": 0.0508893382673849
+          }
+        }
+      }
+    },
+    "port_true_mask": {
+      "engine": "port_true_mask",
+      "windows": [
+        {
+          "azimuth_deg": -24.9665163647609,
+          "elevation_deg": 31.22412109375,
+          "sun_dir": [
+            -0.775236666202545,
+            0.518387079238892,
+            0.360947370529175
+          ],
+          "angle_to_code_sun_deg": 0.107935931988978,
+          "cost": 1151.64892578125,
+          "se_curvature_deg": [
+            0.00911556632566701,
+            0.0160823279865257
+          ],
+          "post": "bollard0",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -2.35,
+            0.02,
+            -5.62
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 334.983923088364,
+          "strip_dir_se_deg": 0.0300077357572568,
+          "strip_centre_bins": 22,
+          "strip_shaft_m": 1.04999995231628,
+          "levels_log": [
+            -0.797207236289978,
+            0.00764178158715367
+          ],
+          "window_px": 16953,
+          "window_entries": 16953,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.24499988555908,
+          "tip_model_m": 1.31400001049042,
+          "tip_observed_m": 1.3014087677002,
+          "elevation_from_tip_raw_deg": 32.04126167295
+        },
+        {
+          "azimuth_deg": -25.0263308178859,
+          "elevation_deg": 31.09423828125,
+          "sun_dir": [
+            -0.775922179222107,
+            0.516447246074677,
+            0.362252682447433
+          ],
+          "angle_to_code_sun_deg": 0.0319356266866124,
+          "cost": 5663.91064453125,
+          "se_curvature_deg": [
+            0.014333239357629,
+            0.0123409132054491
+          ],
+          "post": "postbox",
+          "kind": "postbox",
+          "view": 1,
+          "base": [
+            -2.9,
+            0.02,
+            -6.35
+          ],
+          "top": 1.37,
+          "strip_dir_deg": 334.634217402859,
+          "strip_dir_se_deg": 0.0695695187811863,
+          "strip_centre_bins": 36,
+          "strip_shaft_m": 1.75000011920929,
+          "levels_log": [
+            -0.800284206867218,
+            0.00742145767435431
+          ],
+          "window_px": 84104,
+          "window_entries": 19975,
+          "slices_dropped": [
+            0,
+            148
+          ],
+          "window_end_m": 3.81697225570679,
+          "tip_model_m": 2.24600005149841,
+          "tip_observed_m": 2.2393593788147,
+          "elevation_from_tip_raw_deg": 31.6168317795109
+        },
+        {
+          "azimuth_deg": -25.0207155835109,
+          "elevation_deg": 31.1669921875,
+          "sun_dir": [
+            -0.775362849235535,
+            0.517534136772156,
+            0.361898988485336
+          ],
+          "angle_to_code_sun_deg": 0.0457115946391591,
+          "cost": 1808.82922363281,
+          "se_curvature_deg": [
+            0.0030469372667499,
+            0.00515750241990406
+          ],
+          "post": "lamp0",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            5.8,
+            0.02,
+            -9.2
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 334.994304975902,
+          "strip_dir_se_deg": 0.0176397372639248,
+          "strip_centre_bins": 134,
+          "strip_shaft_m": 6.95000028610229,
+          "levels_log": [
+            -0.802285134792328,
+            0.00762682314962149
+          ],
+          "window_px": 16479,
+          "window_entries": 16479,
+          "slices_dropped": [
+            0,
+            494
+          ],
+          "window_end_m": 12.7750005722046,
+          "tip_model_m": 7.37000036239624,
+          "tip_observed_m": 7.3540096282959,
+          "elevation_from_tip_raw_deg": 31.4050207137752
+        },
+        {
+          "azimuth_deg": -25.1505983960109,
+          "elevation_deg": 33.1552734375,
+          "sun_dir": [
+            -0.757820606231689,
+            0.546909868717194,
+            0.355805516242981
+          ],
+          "angle_to_code_sun_deg": 2.03638525598957,
+          "cost": 167.186553955078,
+          "se_curvature_deg": [
+            0.00687730386980439,
+            0.0303989797471658
+          ],
+          "post": "lamp1",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            12.6,
+            0.02,
+            -12.8
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 334.824998246756,
+          "strip_dir_se_deg": 0.171782032390171,
+          "strip_centre_bins": 33,
+          "strip_shaft_m": 3.35000014305115,
+          "levels_log": [
+            -0.804170191287994,
+            0.00731927854940295
+          ],
+          "window_px": 1587,
+          "window_entries": 1587,
+          "slices_dropped": [
+            12,
+            494
+          ],
+          "window_end_m": 6.47500038146973,
+          "tip_model_m": 7.37000036239624,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        },
+        {
+          "azimuth_deg": -24.8151491772609,
+          "elevation_deg": 31.6201171875,
+          "sun_dir": [
+            -0.772917032241821,
+            0.524284899234772,
+            0.357385814189911
+          ],
+          "angle_to_code_sun_deg": 0.524432543283304,
+          "cost": 3433.552734375,
+          "se_curvature_deg": [
+            0.034019631537013,
+            0.0385621505958216
+          ],
+          "post": "bus_stop",
+          "kind": "bus_stop",
+          "view": 3,
+          "base": [
+            8.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 335.315241904623,
+          "strip_dir_se_deg": 0.147014659222007,
+          "strip_centre_bins": 29,
+          "strip_shaft_m": 3.0,
+          "levels_log": [
+            -0.802883982658386,
+            0.00737685291096568
+          ],
+          "window_px": 4207,
+          "window_entries": 4207,
+          "slices_dropped": [
+            24,
+            263
+          ],
+          "window_end_m": 5.93249988555908,
+          "tip_model_m": 3.85000014305115,
+          "tip_observed_m": 4.07089471817017,
+          "elevation_from_tip_raw_deg": 30.1227865219389
+        }
+      ],
+      "views": {
+        "1": {
+          "azimuth_deg": -25.0055788647609,
+          "elevation_deg": 31.111328125,
+          "sun_dir": [
+            -0.775913715362549,
+            0.516702592372894,
+            0.361906498670578
+          ],
+          "angle_to_code_sun_deg": 0.0114428722153689,
+          "cost": 6821.1865234375,
+          "se_curvature_deg": [
+            0.00910230402826883,
+            0.0091462624593562
+          ],
+          "posts": 2,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.0206252898866455,
+            "elevation_sd_deg": 0.052295062835212,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.0212038647609,
+              -25.0212038647609,
+              -25.0055788647609,
+              -25.0055788647609,
+              -24.9587038647609
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.080078125,
+              31.080078125,
+              31.111328125,
+              31.111328125,
+              31.236328125
+            ],
+            "angle_p68_deg": 0.0339915403072126,
+            "angle_p95_deg": 0.131276329229138
+          }
+        },
+        "3": {
+          "azimuth_deg": -25.0197390210109,
+          "elevation_deg": 31.17822265625,
+          "sun_dir": [
+            -0.775277078151703,
+            0.517701864242554,
+            0.361842840909958
+          ],
+          "angle_to_code_sun_deg": 0.0565702480579439,
+          "cost": 5464.8212890625,
+          "se_curvature_deg": [
+            0.00442935506303272,
+            0.00695191328606445
+          ],
+          "posts": 3,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.0577051022573447,
+            "elevation_sd_deg": 0.186963518213734,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.1291140210109,
+              -25.0197390210109,
+              -25.0197390210109,
+              -25.0197390210109,
+              -24.8166140210109
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.17822265625,
+              31.17822265625,
+              31.17822265625,
+              31.61572265625,
+              31.64697265625
+            ],
+            "angle_p68_deg": 0.0,
+            "angle_p95_deg": 0.477952892537956
+          }
+        }
+      },
+      "rejected": [],
+      "joint": {
+        "azimuth_deg": -25.0177858960109,
+        "elevation_deg": 31.1572265625,
+        "sun_dir": [
+          -0.775461256504059,
+          0.51738828420639,
+          0.361896634101868
+        ],
+        "angle_to_code_sun_deg": 0.0356334237351805,
+        "cost": 12292.921875,
+        "se_curvature_deg": [
+          0.00374314721817677,
+          0.00583439208387012
+        ],
+        "se_curvature_b_profiled_deg": [
+          0.00376080460149624,
+          0.0101536737223405
+        ],
+        "bootstrap": {
+          "replicates": 200,
+          "azimuth_sd_deg": 0.0293191524387918,
+          "elevation_sd_deg": 0.12654043923954,
+          "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+            -25.0920046460109,
+            -25.0216921460109,
+            -25.0177858960109,
+            -25.0060671460109,
+            -24.9318483960109
+          ],
+          "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+            30.9619140625,
+            31.0087890625,
+            31.1572265625,
+            31.2119140625,
+            31.3681640625
+          ],
+          "angle_p68_deg": 0.093987598476434,
+          "angle_p95_deg": 0.211361017619051
+        }
+      },
+      "edge_model": {
+        "units": "texels of each pixel's PSSM split",
+        "dilation": 0.28369140625,
+        "normal_bias": 1.869140625,
+        "blur_m": 0.00381183783475661
+      },
+      "start": {
+        "azimuth_deg": -25.0160769116359,
+        "elevation_deg": 32.0
+      }
+    },
+    "original_true_mask": {
+      "engine": "original_true_mask",
+      "windows": [
+        {
+          "azimuth_deg": -25.6478256919842,
+          "elevation_deg": 30.85888671875,
+          "sun_dir": [
+            -0.773853063583374,
+            0.512925386428833,
+            0.37156280875206
+          ],
+          "angle_to_code_sun_deg": 0.607895160424186,
+          "cost": 229.515380859375,
+          "se_curvature_deg": [
+            0.00559757981659425,
+            0.00986076177955474
+          ],
+          "post": "bollard0",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -2.35,
+            0.02,
+            -5.62
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 334.26719035762,
+          "strip_dir_se_deg": 0.0891404320019728,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.637633442878723,
+            0.00683480640873313
+          ],
+          "window_px": 16792,
+          "window_entries": 16792,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.28800010681152,
+          "tip_observed_m": 1.28925609588623,
+          "elevation_from_tip_raw_deg": 32.2858600616728
+        },
+        {
+          "azimuth_deg": -24.6851792076092,
+          "elevation_deg": 30.86572265625,
+          "sun_dir": [
+            -0.779930710792542,
+            0.513027846813202,
+            0.358483642339706
+          ],
+          "angle_to_code_sun_deg": 0.377967887712255,
+          "cost": 147.830871582031,
+          "se_curvature_deg": [
+            0.00440183095885563,
+            0.00828428080525546
+          ],
+          "post": "bollard1",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            -1.2,
+            0.02,
+            -5.65
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 335.27510771306,
+          "strip_dir_se_deg": 0.0534069233170891,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.71103173494339,
+            0.0064423568546772
+          ],
+          "window_px": 16309,
+          "window_entries": 16309,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.28800010681152,
+          "tip_observed_m": 1.27007389068604,
+          "elevation_from_tip_raw_deg": 32.6591167449824
+        },
+        {
+          "azimuth_deg": -24.3360581138592,
+          "elevation_deg": 31.72119140625,
+          "sun_dir": [
+            -0.775034427642822,
+            0.525786280632019,
+            0.350528806447983
+          ],
+          "angle_to_code_sun_deg": 0.829512173989474,
+          "cost": 528.94580078125,
+          "se_curvature_deg": [
+            0.0127532372938697,
+            0.0191605713233221
+          ],
+          "post": "bollard2",
+          "kind": "bollard",
+          "view": 1,
+          "base": [
+            1.2,
+            0.02,
+            -5.65
+          ],
+          "top": 0.825,
+          "strip_dir_deg": 335.568532639804,
+          "strip_dir_se_deg": 0.0866789425488699,
+          "strip_centre_bins": 21,
+          "strip_shaft_m": 1.0,
+          "levels_log": [
+            -0.650136530399323,
+            0.00649612676352263
+          ],
+          "window_px": 10634,
+          "window_entries": 10634,
+          "slices_dropped": [
+            0,
+            91
+          ],
+          "window_end_m": 2.1949999332428,
+          "tip_model_m": 1.28800010681152,
+          "tip_observed_m": 1.24711501598358,
+          "elevation_from_tip_raw_deg": 33.1690578460966
+        },
+        {
+          "azimuth_deg": -25.0277085044842,
+          "elevation_deg": 31.052734375,
+          "sun_dir": [
+            -0.776252269744873,
+            0.515826761722565,
+            0.36242949962616
+          ],
+          "angle_to_code_sun_deg": 0.0715527349098296,
+          "cost": 17402.173828125,
+          "se_curvature_deg": [
+            0.0316282563122082,
+            0.0328433706176575
+          ],
+          "post": "postbox",
+          "kind": "postbox",
+          "view": 1,
+          "base": [
+            -2.9,
+            0.02,
+            -6.35
+          ],
+          "top": 1.37,
+          "strip_dir_deg": 334.604656344132,
+          "strip_dir_se_deg": 0.0680069796064137,
+          "strip_centre_bins": 35,
+          "strip_shaft_m": 1.70000016689301,
+          "levels_log": [
+            -0.799771964550018,
+            0.00671818060800433
+          ],
+          "window_px": 79536,
+          "window_entries": 19963,
+          "slices_dropped": [
+            0,
+            148
+          ],
+          "window_end_m": 3.72947239875793,
+          "tip_model_m": 2.22200012207031,
+          "tip_observed_m": 2.19851732254028,
+          "elevation_from_tip_raw_deg": 32.1149806976118
+        },
+        {
+          "azimuth_deg": -24.9124741294842,
+          "elevation_deg": 31.0673828125,
+          "sun_dir": [
+            -0.776859998703003,
+            0.516045808792114,
+            0.36081200838089
+          ],
+          "angle_to_code_sun_deg": 0.0991720922525505,
+          "cost": 1639.47900390625,
+          "se_curvature_deg": [
+            0.00443161423652612,
+            0.00921261959266499
+          ],
+          "post": "lamp0",
+          "kind": "lamp",
+          "view": 3,
+          "base": [
+            5.8,
+            0.02,
+            -9.2
+          ],
+          "top": 4.505,
+          "strip_dir_deg": 335.103150870516,
+          "strip_dir_se_deg": 0.0154901703439214,
+          "strip_centre_bins": 130,
+          "strip_shaft_m": 6.85000038146973,
+          "levels_log": [
+            -0.951263844966888,
+            0.00663863401859999
+          ],
+          "window_px": 16326,
+          "window_entries": 16326,
+          "slices_dropped": [
+            0,
+            494
+          ],
+          "window_end_m": 12.6000003814697,
+          "tip_model_m": 7.38800048828125,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        },
+        {
+          "azimuth_deg": -25.5753159263592,
+          "elevation_deg": 33.22216796875,
+          "sun_dir": [
+            -0.754585802555084,
+            0.547886908054352,
+            0.361137300729752
+          ],
+          "angle_to_code_sun_deg": 2.15378318777398,
+          "cost": 3959.98803710938,
+          "se_curvature_deg": [
+            0.060515048091465,
+            0.10822653341385
+          ],
+          "post": "bus_stop",
+          "kind": "bus_stop",
+          "view": 3,
+          "base": [
+            8.0,
+            0.02,
+            -5.9
+          ],
+          "top": 2.375,
+          "strip_dir_deg": 334.445321691174,
+          "strip_dir_se_deg": 0.136670938033618,
+          "strip_centre_bins": 39,
+          "strip_shaft_m": 3.0,
+          "levels_log": [
+            -0.895867466926575,
+            0.00640214746817946
+          ],
+          "window_px": 4553,
+          "window_entries": 4553,
+          "slices_dropped": [
+            20,
+            263
+          ],
+          "window_end_m": 5.93249988555908,
+          "tip_model_m": 3.8580002784729,
+          "tip_observed_m": null,
+          "elevation_from_tip_raw_deg": null
+        }
+      ],
+      "views": {
+        "1": {
+          "azimuth_deg": -24.9725327232342,
+          "elevation_deg": 31.0625,
+          "sun_dir": [
+            -0.7765212059021,
+            0.515972793102264,
+            0.361644685268402
+          ],
+          "angle_to_code_sun_deg": 0.0675017190306046,
+          "cost": 18726.9296875,
+          "se_curvature_deg": [
+            0.0125475257454875,
+            0.0159783841655247
+          ],
+          "posts": 4,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.209494663870111,
+            "elevation_sd_deg": 0.118956252141152,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.2381577232342,
+              -25.2069077232342,
+              -24.9412827232342,
+              -24.7694077232342,
+              -24.5350327232342
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              30.84375,
+              31.03125,
+              31.0625,
+              31.15625,
+              31.34375
+            ],
+            "angle_p68_deg": 0.228778200105782,
+            "angle_p95_deg": 0.468118647432754
+          }
+        },
+        "3": {
+          "azimuth_deg": -24.9290756919842,
+          "elevation_deg": 31.087890625,
+          "sun_dir": [
+            -0.776587843894959,
+            0.516352355480194,
+            0.360959202051163
+          ],
+          "angle_to_code_sun_deg": 0.0765086441323755,
+          "cost": 5685.89453125,
+          "se_curvature_deg": [
+            0.00728675215376715,
+            0.0150454841222375
+          ],
+          "posts": 2,
+          "bootstrap": {
+            "replicates": 50,
+            "azimuth_sd_deg": 0.298256553088879,
+            "elevation_sd_deg": 0.987052662821834,
+            "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+              -25.5697006919842,
+              -25.5697006919842,
+              -24.9290756919842,
+              -24.9290756919842,
+              -24.9134506919842
+            ],
+            "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+              31.056640625,
+              31.087890625,
+              31.087890625,
+              33.212890625,
+              33.212890625
+            ],
+            "angle_p68_deg": 0.0339973533051244,
+            "angle_p95_deg": 2.19311248423198
+          }
+        }
+      },
+      "rejected": [
+        {
+          "post": "bollard3",
+          "view": 1,
+          "why": "centre line over 5 bins",
+          "strip_dir_deg": 338.165835015106
+        },
+        {
+          "post": "lamp1",
+          "view": 3,
+          "why": "centre line direction unsure",
+          "strip_dir_deg": 128.059899767486
+        }
+      ],
+      "joint": {
+        "azimuth_deg": -24.9407944419842,
+        "elevation_deg": 31.0751953125,
+        "sun_dir": [
+          -0.776617765426636,
+          0.516162574291229,
+          0.361166268587112
+        ],
+        "angle_to_code_sun_deg": 0.074986399071642,
+        "cost": 24415.8359375,
+        "se_curvature_deg": [
+          0.0063954461552599,
+          0.0111288441152476
+        ],
+        "se_curvature_b_profiled_deg": [
+          0.00639548399661221,
+          0.019536364725661
+        ],
+        "bootstrap": {
+          "replicates": 200,
+          "azimuth_sd_deg": 0.119790114618512,
+          "elevation_sd_deg": 0.922617956091258,
+          "azimuth_p2.5_p16_p50_p84_p97.5_deg": [
+            -25.2884506919842,
+            -25.0501694419842,
+            -24.9407944419842,
+            -24.8861069419842,
+            -24.7884506919842
+          ],
+          "elevation_p2.5_p16_p50_p84_p97.5_deg": [
+            30.5439453125,
+            30.9892578125,
+            31.0830078125,
+            31.7158203125,
+            34.4033203125
+          ],
+          "angle_p68_deg": 0.261601154409954,
+          "angle_p95_deg": 3.09942608001342
+        }
+      },
+      "edge_model": {
+        "units": "m",
+        "dilation": 0.010322265625,
+        "normal_bias": 0.04955078125,
+        "blur_m": 0.0268275623127898
+      },
+      "start": {
+        "azimuth_deg": -24.8968491294842,
+        "elevation_deg": 32.0
+      }
+    }
+  },
+  "shadow_setup": [
+    {
+      "setting": "filter",
+      "original": "PCFSoftShadowMap (shadowMap.type 2, three r170): a fixed 3x3 bilinear-weighted kernel, about a 4-texel footprint",
+      "port": "PCF, soft_shadow_filter_quality 2 (Soft Low: 4 Vogel taps, radius blur 1.0 x 2 texels), light_angular_distance 0.0 (no PCSS)",
+      "effect": "edge softness: the original's edges blur over about 1.5 texels a side; the port's PCF is thresholded by MToon (below), so its edges stay hard"
+    },
+    {
+      "setting": "radius",
+      "original": "shadow.radius 1.6: ignored, three r170 reads radius only for PCFShadowMap and VSM",
+      "port": "shadow_blur 1.0",
+      "effect": "none in the original; porting radius 1.6 as a blur would soften the port beyond the original"
+    },
+    {
+      "setting": "map",
+      "original": "4096 x 4096, one map",
+      "port": "directional atlas 4096 (16-bit depth: true), 4 splits of 2048 each",
+      "effect": "resolution where the camera is"
+    },
+    {
+      "setting": "coverage",
+      "original": "orthographic box +-75 m (quality.shadowSize at high), near 1, far 520; target = camera + 0.45 S ahead (horizontal), snapped to texels in light space; light 260 m up the sun",
+      "port": "PSSM 4 splits to 100 m (max distance), offsets 0.1 / 0.2 / 0.5 -> far 10.09 / 20.08 / 50.05 / 100 m view depth; each split's box fits its frustum slice's bounding sphere, snapped (stable); pancake 20 m; fade from 80 %; blend_splits false",
+      "effect": "the port has no shadow past 100.00 m (about 1515 soda cans) of view depth (fading from 80 %); the original has none outside its box; the port's quality steps at the split seams"
+    },
+    {
+      "setting": "texel (world)",
+      "original": "3.7 cm (about 1.7 nickels) everywhere",
+      "port": "1.2 cm (about 1.2 AAA batterys) / 2.3 cm (about 1.1 nickels) / 5.7 cm (about 1.0 adult wrist) / 11.3 cm (about 1.7 soda cans) by split (this camera: 58 deg, 16:9)",
+      "effect": "the port is sharper than the original inside 20 m of view depth and coarser beyond; a bollard is 3 of the original's texels wide, so thin posts rasterize coarsely there"
+    },
+    {
+      "setting": "depth bias",
+      "original": "bias -0.00035 in [0,1] depth over far - near = 519 m: 18.2 cm (about 2.8 soda cans) toward the light",
+      "port": "shadow_bias 0.10: 0.10 / 100 x (2 r + pancake) x blur x quality radius -> 9.0 cm (about 1.4 soda cans) (split 1) to 13.3 cm (about 2.0 soda cans) (split 2) toward the light",
+      "effect": "removes shadow where the occluder is that close along the ray: a lit gap at the foot of each post, largest in the original"
+    },
+    {
+      "setting": "normal bias",
+      "original": "normalBias 3.5 cm (about 1.7 nickels) along the world normal: on the paving the lookup moves 5.8 cm (about 1.0 adult wrist) away from the sun, and tips shorten by that",
+      "port": "shadow_normal_bias 2.0 x split texel along the normal, its part along the light removed: 2.4 cm (about 1.1 nickels) / 4.5 cm (about 1.1 golf balls) / 11.4 cm (about 1.7 soda cans), so tips shorten 4.0 cm (about 1.9 nickels) / 7.5 cm (about 1.1 soda cans) / 19.0 cm (about 2.9 soda cans) by split",
+      "effect": "shadows shorter toward the sun by b / tan(elevation); in the port the shortening jumps at each split seam"
+    },
+    {
+      "setting": "shading of a shadow",
+      "original": "MeshToonMaterial: sun irradiance x shadow (linear), so the visible edge sits at 50 % attenuation; in shadow only the hemisphere light remains (about 23 % of lit luminance on the paving, then graded blue-violet)",
+      "port": "MToon: the attenuation enters lightIntensity before the toon ramp (_ShadeToony 0.9, _ShadeShift 0), so the edge snaps at about 69 % attenuation (paving, N.L 0.52); in shadow the shade colour (0.72, 0.68, 0.82) stays lit by the sun (42 % of lit in the sun alone)",
+      "effect": "the port's shadows are harder, slightly larger (dilated) and lighter than the original's"
+    },
+    {
+      "setting": "edge model fitted to the images (light plane)",
+      "original": "dilation 8.2 mm (about 1.2 pencils), normal-bias shift 5.7 cm (about 1.0 adult wrist), blur 2.5 cm (about 1.2 nickels)",
+      "port": "dilation 0.327 texel, normal-bias shift 1.807 texel (setting 2.0), blur 3.3 mm (about 2.2 pennys)",
+      "effect": "measured, not assumed: the sun is fitted with these as free parameters, so they do not bias it"
+    }
+  ],
+  "moge": {
+    "status": "not run",
+    "why": "RFD 2294 (where compute runs): heavy compute runs in a godot-sandbox guest or on ggml-rd/compute-rd, never as a host Python pipeline, and MoGe may run only as ggml in a guest; RFD 1167 lists MoGe read-only with no ggml-rd port, so method B would need that port first",
+    "weights_checked": {
+      "repo": "Ruicheng/moge-2-vitl-normal (MoGe-2, ViT-L, normals)",
+      "license": "MIT (model card), base model facebook/dinov2-large (Apache-2.0)",
+      "file": "model.pt",
+      "size_bytes": 1323815904,
+      "gated": false
+    },
+    "code": "3-interactor/moge-upstream 74fbce0: MIT, its DINOv2 module Apache-2.0",
+    "cost_of_the_python_route_not_taken": "a host deep-learning framework with GPU wheels (about 3 GB), MoGe's helper packages, a GPU kernel compiler for MoGe-3, and the 1.3 GB checkpoint; about 10 minutes on this desk, and off the route",
+    "cost_of_the_allowed_route": "a ggml port of DINOv2-L (24 ViT blocks) plus MoGe-2's conv heads into a guest on ggml-rd, then 8 oracle views at its 1.3 GB weights: a project of its own",
+    "would_add": "normals and depth independent of the port's geometry, a check of the cameras; here the cameras are checked directly instead (cameras: the original's live matrices against the port's, and its own depth against the port's)"
+  },
+  "port_splits": {
+    "far": [
+      10.0900001502037,
+      20.0800002989173,
+      50.0500000007451,
+      100.0
+    ],
+    "texel": [
+      0.0121737626524149,
+      0.0227235997294168,
+      0.0572228604164757,
+      0.113186274106202
+    ]
+  },
+  "log": [
+    "sun_locate: oracle: 8 post windows over views [1, 2, 3], 112495 entries; joint az -24.957 el 31.020 (to code sun 0.112 deg); edge d 8.2 mm (about 1.2 pencils), b 5.7 cm (about 1.0 adult wrist), s 2.5 cm (about 1.2 nickels); 28 s",
+    "sun_locate: oracle toon bands: 40 regions, 61716 pixels; joint az -25.005 el 31.137 (to code sun 0.015 deg)",
+    "sun_locate: port: 8 post windows over views [1, 2, 3], 105794 entries; joint az -25.030 el 31.175 (to code sun 0.056 deg); edge d 0.327 b 1.807 texels, s 3.3 mm (about 2.2 pennys); 24 s",
+    "sun_locate: port toon bands: 40 regions, 61716 pixels; joint az -24.937 el 31.205 (to code sun 0.103 deg)",
+    "sun_locate: control: 8 post windows over views [1, 2, 3], 107821 entries; joint az -27.024 el 31.096 (to code sun 1.726 deg); edge d 0.427 b 2.160 texels, s 3.3 mm (about 2.2 pennys); 25 s",
+    "sun_locate: control toon bands: 40 regions, 61781 pixels; joint az -26.953 el 30.961 (to code sun 1.674 deg)",
+    "sun_locate: original_rerender: 8 post windows over views [1, 2, 3], 112495 entries; joint az -24.957 el 31.020 (to code sun 0.112 deg); edge d 8.1 mm (about 1.2 pencils), b 5.7 cm (about 1.0 adult wrist), s 2.5 cm (about 1.2 nickels); 25 s",
+    "sun_locate: original_rerender toon bands: 40 regions, 61716 pixels; joint az -25.005 el 31.132 (to code sun 0.010 deg)",
+    "sun_locate: port_true_mask: 5 post windows over views [1, 3], 59201 entries; joint az -25.018 el 31.157 (to code sun 0.036 deg); edge d 0.284 b 1.869 texels, s 3.8 mm (about 2.5 pennys); 18 s",
+    "sun_locate: original_true_mask: 6 post windows over views [1, 3], 84577 entries; joint az -24.941 el 31.075 (to code sun 0.075 deg); edge d 1.0 cm (about 1.5 pencils), b 5.0 cm (about 1.2 golf balls), s 2.7 cm (about 1.3 nickels); 25 s"
+  ]
+}
