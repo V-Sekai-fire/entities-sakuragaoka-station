@@ -23,6 +23,7 @@ class EnvTextures extends RefCounted:
 	var fields := Fields.new()
 	var railing
 	var shrub
+	var facade
 	var school
 	var _rest
 
@@ -40,6 +41,7 @@ class EnvTextures extends RefCounted:
 			fields.set(k, T.draw(256, 256, null, {"key": "env-field-" + k, "repeat": [1, 1]}))
 		railing = T.draw(256, 128, null, {"key": "env-railing", "repeat": [1, 1]})
 		shrub = T.draw(256, 256, null, {"key": "env-shrub2", "repeat": [1, 1]})
+		facade = T.draw(256, 128, null, {"key": "env-facade"})
 		school = T.draw(512, 128, null, {"key": "env-school"})
 
 	func _get(p: StringName):
