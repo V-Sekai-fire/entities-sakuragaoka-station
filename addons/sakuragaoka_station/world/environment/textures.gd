@@ -15,6 +15,10 @@ class Fields extends RefCounted:
 class EnvTextures extends RefCounted:
 	var masonry
 	var path
+	var tufts
+	var flowers
+	var mats
+	var reeds
 	var fields := Fields.new()
 	var railing
 	var shrub
@@ -26,6 +30,10 @@ class EnvTextures extends RefCounted:
 		_rest = T.bag()
 		masonry = T.draw(512, 512, null, {"key": "env-masonry2", "repeat": [1, 1]})
 		path = T.draw(512, 512, null, {"key": "env-path", "repeat": [1, 1]})
+		tufts = T.draw(1024, 512, null, {"key": "env-tufts2"})
+		flowers = T.draw(1024, 512, null, {"key": "env-flowers2"})
+		mats = T.draw(512, 512, null, {"key": "env-mats"})
+		reeds = T.draw(512, 512, null, {"key": "env-reeds2"})
 		for k in ["dry", "veg", "renge", "wheat", "nano", "grass"]:
 			fields.set(k, T.draw(256, 256, null, {"key": "env-field-" + k, "repeat": [1, 1]}))
 		railing = T.draw(256, 128, null, {"key": "env-railing", "repeat": [1, 1]})
