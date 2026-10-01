@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="690" height="470" viewBox="0 0 690 470">
-<!-- lookdev-24: Macbeth-style chart, values from Pascale 2006 (BabelColor Avg.), see chart24.json -->
+<!-- lookdev-24: our own 24-patch colour chart, values from Pascale 2006 (BabelColor Avg.), see chart24.json -->
 <rect x="0" y="0" width="690" height="470" fill="#1a1a1a"/>
 <rect x="20" y="20" width="100" height="100" fill="#735143"/>
 <rect x="130" y="20" width="100" height="100" fill="#c49581"/>

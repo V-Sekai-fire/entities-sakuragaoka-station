@@ -1,5 +1,5 @@
 {
- "name": "lookdev-24, a Macbeth-style 24-patch reference chart",
+ "name": "lookdev-24, our own 24-patch colour chart",
  "layout": {
   "rows": 4,
   "cols": 6,
@@ -7,15 +7,15 @@
  },
  "values": "BabelColor Avg. (spectral average of 20 charts): L*a*b* and xyY under CIE D50; sRGB 8-bit derived by the paper (Section 5)",
  "source": {
-  "title": "RGB coordinates of the Macbeth ColorChecker",
   "author": "Danny Pascale",
   "publisher": "The BabelColor Company",
   "date": "2006-06-01",
   "url": "https://babelcolor.com/index_htm_files/RGB%20Coordinates%20of%20the%20Macbeth%20ColorChecker.pdf",
-  "table": "Table 2 (8-bit), 'BabelColor Avg.' block; check columns from the 'ColorChecker 2005' block"
+  "table": "Table 2 (8-bit): the 'BabelColor Avg.' block; check columns from the manufacturer's 2005 reference block",
+  "document": "Pascale (BabelColor), 2006: RGB coordinates of the classic 24-patch colour chart in four RGB spaces"
  },
  "notes": [
-  "ColorChecker and Macbeth are trademarks of their owners; this chart is our own layout carrying published colorimetric values.",
+  "Our own 6x4 layout carrying published colorimetric values (see source).",
   "srgb8_clipped marks channels at 0 or 255 (cyan R' = 0 lies outside sRGB); compare such patches by CIEDE2000 against lab_d50, not by sRGB equality."
  ],
  "patches": [
@@ -45,12 +45,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     115,
     82,
     68
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     37.99,
     13.56,
     14.06
@@ -82,12 +82,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     194,
     150,
     130
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     65.71,
     18.13,
     17.81
@@ -119,12 +119,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     98,
     122,
     157
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     49.93,
     -4.88,
     -21.93
@@ -156,12 +156,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     87,
     108,
     67
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     43.14,
     -13.1,
     21.91
@@ -193,12 +193,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     133,
     128,
     177
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     55.11,
     8.84,
     -25.4
@@ -230,12 +230,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     103,
     189,
     170
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     70.72,
     -33.4,
     -0.2
@@ -267,12 +267,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     214,
     126,
     44
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     62.66,
     36.07,
     57.1
@@ -304,12 +304,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     80,
     91,
     166
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     40.02,
     10.41,
     -45.96
@@ -341,12 +341,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     193,
     90,
     99
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     51.12,
     48.24,
     16.25
@@ -378,12 +378,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     94,
     60,
     108
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     30.33,
     22.98,
     -21.59
@@ -415,12 +415,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     157,
     188,
     64
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     72.53,
     -23.71,
     57.26
@@ -452,12 +452,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     224,
     163,
     46
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     71.94,
     19.36,
     67.86
@@ -489,12 +489,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     56,
     61,
     150
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     28.78,
     14.18,
     -50.3
@@ -526,12 +526,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     70,
     148,
     73
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     55.26,
     -38.34,
     31.37
@@ -563,12 +563,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     175,
     54,
     60
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     42.1,
     53.38,
     28.19
@@ -600,12 +600,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     231,
     199,
     31
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     81.73,
     4.04,
     79.82
@@ -637,12 +637,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     187,
     86,
     149
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     51.94,
     49.99,
     -14.57
@@ -674,12 +674,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     8,
     133,
     161
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     51.04,
     -28.63,
     -28.64
@@ -711,12 +711,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     243,
     243,
     242
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     96.54,
     -0.43,
     1.19
@@ -748,12 +748,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     200,
     200,
     200
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     81.26,
     -0.64,
     -0.34
@@ -785,12 +785,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     160,
     160,
     160
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     66.77,
     -0.73,
     -0.5
@@ -822,12 +822,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     122,
     122,
     121
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     50.87,
     -0.15,
     -0.27
@@ -859,12 +859,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     85,
     85,
     85
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     35.66,
     -0.42,
     -1.23
@@ -896,12 +896,12 @@
     false,
     false
    ],
-   "check_srgb8_cc2005_gmb": [
+   "check_srgb8_mfr2005": [
     52,
     52,
     52
    ],
-   "check_lab_d50_cc2005": [
+   "check_lab_d50_mfr2005": [
     20.46,
     -0.08,
     -0.97
