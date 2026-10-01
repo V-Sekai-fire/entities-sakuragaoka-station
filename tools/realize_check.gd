@@ -8,6 +8,7 @@
 #   godot --path . --resolution 1920x1080 --script tools/realize_check.gd -- --shots=<dir>
 #       [--hammersley=8@-1,-11.4 | --cams="x,z,yaw,pitch;..."] [--original=<prefix>] [--modules=...]
 #       [--q=high|medium|low]   the original's ?q= level (core/quality.gd), default high
+#       [--tint-group-max=n]    Realize.tint_group_max for this run
 extends SceneTree
 
 const Layout = preload("res://addons/sakuragaoka_station/world/layout.gd")
@@ -32,6 +33,7 @@ var _last := PackedByteArray()
 var _t0 := Time.get_ticks_msec()
 var _layout = Layout.new("")
 var _quality := "high"
+var _gpu := 0.0
 
 
 func _initialize() -> void:
@@ -45,6 +47,8 @@ func _initialize() -> void:
 			mods = a.substr(10)
 		elif a.begins_with("--q="):
 			_quality = a.substr(4)
+		elif a.begins_with("--tint-group-max="):
+			Realize.tint_group_max = int(a.substr(17))
 		elif a.begins_with("--hammersley="):
 			_cams = _hammersley(a.substr(13))
 		elif a.begins_with("--cams="):
@@ -71,8 +75,9 @@ func _on_built(s: Dictionary) -> void:
 			",".join(s.modules), s.meshes, s.solids, s.surfaces, s.single, s.instanced, s.skipped])
 	print("realize: geometries %d manifold, %d open; CSG %d triangles in, %d out; %d cells kept raw, %d combiners failed" % [
 			s.manifold, s.open, s.csg_in, s.csg_out, s.csg_raw, s.csg_failed])
-	print("realize: %d palette colours; %d blossom masses; %d alpha-cut cards held (no Slug or mesh form); %d instance tints dropped" % [
-			s.colours, s.blob, s.held, s.instance_tints_dropped])
+	print("realize: %d palette colours; %d blossom masses; %d alpha-cut cards held (no Slug or mesh form)" % [s.colours, s.blob, s.held])
+	print("realize: instance tints: %d dropped, %d grouped into a MultiMesh per tint (up to %d tints an object), %d as instance colours; %d MultiMeshes" % [
+			s.instance_tints_dropped, s.instance_tints_grouped, Realize.tint_group_max, s.instance_tints_coloured, s.multimeshes])
 	var atlas = SlugAtlas.shared()
 	print("realize: canvas textures: %d surfaces drawn by Slug, %d on the mean-colour fallback; modes mesh %d, slug %d, mean %d" % [
 			s.slugged, s.fallback, s.mode_mesh, s.mode_slug, s.mode_mean])
@@ -95,6 +100,7 @@ func _on_built(s: Dictionary) -> void:
 	_cam.far = 2500.0
 	get_root().add_child(_cam)
 	_cam.make_current()
+	RenderingServer.viewport_set_measure_render_time(get_root().get_viewport_rid(), true)
 	_frames = 0
 
 
@@ -112,6 +118,9 @@ func _process(_dt: float) -> bool:
 			quit()
 			return false
 		_place(_cams[_view])
+		_gpu = 0.0
+	elif _frames >= 4 and _frames < 12:
+		_gpu += RenderingServer.viewport_get_measured_render_time_gpu(get_root().get_viewport_rid())
 	elif _frames == 12:
 		var img := get_root().get_texture().get_image()
 		var data := img.get_data()
@@ -120,7 +129,9 @@ func _process(_dt: float) -> bool:
 		_last = data
 		var file := _out.path_join("port-view_%d.png" % _view)
 		img.save_png(file)
-		var line := "realize: view %d %s saved %s" % [_view, str(_cams[_view]), file]
+		var line := "realize: view %d %s saved %s; draw calls %d (shadows %d), GPU %.2f ms" % [_view, str(_cams[_view]), file,
+				get_root().get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
+				get_root().get_render_info(Viewport.RENDER_INFO_TYPE_SHADOW, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME), _gpu / 8.0]
 		if _original != "":
 			line += _compare(img, "%s_%d.png" % [_original, _view])
 		print(line)

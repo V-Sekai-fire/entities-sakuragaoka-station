@@ -35,10 +35,16 @@ const PALETTE := 512
 ## instead, which shows the same vector content on the original geometry's own triangles.
 const BAKE_TRI_BUDGET := 4096
 const SHADE := Color(0.72, 0.68, 0.82)
+## MToon reading the instance tint from COLOR (core/mtoon_tint.gdshaderinc), for palette MultiMeshes.
+const TINT := "res://addons/sakuragaoka_station/core/mtoon_tint"
+## Distinct instance tints a palette object may split into, a MultiMesh each; past it they ride as
+## MultiMesh instance colours through the tint variant (one MultiMesh), as Slug cards always do.
+static var tint_group_max := 8
 
 var stats := {"meshes": 0, "solids": 0, "surfaces": 0, "single": 0, "instanced": 0, "skipped": 0,
 		"held": 0, "blob": 0, "batches": 0, "csg_in": 0, "csg_out": 0, "csg_failed": 0, "csg_raw": 0,
-		"manifold": 0, "open": 0, "colours": 0, "instance_tints_dropped": 0,
+		"manifold": 0, "open": 0, "colours": 0, "instance_tints_dropped": 0, "instance_tints_grouped": 0,
+		"instance_tints_coloured": 0, "multimeshes": 0,
 		"slugged": 0, "fallback": 0, "mode_mesh": 0, "mode_slug": 0, "mode_mean": 0, "baked_cards": 0,
 		"baked_decals": 0, "baked_tris": 0, "decal_capped": 0, "ramps": 0, "bake_replaced": 0}
 var _root: Node3D
@@ -258,6 +264,7 @@ func _instanced(o) -> void:
 		return
 	var gd := _geo_data(o.geometry)
 	var mesh: ArrayMesh = null
+	var slug_mesh := false
 	var base_tris := 0
 	if md == "mesh":
 		var am := ArrayMesh.new()
@@ -275,33 +282,97 @@ func _instanced(o) -> void:
 		mesh = ArrayMesh.new()
 		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _slug_arrays(gd, gd.idx, m))
 		mesh.surface_set_material(0, _slug_mtoon(m))
+		slug_mesh = true
 		stats.slugged += 1
 		_tally("Slug instanced" + (" cards" if card else ""), gd.idx.size() / 3 * o.count, o)
 	if mesh == null and card:
 		stats.held += 1
 		return
 	stats.instanced += 1
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	if mesh != null:
-		mm.mesh = mesh
-	else:
-		if md != "":
-			stats.fallback += 1
-		mm.mesh = _array_mesh(_coloured(gd, gd.idx, _mean_colour(m), gd.cols if m.vertex_colors else null, "g%d" % gd.id))
-		_tally("palette instanced", gd.idx.size() / 3 * o.count)
-	mm.instance_count = o.count
+	if mesh == null and md != "":
+		stats.fallback += 1
+	# three.js multiplies instanceColor into the material colour: a palette object with few tints
+	# splits into a MultiMesh per tint, anything else carries them as instance colours
+	var tints := _tints(o)
+	var shader_mat: bool = m.type == "shader" and not m.user_data.get("distant", {}).is_empty()
+	var coloured: bool = not tints.is_empty() and (mesh != null or (tints.size() > tint_group_max and not shader_mat))
+	var groups: Array = tints.values() if not tints.is_empty() and not coloured else [[Color(1, 1, 1), null]]
+	stats["instance_tints_coloured" if coloured else "instance_tints_grouped"] += o.count if not tints.is_empty() else 0
+	var am = mesh
+	if coloured and mesh != null and not slug_mesh:
+		am = _tint_mesh(mesh)
+	for g in groups:
+		var ids = g[1]
+		var n: int = o.count if ids == null else ids.size()
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = coloured
+		if am != null:
+			mm.mesh = am
+		else:
+			mm.mesh = _array_mesh(_coloured(gd, gd.idx, _mean_colour(m) * g[0], gd.cols if m.vertex_colors else null, "g%d" % gd.id))
+			_tally("palette instanced", gd.idx.size() / 3 * n)
+		mm.instance_count = n
+		for i in n:
+			var src: int = i if ids == null else ids[i]
+			mm.set_instance_transform(i, o.instance_matrix[src])
+			if coloured:
+				mm.set_instance_color(i, _slug_tint(m, o.instance_color[src]) if slug_mesh else o.instance_color[src])
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = o.name if o.name != "" else "instanced"
+		mmi.multimesh = mm
+		mmi.transform = o.matrix_world
+		if am == null:
+			mmi.material_override = _tint_mtoon(m) if coloured else _mtoon(m)
+		_root.add_child(mmi)
+		stats.multimeshes += 1
+
+
+## An instanced object's distinct tints: {html: [tint, instance indices]}, empty without tints.
+static func _tints(o) -> Dictionary:
+	var out := {}
+	if o.instance_color == null:
+		return out
 	for i in o.count:
-		mm.set_instance_transform(i, o.instance_matrix[i])
-	if o.instance_color != null:
-		stats.instance_tints_dropped += o.count
-	var mmi := MultiMeshInstance3D.new()
-	mmi.name = o.name if o.name != "" else "instanced"
-	mmi.multimesh = mm
-	mmi.transform = o.matrix_world
-	if mesh == null:
-		mmi.material_override = _mtoon(m)
-	_root.add_child(mmi)
+		var c: Color = o.instance_color[i]
+		var k := c.to_html()
+		if not out.has(k):
+			out[k] = [c, []]
+		out[k][1].append(i)
+	return out
+
+
+## The instance colour for a Slug MultiMesh: its vertex COLOR is the sRGB-encoded tint, so the factor
+## that turns srgb(tint) into srgb(tint x instance tint).
+func _slug_tint(m, t: Color) -> Color:
+	var tint: Color = m.color if m.map == null or _in_atlas(m.map) else _mean_colour(m)
+	var a := Color(tint.r, tint.g, tint.b).clamp().linear_to_srgb()
+	var b := Color(tint.r * t.r, tint.g * t.g, tint.b * t.b).clamp().linear_to_srgb()
+	return Color(b.r / a.r if a.r > 0.0 else 0.0, b.g / a.g if a.g > 0.0 else 0.0, b.b / a.b if a.b > 0.0 else 0.0)
+
+
+## The palette MToon of m reading the instance tint (TINT variants), for a MultiMesh with colours.
+func _tint_mtoon(m) -> ShaderMaterial:
+	var k := _mat_key(m) + "|tint"
+	if _materials.has(k):
+		return _materials[k]
+	var sm: ShaderMaterial = _mtoon(m).duplicate()
+	sm.shader = load(TINT + _variant(m, "") + ".gdshader")
+	sm.set_shader_parameter("tint_emission", m.type == "basic")
+	_materials[k] = sm
+	return sm
+
+
+## A baked mesh whose palette MToon surfaces read the instance tint.
+func _tint_mesh(mesh: ArrayMesh) -> ArrayMesh:
+	var am: ArrayMesh = mesh.duplicate()
+	for i in am.get_surface_count():
+		var sm = am.surface_get_material(i)
+		if sm is ShaderMaterial and sm.shader != null and sm.shader.resource_path.begins_with(MTOON):
+			var t: ShaderMaterial = sm.duplicate()
+			t.shader = load(TINT + sm.shader.resource_path.get_file().get_basename().trim_prefix("mtoon") + ".gdshader")
+			am.surface_set_material(i, t)
+	return am
 
 
 ## One object as its own MeshInstance3D, a surface per material group. Baked canvas triangles of
