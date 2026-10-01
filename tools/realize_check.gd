@@ -1,6 +1,6 @@
 # Builds and realizes the station and reports what a renderer draws: batches, solids through CSG
 # and the triangles they came out as, single and instanced meshes, total triangles, and times.
-# Cameras follow the three.js original's player (tools/shot.mjs): "x,z,yaw,pitch" is an eye 1.52 m
+# Cameras follow the three.js original's player (tools/oracle/shot.mjs): "x,z,yaw,pitch" is an eye 1.52 m
 # above the ground, "x,y,z,yaw,pitch" a free camera, yaw 0 north (-Z), Euler YXZ, 58 degree vertical
 # field of view. --hammersley n@x,z puts n eyes at (x,z) at the sphere Hammersley sequence's angles,
 # as shot.mjs does. --original=<prefix> sets each render beside <prefix>_<i>.png and prints the mean
