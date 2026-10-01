@@ -541,7 +541,7 @@ func _mtoon(m) -> ShaderMaterial:
 			_materials[k] = custom
 			return custom
 	var sm := ShaderMaterial.new()
-	if m.type == "toon":
+	if m.type == "toon" or m.type == "basic":
 		sm.shader = load(RAMP + _variant(m, "mtoon_ramp_sakura" if RampSakura.wants(m) else "mtoon_ramp") + ".gdshader")
 	else:
 		sm.shader = load(MTOON + _variant(m, "mtoon") + ".gdshader")
@@ -604,7 +604,7 @@ func _toon_params(sm: ShaderMaterial, m) -> void:
 		sm.set_shader_parameter("_EmissionColor", Color(1, 1, 1))
 	elif m.emissive != Color(0, 0, 0):
 		sm.set_shader_parameter("_EmissionColor", (m.emissive * m.emissive_intensity).linear_to_srgb())
-	if m.type == "toon":
+	if m.type == "toon" or m.type == "basic":
 		sm.set_shader_parameter("ramp_paint", _ramp_paint(m))
 		sm.set_shader_parameter("ramp_flip", _ramp_flip(m))
 	if m.user_data.get("overlay", false):
