@@ -4,6 +4,7 @@ extends RefCounted
 
 
 class EnvTextures extends RefCounted:
+	var ground
 	var tufts
 	var flowers
 	var mats
@@ -13,6 +14,7 @@ class EnvTextures extends RefCounted:
 	func _init(ctx) -> void:
 		var T = ctx.tex
 		_rest = T.bag()
+		ground = T.draw(512, 512, null, {"key": "env-ground", "repeat": [1, 1]})
 		tufts = T.draw(1024, 512, null, {"key": "env-tufts2"})
 		flowers = T.draw(1024, 512, null, {"key": "env-flowers2"})
 		mats = T.draw(512, 512, null, {"key": "env-mats"})
