@@ -420,3 +420,15 @@ static func pack_stamps(r: Dictionary, stops: PackedInt32Array) -> Dictionary:
 		sol.append(si)
 	return {"error": "", "px": px, "rows": rows, "cells": cells, "cell_rows": cell_rows, "stamp_of_layer": sol,
 			"stamp_layer_count": stamp_layer_count, "instance_count": instance_count}
+
+
+static func score_rgba(a: PackedByteArray, b: PackedByteArray, w: int, h: int) -> PackedFloat64Array:
+	if sandbox() == null:
+		return PackedFloat64Array()
+	return _sb.vmcall("score_rgba", a, b, w, h)
+
+
+static func diff_rgba(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
+	if sandbox() == null:
+		return PackedByteArray()
+	return _sb.vmcall("diff_rgba", a, b)

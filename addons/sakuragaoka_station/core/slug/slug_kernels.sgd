@@ -16,6 +16,8 @@
 #   ramp_row        realize.gd _ramp_row's colours (linear gradient times tint, sRGB)
 #   blob_cols       realize.gd _blob_cols (a blossom mass's band colours)
 #   split_coloured  realize.gd _coloured's per-vertex-colour branch (faces split, per-face colour)
+#   score_rgba      tools/oracle/score_renders.gd's image metric (guest only, no GDScript twin)
+#   diff_rgba       tools/oracle/score_renders.gd's contact-sheet difference images (guest only, no GDScript twin)
 extends Node
 
 const DATA_WIDTH := 1024
@@ -425,3 +427,101 @@ func pack_stamps(r: Dictionary, stops: PackedInt32Array) -> Dictionary:
 		sol.append(si)
 	return {"error": "", "px": px, "rows": rows, "cells": cells, "cell_rows": cell_rows, "stamp_of_layer": sol,
 			"stamp_layer_count": stamp_layer_count, "instance_count": instance_count}
+
+
+## [mae (alpha-weighted mean |linear RGB| difference), alpha_mae, iou, cov_1px (alpha >= 128 pixels with one
+## within 1 px in the other image), weight_sum, weighted_error_sum] of two w x h RGBA8 images.
+func score_rgba(a: PackedByteArray, b: PackedByteArray, w: int, h: int) -> PackedFloat64Array:
+	var lin := PackedFloat32Array()
+	lin.resize(256)
+	for i in 256:
+		var c := float(i) / 255.0
+		if c <= 0.04045:
+			lin[i] = c / 12.92
+		else:
+			lin[i] = pow((c + 0.055) / 1.055, 2.4)
+	var n := w * h
+	var ca := PackedByteArray()
+	var cb := PackedByteArray()
+	ca.resize(n)
+	cb.resize(n)
+	var sw := 0.0
+	var se := 0.0
+	var ae := 0.0
+	var inter := 0
+	var uni := 0
+	for i in n:
+		var p := i * 4
+		var a3: int = a[p + 3]
+		var b3: int = b[p + 3]
+		var aa := float(a3) / 255.0
+		var ab := float(b3) / 255.0
+		ae += absf(aa - ab)
+		var ia := a3 >= 128
+		var ib := b3 >= 128
+		if ia or ib:
+			uni += 1
+			if ia and ib:
+				inter += 1
+		ca[i] = 1 if ia else 0
+		cb[i] = 1 if ib else 0
+		var wgt := maxf(aa, ab)
+		if wgt == 0.0:
+			continue
+		var e := (absf(lin[a[p]] - lin[b[p]]) + absf(lin[a[p + 1]] - lin[b[p + 1]]) + absf(lin[a[p + 2]] - lin[b[p + 2]])) / 3.0
+		sw += wgt
+		se += wgt * e
+	var na := 0
+	var nb := 0
+	var ma := 0
+	var mb := 0
+	for y in h:
+		for x in w:
+			var i := y * w + x
+			if ca[i] == 1:
+				na += 1
+				if cb[i] == 1 or _near(cb, x, y, w, h):
+					ma += 1
+			if cb[i] == 1:
+				nb += 1
+				if ca[i] == 1 or _near(ca, x, y, w, h):
+					mb += 1
+	var out := PackedFloat64Array()
+	out.resize(6)
+	out[0] = se / sw if sw > 0.0 else 0.0
+	out[1] = ae / float(n) if n > 0 else 0.0
+	out[2] = float(inter) / float(uni) if uni > 0 else 1.0
+	out[3] = float(ma + mb) / float(na + nb) if na + nb > 0 else 1.0
+	out[4] = sw
+	out[5] = se
+	return out
+
+
+func _near(m: PackedByteArray, x: int, y: int, w: int, h: int) -> bool:
+	for dy in range(-1, 2):
+		var yy := y + dy
+		if yy < 0 or yy >= h:
+			continue
+		for dx in range(-1, 2):
+			var xx := x + dx
+			if xx >= 0 and xx < w and m[yy * w + xx] == 1:
+				return true
+	return false
+
+
+## The largest channel difference of two RGBA8 images, times 4, as (v, 0.4 v, 0, 255).
+func diff_rgba(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(a.size())
+	for p in range(0, a.size() - 3, 4):
+		var m := 0
+		for k in 4:
+			var d: int = absi(int(a[p + k]) - int(b[p + k]))
+			if d > m:
+				m = d
+		var v := mini(255, m * 4)
+		out[p] = v
+		out[p + 1] = int(float(v) * 0.4 + 0.5)
+		out[p + 2] = 0
+		out[p + 3] = 255
+	return out

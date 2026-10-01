@@ -13,15 +13,19 @@
 //   --ablate text|tiny  deliberately drop text or tiny (<=16 px2) fills, to see what the score does when content is missing
 //   --no-stamp / --stamp-min N  disable stamping (instancing) / change the minimum run length (default 8: below it,
 //                  runs save little; 32 -> 8 saved 4.3k curves on the port keys, 8 -> 4 only 0.7k for 32 more runs)
-//   --png <dir>    also write <key>.real/.direct/.svg.png and labelled contact sheets <out>/oracle-sheet-NN.png
+//   --png <dir>    keep the renders (<key>.real/.direct/.svg.png, the difference images .dab/.dbc.png) and write
+//                  labelled contact sheets <out>/oracle-sheet-NN.png
 //                  (12 keys per sheet: canvas | direct SVG | optimized SVG | |A-B| x4 | |B-C| x4; failing keys first,
 //                  then the worst emitter error)
 //   --sheet-copy <dir>  also copy each sheet to <dir>/oracle-canvas-vs-svg-NN.png, numbering after the highest existing NN
 //   --direct-out <dir>  also write the direct (1:1) SVGs B there
+//   --godot <exe>  the Godot that scores the renders (default: godot on PATH)
 //   --no-font-gate skip the second pass that preloads the webfonts before the page draws
 //   --no-determinism    skip the second page load that checks A, B and C reproduce byte for byte
 // Three-way verification per key: A = the real canvas, B = a direct 1:1 SVG of the recorded calls, C = the optimized
 // SVG; floor = d(A,B), emitter error = d(B,C), residual = d(A,C) (what pass/fail uses); see manifest.verification.
+// The browser records and renders; the scores come from Godot, tools/oracle/score_renders.gd, through the guest kernel
+// score_rgba (core/slug/kernels.gd -> slug_kernels.sgd), as RFD 2294 requires of heavy compute.
 // Text is converted to outlines with opentype.js (fetched once from jsdelivr) and the TTF subsets of the
 // Google Fonts families that index.html loads (fetched with text=<the characters drawn>); both are
 // cached under <os tmp>/sakuragaoka-canvas-svg-cache. Glyph positions come from the browser's own
@@ -35,6 +39,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -1170,33 +1175,7 @@ try {
     protoInfo: new Map(), stampGradIds: new Set(), stampGradUses: 0, stampGradAlphaFactored: new Set(), inlined: 0, dupBytes: 0, unsup: {} });
   const wrapSvg = (em) => `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="${em.W}" height="${em.H}" viewBox="0 0 ${em.W} ${em.H}">` +
     (em.defs.length ? `<defs>${em.defs.join('')}</defs>` : '') + em.body + '</svg>\n';
-  // ---------------------------------------------------------------- metric: ONE implementation, injected into the pages
-  // A = reference RGBA, B = candidate RGBA (getImageData, unpremultiplied), both w x h.
-  //  mae      alpha-weighted mean |linear RGB| difference (weight = max alpha of the two pixels)
-  //  cov1px   share of alpha>=0.5 pixels in either image with a covered pixel within 1 px in the other
-  function scoreRGBA(A, B, w, h) {
-    let LIN = scoreRGBA.LIN;
-    if (!LIN) { LIN = scoreRGBA.LIN = new Float32Array(256); for (let i = 0; i < 256; i++) { const c = i / 255; LIN[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); } }
-    let sw = 0, se = 0, ae = 0, inter = 0, uni = 0;
-    for (let p = 0; p < A.length; p += 4) {
-      const aa = A[p + 3] / 255, ab = B[p + 3] / 255, wgt = Math.max(aa, ab);
-      ae += Math.abs(aa - ab);
-      const ia = aa >= 0.5, ib = ab >= 0.5; if (ia || ib) { uni++; if (ia && ib) inter++; }
-      if (!wgt) continue;
-      const e = (Math.abs(LIN[A[p]] - LIN[B[p]]) + Math.abs(LIN[A[p + 1]] - LIN[B[p + 1]]) + Math.abs(LIN[A[p + 2]] - LIN[B[p + 2]])) / 3;
-      sw += wgt; se += wgt * e;
-    }
-    const n = A.length / 4;
-    const cov = (D) => { const m = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) m[i] = D[i * 4 + 3] >= 128 ? 1 : 0; return m; };
-    const ca = cov(A), cb = cov(B);
-    const near = (m, x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h && m[yy * w + xx]) return true; } return false; };
-    let na = 0, nb = 0, ma = 0, mb = 0;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (ca[i]) { na++; if (cb[i] || near(cb, x, y)) ma++; } if (cb[i]) { nb++; if (ca[i] || near(ca, x, y)) mb++; } }
-    // sw / se (weight and weighted-error sums) let a floor be expressed in a key's own units: se_floor / sw_key
-    return { mae: sw ? se / sw : 0, alphaMae: ae / n, iou: uni ? inter / uni : 1, cov1px: na + nb ? (ma + mb) / (na + nb) : 1, sw, se };
-  }
-  const installHelpers = (pg) => pg.evaluate((src) => {
-    window.__score = eval('(' + src + ')');
+  const installHelpers = (pg) => pg.evaluate(() => {
     window.__hash = async (u8) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', u8))).map(b => b.toString(16).padStart(2, '0')).join('');
     // CPU-backed canvas: the GPU path rounds translucent fills differently depending on the SVG's structure
     // (+-3/255 on 0.3-alpha fills), which is renderer noise, not a difference in the SVG
@@ -1207,9 +1186,7 @@ try {
       og.drawImage(img, 0, 0, w, h); URL.revokeObjectURL(url);
       return { canvas: oc, data: og.getImageData(0, 0, w, h).data };
     };
-    window.__b64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
-    window.__unb64 = (b) => { const s = atob(b); const u = new Uint8ClampedArray(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
-  }, scoreRGBA.toString());
+  });
 
   // ---------------------------------------------------------------- three-way verification, one key at a time
   //  A = the real canvas (oracle); B = the DIRECT SVG (every recorded call 1:1, full precision); C = the optimized
@@ -1220,7 +1197,8 @@ try {
   if (!onlyKeys) for (const f of fs.readdirSync(outDir)) if (f.endsWith('.svg')) fs.unlinkSync(path.join(outDir, f));
   const directDir = args['direct-out'] ? path.resolve(args['direct-out']) : fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-svg-direct-'));
   fs.mkdirSync(directDir, { recursive: true });
-  if (args.png) fs.mkdirSync(args.png, { recursive: true });
+  const rendersDir = args.png ? path.resolve(args.png) : fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-svg-renders-'));
+  fs.mkdirSync(rendersDir, { recursive: true });
   await installHelpers(page);
   const results = [];
   for (const kk of keyed.res) {
@@ -1233,19 +1211,15 @@ try {
     const dnotes = {}, direct = wrapSvg(emitDirect(kk.id, cv.items.length, 'd', (k, c = 1) => { dnotes[k] = (dnotes[k] || 0) + c; }));
     fs.writeFileSync(path.join(outDir, file), svg);
     fs.writeFileSync(path.join(directDir, file), direct);
-    const three = await page.evaluate(async (key, svgC, svgB, png) => {
+    const three = await page.evaluate(async (key, svgC, svgB) => {
       const c = window.__texByKey.get(key).image, w = c.width, h = c.height;
       const A = c.getContext('2d').getImageData(0, 0, w, h).data;
       const rC = await window.__svgRaster(svgC, w, h), rB = await window.__svgRaster(svgB, w, h);
       if (!rC || !rB) return { error: (!rC ? 'optimized' : 'direct') + ' svg decode failed' };
-      const res = {
-        residual: window.__score(A, rC.data, w, h), floor: window.__score(A, rB.data, w, h), emitter: window.__score(rB.data, rC.data, w, h),
-        hashA: await window.__hash(A), hashB: await window.__hash(rB.data), hashC: await window.__hash(rC.data),
-      };
-      if (png) res.png = [c.toDataURL('image/png'), rB.canvas.toDataURL('image/png'), rC.canvas.toDataURL('image/png')];
-      return res;
-    }, kk.key, svg, direct, !!args.png);
-    if (three.png) { for (const [i, tag] of [[0, 'real'], [1, 'direct'], [2, 'svg']]) fs.writeFileSync(path.join(args.png, file.replace(/[.]svg$/, `.${tag}.png`)), Buffer.from(three.png[i].split(',')[1], 'base64')); delete three.png; }
+      return { hashA: await window.__hash(A), hashB: await window.__hash(rB.data), hashC: await window.__hash(rC.data),
+        png: [c.toDataURL('image/png'), rB.canvas.toDataURL('image/png'), rC.canvas.toDataURL('image/png')] };
+    }, kk.key, svg, direct);
+    if (three.png) { for (const [i, tag] of [[0, 'real'], [1, 'direct'], [2, 'svg']]) fs.writeFileSync(path.join(rendersDir, file.replace(/[.]svg$/, `.${tag}.png`)), Buffer.from(three.png[i].split(',')[1], 'base64')); delete three.png; }
     results.push({ ...kk, file, stats, ops: cv.ops, dnotes, three, bytes: Buffer.byteLength(svg), directBytes: Buffer.byteLength(direct), gradients: (svg.match(/<(linear|radial)Gradient /g) || []).length });
   }
   for (const k of Object.keys(canvases)) delete canvases[k];
@@ -1275,6 +1249,24 @@ try {
     await page2.close();
   }
   if (!args['direct-out']) fs.rmSync(directDir, { recursive: true, force: true });
+
+  // the scores: Godot scores the renders through the guest kernel score_rgba (tools/oracle/score_renders.gd)
+  const toScore = results.filter(r => r.file && r.three && !r.three.error);
+  if (toScore.length) {
+    const keysFile = path.join(rendersDir, 'keys.json'), scoresFile = path.join(rendersDir, 'scores.json');
+    fs.writeFileSync(keysFile, JSON.stringify(Object.fromEntries(toScore.map(r => [r.key, r.file]))));
+    fs.rmSync(scoresFile, { force: true });
+    const g = spawnSync(args.godot || 'godot', ['--headless', '--path', path.resolve(here, '../..'), '--script', 'res://tools/oracle/score_renders.gd', '--',
+      `--renders=${rendersDir}`, `--files=${keysFile}`, `--out=${scoresFile}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
+    for (const l of `${g.stdout || ''}${g.stderr || ''}`.split(/\r?\n/)) if (/score_renders/.test(l)) console.log(l);
+    const sc = fs.existsSync(scoresFile) ? JSON.parse(fs.readFileSync(scoresFile, 'utf8')) : {};
+    const obj = (v) => ({ mae: v[0], alphaMae: v[1], iou: v[2], cov1px: v[3], sw: v[4], se: v[5] });
+    for (const r of toScore) {
+      const k = sc[r.key];
+      if (k && !k.error) Object.assign(r.three, { residual: obj(k.residual), floor: obj(k.floor), emitter: obj(k.emitter) });
+      else r.three.error = k && k.error ? k.error : `not scored (godot exit ${g.status}${g.error ? ': ' + g.error.message : ''})`;
+    }
+  }
 
   // ---------------------------------------------------------------- write
   const manifest = {
@@ -1381,7 +1373,7 @@ try {
   // ---------------------------------------------------------------- contact sheets (with --png): one row per key,
   // canvas | direct SVG | optimized SVG | |A-B| x4 | |B-C| x4; failing keys first, then the worst emitter error d(B,C)
   if (args.png) {
-    const keys = Object.keys(manifest.keys).filter(k => manifest.keys[k].emitter_error && fs.existsSync(path.join(args.png, manifest.keys[k].file.replace(/[.]svg$/, '.real.png'))));
+    const keys = Object.keys(manifest.keys).filter(k => manifest.keys[k].emitter_error && fs.existsSync(path.join(rendersDir, manifest.keys[k].file.replace(/[.]svg$/, '.dbc.png'))));
     keys.sort((a, b) => (manifest.keys[a].pass - manifest.keys[b].pass) || manifest.keys[b].emitter_error.mae - manifest.keys[a].emitter_error.mae);
     const rows = keys.map(k => {
       const e = manifest.keys[k], s = e.stamp, dt = e.deterministic;
@@ -1397,13 +1389,6 @@ try {
     const drawSheet = async (pg, cell) => {
       const load = (s) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = s; });
       const LABEL = 56, GAP = 10, HEAD = 34, PAD = 10, W = PAD * 2 + cell * 5 + GAP * 4;
-      const diff = (P, Q, w, h) => {
-        const t = document.createElement('canvas'); t.width = w; t.height = h; const tg = t.getContext('2d', { willReadFrequently: true });
-        tg.drawImage(P, 0, 0); const da = tg.getImageData(0, 0, w, h).data; tg.clearRect(0, 0, w, h); tg.drawImage(Q, 0, 0); const db = tg.getImageData(0, 0, w, h).data;
-        const D = tg.createImageData(w, h);
-        for (let i = 0; i < da.length; i += 4) { let m = 0; for (let k = 0; k < 4; k++) m = Math.max(m, Math.abs(da[i + k] - db[i + k])); const v = Math.min(255, m * 4); D.data[i] = v; D.data[i + 1] = v * 0.4; D.data[i + 2] = 0; D.data[i + 3] = 255; }
-        tg.putImageData(D, 0, 0); return t;
-      };
       const c = document.createElement('canvas'); c.width = W; c.height = HEAD + pg.length * (LABEL + cell + GAP) + PAD;
       const g = c.getContext('2d', { willReadFrequently: true });
       g.fillStyle = '#1d1e22'; g.fillRect(0, 0, c.width, c.height);
@@ -1414,8 +1399,9 @@ try {
         g.font = 'bold 13px "Segoe UI", Arial, sans-serif'; g.fillStyle = r.fail ? '#ff7070' : '#f2f2f2'; g.fillText(r.title, PAD, y + 11);
         g.font = '12px "Segoe UI", Arial, sans-serif'; g.fillStyle = r.fail ? '#ffb0b0' : '#aebccc'; g.fillText(r.info, PAD, y + 28); g.fillStyle = '#8f9bab'; g.fillText(r.info2, PAD, y + 44);
         y += LABEL;
-        const [A, B, C] = [await load(r.imgs[0]), await load(r.imgs[1]), await load(r.imgs[2])], w = A.width, h = A.height, sc = Math.min(cell / w, cell / h), dw = w * sc, dh = h * sc;
-        [A, B, C, diff(A, B, w, h), diff(B, C, w, h)].forEach((img, i) => {
+        const im = []; for (const u of r.imgs) im.push(await load(u));
+        const w = im[0].width, h = im[0].height, sc = Math.min(cell / w, cell / h), dw = w * sc, dh = h * sc;
+        im.forEach((img, i) => {
           const x = PAD + i * (cell + GAP);
           if (i < 3) for (let cy = 0; cy < cell; cy += 16) for (let cx = 0; cx < cell; cx += 16) { g.fillStyle = ((cx + cy) / 16) % 2 ? '#8f8f8f' : '#bdbdbd'; g.fillRect(x + cx, y + cy, 16, 16); }
           else { g.fillStyle = '#000'; g.fillRect(x, y, cell, cell); }
@@ -1429,7 +1415,7 @@ try {
     if (!onlyKeys) for (const f of fs.readdirSync(outDir)) if (/^oracle-sheet-\d+\.png$/.test(f)) fs.unlinkSync(path.join(outDir, f));
     const written = [];
     for (let p = 0; p < rows.length; p += 12) {
-      const pg = rows.slice(p, p + 12).map(r => ({ ...r, imgs: ['real', 'direct', 'svg'].map(tag => 'data:image/png;base64,' + fs.readFileSync(path.join(args.png, r.file.replace(/[.]svg$/, `.${tag}.png`))).toString('base64')) }));
+      const pg = rows.slice(p, p + 12).map(r => ({ ...r, imgs: ['real', 'direct', 'svg', 'dab', 'dbc'].map(tag => 'data:image/png;base64,' + fs.readFileSync(path.join(rendersDir, r.file.replace(/[.]svg$/, `.${tag}.png`))).toString('base64')) }));
       const url = await sheetPage.evaluate(drawSheet, pg, 256);
       const f = path.join(outDir, `oracle-sheet-${String(written.length + 1).padStart(2, '0')}.png`); fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64')); written.push(f);
     }
@@ -1441,6 +1427,7 @@ try {
       for (const f of written) { let dst; do { nn++; dst = path.join(dir, `oracle-canvas-vs-svg-${String(nn).padStart(2, '0')}.png`); } while (fs.existsSync(dst)); fs.copyFileSync(f, dst); console.log(`sheet copy: ${dst}`); }
     }
   }
+  if (!args.png) fs.rmSync(rendersDir, { recursive: true, force: true });
   console.log(`peak memory: node maxRSS ${(process.resourceUsage().maxRSS / 1024).toFixed(0)} MB`);
 } finally {
   await browser.close();
