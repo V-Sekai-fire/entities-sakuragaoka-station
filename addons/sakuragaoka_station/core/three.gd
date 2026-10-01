@@ -22,6 +22,7 @@ class Bag extends RefCounted:
 
 
 class Attr extends RefCounted:
+	static var DOUBLE := OS.has_feature("double")
 	var array: PackedFloat32Array
 	var item_size: int
 	var normalized := false
@@ -81,11 +82,30 @@ class Attr extends RefCounted:
 		array[k + 1] = v.y
 		array[k + 2] = v.z
 
+	## The bytes of a float32 array are a PackedVector3Array only while Vector3 is float32; a
+	## precision=double engine has float64 vectors, so it copies element by element.
 	func vec3_array() -> PackedVector3Array:
-		return array.to_byte_array().to_vector3_array()
+		if not DOUBLE:
+			return array.to_byte_array().to_vector3_array()
+		var out := PackedVector3Array()
+		var n := array.size() / 3
+		out.resize(n)
+		for i in n:
+			out[i] = Vector3(array[i * 3], array[i * 3 + 1], array[i * 3 + 2])
+		return out
 
 	func set_vec3_array(v: PackedVector3Array) -> void:
-		array = v.to_byte_array().to_float32_array()
+		if not DOUBLE:
+			array = v.to_byte_array().to_float32_array()
+			return
+		var out := PackedFloat32Array()
+		out.resize(v.size() * 3)
+		for i in v.size():
+			var p := v[i]
+			out[i * 3] = p.x
+			out[i * 3 + 1] = p.y
+			out[i * 3 + 2] = p.z
+		array = out
 
 	func clone() -> Attr:
 		var a := Attr.new(array.duplicate(), item_size)
