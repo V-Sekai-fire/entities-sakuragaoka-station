@@ -4,19 +4,28 @@
 # (tools/oracle/calib.mjs, the original's own modules), one tile per content class:
 #   a  unlit palette triangles with sharp edges   b  the toon ramp under the station's sun and
 #   ambient (with and without the hand-paint noise)   c  sun shadows   d  sky and fog at distance
-#   e  each post stage of the original alone, all off and all on (the port has none)
-# Measures, all in the station's units (MAD 0..255: both images at half size, RGB):
+#   e  each post stage of the original alone, all off and all on; the port's composite
+#      (core/composite.gd) runs the matching stages where it can (see _set_post), else stays off
+#   chart  the 24-patch colour chart (tools/calib/chart24.json) unlit, toon lit and in shadow, and
+#      as a canvas texture (the original's; the port's baked and runtime Slug): tools/chart_calib.gd
+# Every tile but the e tiles has all post stages off in both engines.
+# Measures, all in the parity's units (MAD 0..255 over every pixel and RGB channel, full resolution):
 #   d(three, godot) per tile; for tile a also split into edge pixels (where either render is not
 #   flat over its 3x3 neighbourhood) and interior pixels, and again with the port at MSAA 4x.
 # With --station it also renders the station's Hammersley views with a class pass (sky; geometry
 # past 150 m; unlit; toon in the sun's shadow; lit toon; edges where class or depth jumps) and
 # estimates each view's floor from its class mix and the per-class floors, against its residual.
-#   godot --path . --resolution 1920x1080 --script tools/engine_floor.gd -- --three=<prefix> --out=<dir>
+#   node tools/oracle/calib.mjs --out <dir>/three            (the original's tiles)
+#   node tools/oracle/calib_svg.mjs --out <dir>/svg          (the chart's canvas texture as SVG)
+#   godot --path . --resolution 1920x1080 --script tools/engine_floor.gd -- --three=<dir>/three --out=<dir>
+#       --chart-svg=<dir>/svg/calib-chart24.svg [--q=high] [--sheet-only]
 #   godot --path . --resolution 1920x1080 --script tools/engine_floor.gd -- --station --floors=<dir>/engine_floor.json
 #       --original=<prefix> --views=<dir> [--hammersley=8@-1,-11.4]
 # <prefix>_<tile id>.png are calib.mjs' renders; <dir>/godot_<tile id>.png are written here, with
 # engine_floor.json (the measures) and engine-floor-contact-sheet.png (three | godot | diff, worst
-# first; also copied to the desktop as engine-floor-NN by Sheet.publish).
+# first; also copied to the desktop as engine-floor-NN by Sheet.publish), then chart_calib.json and
+# chart-calib-sheet.png (chart-calib-NN). --chart-svg loads the SVG into a slug.elf of this run's own
+# for the textured chart tiles (no cache); --sheet-only re-measures the renders already in <dir>.
 extends SceneTree
 
 const T = preload("res://addons/sakuragaoka_station/core/three.gd")
@@ -24,6 +33,13 @@ const Geo = preload("res://addons/sakuragaoka_station/core/geo.gd")
 const Materials = preload("res://addons/sakuragaoka_station/core/materials.gd")
 const Realize = preload("res://addons/sakuragaoka_station/core/realize.gd")
 const Sheet = preload("res://tools/sheet.gd")
+const Chart = preload("res://tools/chart_calib.gd")
+const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
+const Pack = preload("res://addons/sakuragaoka_station/core/slug/pack.gd")
+const SlugAtlas = preload("res://addons/sakuragaoka_station/core/slug/atlas.gd")
+const Baked = preload("res://addons/sakuragaoka_station/core/slug/baked.gd")
+const SandboxUtil = preload("res://addons/sakuragaoka_station/core/slug/sandbox_util.gd")
+const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const SCENE := "res://tools/oracle/calib_scene.json"
 const FAR_M := 150.0
 const EYE := 1.52
@@ -31,6 +47,8 @@ const EYE := 1.52
 var _a := {}
 var _st: Node3D
 var _cam: Camera3D
+var _fx = null
+var _fx_on := {}
 
 
 func _initialize() -> void:
@@ -58,6 +76,14 @@ func _make_station(modules: PackedStringArray) -> void:
 	_st.quality = _a.get("q", "high")
 	get_root().add_child(_st)
 	await _st.built
+	_make_cam()
+	var we = _st.get_node_or_null("SkyAndFog")
+	if we != null and we.compositor != null and not we.compositor.compositor_effects.is_empty():
+		_fx = we.compositor.compositor_effects[0]
+		_fx_on = {"outline": _fx.outline, "grade": _fx.grade, "vignette": _fx.vignette}
+
+
+func _make_cam() -> void:
 	_cam = Camera3D.new()
 	_cam.fov = 58.0
 	_cam.near = 0.1
@@ -66,7 +92,66 @@ func _make_station(modules: PackedStringArray) -> void:
 	_cam.make_current()
 
 
+## Each chart tile's patch read rects, per chart placement (its "charts", then its "textured" quad).
+func _chart_rects(scene: Dictionary, chart: Dictionary) -> Dictionary:
+	var rects := {}
+	for t in scene.tiles:
+		if t.has("charts") or t.has("textured"):
+			_place(t.cam)
+			var rs := []
+			for c in t.get("charts", []):
+				rs.append(Chart.patch_rects(_cam, c, chart))
+			if t.has("textured"):
+				rs.append(Chart.patch_rects(_cam, t.textured, chart))
+			rects[t.id] = rs
+	return rects
+
+
+## Frees what this run made in the sandbox (the chart's slug.elf, the kernels), then the station's.
+func _teardown() -> void:
+	if Guest.override != null:
+		SandboxUtil.release(Guest.override.sandbox)
+		Guest.override = null
+	Kernels.shutdown()
+	Guest.shutdown()
+
+
 # ------------------------------------------------------------------------------------- tiles
+
+## The port's composite (core/composite.gd) set for a tile's post stages {outline, bloom, grade,
+## leak, vignette, dither}. Its outline is the original's outline stage; its grade block is the
+## original's grading, light leak and vignette under one switch (vignette is its amount), so it runs
+## only when all three are on; the port has no bloom or dither. A tile whose stages the port cannot
+## run (bloom, dither, or grading, leak or vignette alone) is drawn with those off, so its measure
+## is the stage's whole contribution. Returns what the port ran, for the labels.
+func _set_post(p: Dictionary) -> String:
+	if _fx == null:
+		return "port: no composite"
+	var block: bool = bool(p.grade) and bool(p.leak) and bool(p.vignette)
+	_fx.outline = _fx_on.outline if p.outline else 0.0
+	_fx.grade = _fx_on.grade if block else 0.0
+	_fx.vignette = _fx_on.vignette if block else 0.0
+	return _port_label(p)
+
+
+static func _port_label(p: Dictionary) -> String:
+	var block: bool = bool(p.grade) and bool(p.leak) and bool(p.vignette)
+	var on := PackedStringArray()
+	if p.outline:
+		on.append("outline")
+	if block:
+		on.append("grade block")
+	var s := "port composite: " + (" + ".join(on) if not on.is_empty() else "off")
+	var not_run := PackedStringArray()
+	for k in ["bloom", "dither"]:
+		if p[k]:
+			not_run.append(k + " (not in the port)")
+	if not block:
+		for k in ["grade", "leak", "vignette"]:
+			if p[k]:
+				not_run.append(k + " (alone: not separable in the port)")
+	return s + ("; not run: " + ", ".join(not_run) if not not_run.is_empty() else "")
+
 
 static func _geometry(o: Dictionary) -> T.Geometry:
 	var a: Array = o.args
@@ -124,15 +209,34 @@ func _tiles() -> void:
 	if _a.has("sheet-only"):
 		# the port's renders from an earlier run, for re-measuring and a new sheet
 		var have := {}
+		var labels := {}
 		for t in scene.tiles:
-			have[t.id] = Image.load_from_file(out.path_join("godot_%s.png" % (t.id if not (t.has("same_as") and t.same_as != null) else t.same_as)))
-		_compare(scene, have, Image.load_from_file(out.path_join("godot_%s-msaa4.png" % scene.tiles[0].id)), out,
-				Image.load_from_file(out.path_join("godot_%s-msaa-off.png" % scene.tiles[0].id)))
+			if FileAccess.file_exists(out.path_join("godot_%s.png" % t.id)):
+				have[t.id] = Image.load_from_file(out.path_join("godot_%s.png" % t.id))
+			labels[t.id] = _port_label(t.post)
+		await _compare(scene, have, Image.load_from_file(out.path_join("godot_%s-msaa4.png" % scene.tiles[0].id)), out,
+				Image.load_from_file(out.path_join("godot_%s-msaa-off.png" % scene.tiles[0].id)), labels)
+		_make_cam()
+		var ch: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://" + str(scene.get("chart", "tools/calib/chart24.json"))))
+		await _frames(2)
+		await _chart_report(scene, ch, have, _chart_rects(scene, ch), out)
+		quit()
 		return
+	var chart: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://" + str(scene.get("chart", "tools/calib/chart24.json"))))
 	await _make_station(PackedStringArray())
+	if _texture_tiles(scene) and not await _chart_guest():
+		_teardown()
+		quit(1)
+		return
 	var mats = Materials.new()
 	var objs := []
 	for t in scene.tiles:
+		if t.has("engines") and not t.engines.has("godot"):
+			continue
+		for c in t.get("charts", []):
+			objs.append(_chart(mats, chart, c))
+		if t.has("textured"):
+			objs.append(_textured(mats, t.textured))
 		if t.has("grid"):
 			objs.append_array(_grid(mats, t.grid))
 		for o in t.objects:
@@ -155,21 +259,33 @@ func _tiles() -> void:
 	r.finish()
 	var sun: DirectionalLight3D = _st.get_node("Sun")
 	var renders := {}
+	var rects := _chart_rects(scene, chart)
+	var ports := {}
+	var drawn := {}
 	for t in scene.tiles:
-		if t.has("same_as") and t.same_as != null and renders.has(t.same_as):
-			renders[t.id] = renders[t.same_as]
+		_place(t.cam)
+		if t.has("engines") and not t.engines.has("godot"):
+			continue
+		ports[t.id] = _set_post(t.post)
+		# a tile the port draws exactly as an earlier one (same camera, shadows and composite) reuses it
+		var same := JSON.stringify([t.cam, t.shadows, _fx.outline, _fx.grade, _fx.vignette] if _fx != null else [t.cam, t.shadows])
+		if drawn.has(same):
+			renders[t.id] = renders[drawn[same]]
+			renders[t.id].save_png(out.path_join("godot_%s.png" % t.id))
+			print("engine_floor: rendered %s (as %s)" % [t.id, drawn[same]])
 			continue
 		sun.shadow_enabled = bool(t.shadows)
-		_place(t.cam)
 		await _frames(12)
 		var img := get_root().get_texture().get_image()
 		img.save_png(out.path_join("godot_%s.png" % t.id))
 		renders[t.id] = img
-		print("engine_floor: rendered ", t.id)
+		drawn[same] = t.id
+		print("engine_floor: rendered %s (%s)" % [t.id, ports[t.id]])
 	# tile a again at both AA settings, whatever the quality level runs: how much of its floor is AA
 	var ta: Dictionary = scene.tiles[0]
 	var as_run := get_root().msaa_3d
 	sun.shadow_enabled = bool(ta.shadows)
+	_set_post(ta.post)
 	_place(ta.cam)
 	var alt := {}
 	for m in [[Viewport.MSAA_DISABLED, "msaa-off"], [Viewport.MSAA_4X, "msaa4"]]:
@@ -179,77 +295,209 @@ func _tiles() -> void:
 		alt[m[1]].save_png(out.path_join("godot_%s-%s.png" % [ta.id, m[1]]))
 	get_root().msaa_3d = as_run
 	print("engine_floor: quality %s, MSAA %s as run" % [_st.quality, ["off", "2x", "4x", "8x"][as_run]])
-	_compare(scene, renders, alt.msaa4, out, alt["msaa-off"])
+	await _compare(scene, renders, alt.msaa4, out, alt["msaa-off"], ports)
+	await _chart_report(scene, chart, renders, rects, out)
+	_teardown()
+	quit()
 
 
-## The class verdict the measure supports: FLOOR only where the math is identical on both sides.
-static func _verdict(id: String, mad: float, base_e: float, ta) -> String:
-	if id == "a-unlit (port MSAA 4x)":
-		return "FLOOR: identical math and AA, %.2f" % mad
-	if id == "a-unlit":
-		return "PORT ERROR (setting): MSAA off in the port; %.2f with MSAA 4x" % (ta.mad_msaa4 if ta != null else -1.0)
+static func _texture_tiles(scene: Dictionary) -> bool:
+	for t in scene.tiles:
+		if t.has("textured") and (not t.has("engines") or t.engines.has("godot")):
+			return true
+	return false
+
+
+## slug.elf with the chart's SVG (--chart-svg, from tools/oracle/calib_svg.mjs) loaded as
+## calib-chart24, as the guest every Slug consumer reads for this run (no cache).
+func _chart_guest() -> bool:
+	var svg_path: String = _a.get("chart-svg", "")
+	var svg := FileAccess.get_file_as_string(svg_path)
+	if svg == "":
+		print("engine_floor: FAIL the textured tiles need --chart-svg=<calib-chart24.svg> (tools/oracle/calib_svg.mjs)")
+		return false
+	var r := SandboxUtil.make_sandbox(null, Guest.ELF, Guest.MEM_MB, Guest.REFS, Guest.TIMEOUT_UNITS)
+	if r.sandbox == null:
+		print("engine_floor: FAIL no slug.elf: ", r.reason)
+		return false
+	var ans = r.sandbox.vmcall("slug_load_svg", "calib-chart24", svg, 0.25)
+	print("engine_floor: slug_load_svg(calib-chart24): ", ans)
+	var g = Guest.new()
+	g.sandbox = r.sandbox
+	Guest.override = g
+	Pack.reset()
+	SlugAtlas.reset()
+	Baked.reset()
+	return str(ans).begins_with("ok")
+
+
+## calib_world.js' chart: the #1a1a1a ground 5 mm behind, a quad per patch, one material each.
+static func _chart(mats, chart: Dictionary, c: Dictionary):
+	var grp := T.Group.new()
+	grp.name = "calib-chart-" + str(c.get("name", ""))
+	grp.position = Vector3(c.pos[0], c.pos[1], c.pos[2])
+	grp.rotation = Vector3(0, deg_to_rad(c.yaw), 0)
+	var px: float = c.px
+	var cols := []
+	for p in chart.patches:
+		cols.append("#%02x%02x%02x" % [p.srgb8[0], p.srgb8[1], p.srgb8[2]])
+	if c.has("swap"):
+		var a: int = c.swap[0] - 1
+		var b: int = c.swap[1] - 1
+		var tmp = cols[a]
+		cols[a] = cols[b]
+		cols[b] = tmp
+	var mat := func(col: String): return mats.toon(col, {"paint": 0}) if c.mat == "toon" else mats.emissive(col, 1.0)
+	var ground := T.MeshObj.new(Geo.plane(690 * px, 470 * px), mat.call("#1a1a1a"))
+	ground.position = Vector3(0, 0, -0.005)
+	grp.add(ground)
+	for i in chart.patches.size():
+		var p: Dictionary = chart.patches[i]
+		var q := T.MeshObj.new(Geo.plane(100 * px, 100 * px), mat.call(cols[i]))
+		q.position = Vector3((20 + p.col * 110 + 50 - 345) * px, (235 - (20 + p.row * 110 + 50)) * px, 0)
+		grp.add(q)
+	grp.update_matrix_world()
+	return grp
+
+
+## The chart texture on an unlit quad, drawn one way (realize.gd's calibration draw_mode).
+static func _textured(mats, t: Dictionary):
+	var tex := T.Tex.new()
+	tex.width = 690
+	tex.height = 470
+	tex.uuid = "calib-chart24"
+	tex.user_data["key"] = "calib-chart24"
+	var m = mats.emissive("#ffffff", 1.0, {"map": tex})
+	m = m.duplicate() if m.has_method("duplicate") else m
+	var mat := T.Mat.new()
+	mat.type = m.type
+	mat.key = m.key + "|" + str(t.draw)
+	mat.color = m.color
+	mat.map = tex
+	mat.side = m.side
+	mat.user_data = {"draw_mode": t.draw}
+	var q := T.MeshObj.new(Geo.plane(690 * t.px, 470 * t.px), mat)
+	q.name = "calib-chart-texture-" + str(t.draw)
+	q.position = Vector3(t.pos[0], t.pos[1], t.pos[2])
+	q.rotation = Vector3(0, deg_to_rad(t.yaw), 0)
+	q.update_matrix_world()
+	return q
+
+
+func _chart_report(scene: Dictionary, chart: Dictionary, renders: Dictionary, rects: Dictionary, out: String) -> void:
+	var three: String = _a.get("three", "")
+	var reads := {}
+	var add := func(key: String, img, tile: String, idx: int) -> void:
+		if img != null and rects.has(tile) and rects[tile].size() > idx:
+			reads[key] = {"img": img, "rects": rects[tile][idx]}
+	add.call("three-unlit", Image.load_from_file("%s_chart-unlit.png" % three), "chart-unlit", 0)
+	add.call("godot-unlit", renders.get("chart-unlit"), "chart-unlit", 0)
+	add.call("godot-unlit-swapped", renders.get("chart-unlit-swapped"), "chart-unlit-swapped", 0)
+	add.call("three-texture", Image.load_from_file("%s_chart-tex.png" % three), "chart-tex", 0)
+	add.call("godot-baked", renders.get("chart-tex-baked"), "chart-tex-baked", 0)
+	add.call("godot-runtime", renders.get("chart-tex-runtime"), "chart-tex-runtime", 0)
+	add.call("three-lit", Image.load_from_file("%s_chart-toon.png" % three), "chart-toon", 0)
+	add.call("godot-lit", renders.get("chart-toon"), "chart-toon", 0)
+	add.call("three-shadow", Image.load_from_file("%s_chart-toon.png" % three), "chart-toon", 1)
+	add.call("godot-shadow", renders.get("chart-toon"), "chart-toon", 1)
+	if reads.is_empty():
+		return
+	await Chart.report(self, chart, reads, out)
+
+
+## The class verdict the measure supports: FLOOR only where the math is identical on both sides and
+## the measure is (near) zero; an e tile's figure is its increase over all post off.
+static func _verdict(id: String, mad: float, base_e: float, ta, port: String) -> String:
+	if id.begins_with("a-unlit"):
+		if mad < 0.05:
+			return "FLOOR: identical math and AA, %.2f" % mad
+		return "PORT ERROR: the unlit palette path differs, %.2f" % mad
+	if id == "chart-unlit":
+		return "per patch in chart-calib; the frame's MAD includes the sky behind the chart"
+	if id == "chart-toon":
+		return "PORT ERROR: different shading math (per patch in chart-calib; the MAD includes the sky)"
 	if id == "e-post-off":
-		return "PORT ERROR: as b-d, plus the sky's clouds missing (rung 2, #68)"
+		return "as b-d (shading, sky and fog); post off in both"
 	if id.begins_with("e-"):
-		return "MISSING in the port (rung 2, #68): %+.2f over all-off" % (mad - base_e)
+		if "not run" in port:
+			return "%+.2f over all-off: stage(s) the port does not run" % (mad - base_e)
+		return "%+.2f over all-off: the port's own stage(s)" % (mad - base_e)
 	if id == "d-skyfog":
-		return "PORT ERROR: fog curve and toon ground; clouds missing (rung 2, #68)"
+		return "PORT ERROR: sky and fog differ (rung 2, #68)"
 	return "PORT ERROR: different shading math"
 
 
-## Half-size RGB8 (the station measure's scale).
-static func _half(img: Image) -> Image:
+## Full-resolution RGB8 (the parity measure's scale: no resize).
+static func _rgb(img: Image) -> Image:
 	var x: Image = img.duplicate()
 	x.convert(Image.FORMAT_RGB8)
-	x.resize(img.get_width() / 2, img.get_height() / 2, Image.INTERPOLATE_BILINEAR)
 	return x
 
 
-## Mean |a - b| over RGB of half-size images, split by a's and b's 3x3 flatness: [all, edge, interior, edge fraction].
+## Mean |a - b| over RGB at full resolution, split by a's and b's 3x3 flatness: [all, edge, interior, edge fraction].
 static func _split(a: Image, b: Image) -> Array:
-	var x := _half(a)
-	var y := _half(b)
+	var x := _rgb(a)
+	var y := _rgb(b)
 	var w := x.get_width()
 	var h := x.get_height()
 	var da := x.get_data()
 	var db := y.get_data()
-	var flat := func(d: PackedByteArray, i: int, j: int) -> bool:
-		var o := (j * w + i) * 3
-		for dj in [-1, 0, 1]:
-			for di in [-1, 0, 1]:
-				var q := ((clampi(j + dj, 0, h - 1)) * w + clampi(i + di, 0, w - 1)) * 3
-				if d[q] != d[o] or d[q + 1] != d[o + 1] or d[q + 2] != d[o + 2]:
-					return false
-		return true
+	var fa := _flat(da, w, h)
+	var fb := _flat(db, w, h)
 	var se := 0.0
 	var ne := 0
 	var si := 0.0
 	var ni := 0
-	for j in h:
-		for i in w:
-			var o := (j * w + i) * 3
-			var dd := (absi(da[o] - db[o]) + absi(da[o + 1] - db[o + 1]) + absi(da[o + 2] - db[o + 2])) / 3.0
-			if flat.call(da, i, j) and flat.call(db, i, j):
-				si += dd
-				ni += 1
-			else:
-				se += dd
-				ne += 1
+	for p in w * h:
+		var o := p * 3
+		var dd := (absi(da[o] - db[o]) + absi(da[o + 1] - db[o + 1]) + absi(da[o + 2] - db[o + 2])) / 3.0
+		if fa[p] and fb[p]:
+			si += dd
+			ni += 1
+		else:
+			se += dd
+			ne += 1
 	return [(se + si) / maxf(ne + ni, 1), se / maxf(ne, 1), si / maxf(ni, 1), float(ne) / maxf(ne + ni, 1)]
 
 
-func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String, a0: Image = null) -> void:
+## Per pixel: 1 when its 3x3 neighbourhood (clamped at the borders) is one colour.
+static func _flat(d: PackedByteArray, w: int, h: int) -> PackedByteArray:
+	var c := PackedInt32Array()
+	c.resize(w * h)
+	for p in w * h:
+		c[p] = (d[p * 3] << 16) | (d[p * 3 + 1] << 8) | d[p * 3 + 2]
+	var out := PackedByteArray()
+	out.resize(w * h)
+	for j in h:
+		var j0 := maxi(j - 1, 0) * w
+		var j1 := j * w
+		var j2 := mini(j + 1, h - 1) * w
+		for i in w:
+			var i0 := maxi(i - 1, 0)
+			var i2 := mini(i + 1, w - 1)
+			var v := c[j1 + i]
+			out[j1 + i] = 1 if (c[j0 + i0] == v and c[j0 + i] == v and c[j0 + i2] == v and c[j1 + i0] == v and c[j1 + i2] == v
+					and c[j2 + i0] == v and c[j2 + i] == v and c[j2 + i2] == v) else 0
+	return out
+
+
+func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String, a0: Image = null, ports: Dictionary = {}) -> void:
 	var three: String = _a.get("three", "")
 	var rows := []
 	var res := {"tiles": {}}
 	for t in scene.tiles:
+		if t.has("engines") and not (t.engines.has("three") and t.engines.has("godot")):
+			continue
 		var ti = Image.load_from_file("%s_%s.png" % [three, t.id])
 		if ti == null:
 			print("engine_floor: FAIL no three.js render %s_%s.png" % [three, t.id])
 			continue
+		if not renders.has(t.id) or renders[t.id] == null:
+			print("engine_floor: FAIL no port render of ", t.id)
+			continue
 		var g: Image = renders[t.id]
 		var m := Sheet.mad(g, ti)
-		var e := {"class": t["class"], "title": t.title, "mad": m}
+		var e := {"class": t["class"], "title": t.title, "mad": m, "port": ports.get(t.id, "")}
 		if t.id == "a-unlit":
 			var s := _split(ti, g)
 			var s4 := _split(ti, a4)
@@ -267,7 +515,7 @@ func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String, a0
 		res.tiles[t.id] = e
 		rows.append({"id": t.id, "mad": m, "cells": [
 			{"image": ti, "label": "three.js (original's modules)"},
-			{"image": g, "label": "Godot (port's realize/MToon)"},
+			{"image": g, "label": "Godot (port's realize/MToon)\n" + str(ports.get(t.id, ""))},
 			{"image": Sheet.heat(g, ti), "label": "|godot - three|: MAD %.2f" % m}]})
 	var ta = res.tiles.get("a-unlit")
 	if ta != null:
@@ -282,12 +530,14 @@ func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String, a0
 		var r: Dictionary = rows[i]
 		var e = res.tiles.get(r.id)
 		r["label"] = "#%d  %s  MAD %.2f  %s  [%s]" % [i + 1, r.id, r.mad, e.title if e != null else "unlit, the port at MSAA 4x",
-				_verdict(r.id, r.mad, base_e, ta)]
+				_verdict(r.id, r.mad, base_e, ta, str(e.port) if e != null else "")]
+		if e != null:
+			e["verdict"] = _verdict(r.id, r.mad, base_e, ta, str(e.port))
 		r["color"] = Color(1, 0.55, 0.45) if i < 3 else Color(1, 0.95, 0.7)
 	print("engine_floor: tile | class | MAD(three, godot)")
 	for id in res.tiles:
 		var e: Dictionary = res.tiles[id]
-		print("engine_floor: %-14s %s  %6.2f  %s" % [id, e["class"], e.mad, e.title])
+		print("engine_floor: %-20s %-5s  %6.2f  %s  [%s]" % [id, e["class"], e.mad, e.title, e.port])
 	if ta != null:
 		print("engine_floor: a-unlit as run: MAD %.2f, edge %.2f, interior %.3f, edge fraction %.3f; port at MSAA 4x: MAD %.2f, edge %.2f, interior %.3f; at MSAA off: MAD %.2f, edge %.2f, interior %.3f" % [
 				ta.mad, ta.edge, ta.interior, ta.edge_fraction, ta.mad_msaa4, ta.edge_msaa4, ta.interior_msaa4,
@@ -295,11 +545,10 @@ func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String, a0
 	var f := FileAccess.open(out.path_join("engine_floor.json"), FileAccess.WRITE)
 	f.store_string(JSON.stringify(res, " "))
 	f.close()
-	var img: Image = await Sheet.render(self, "Engine floor tiles, 1920x1080: three.js (original) | Godot (port) | difference, worst first (MAD 0..255, half size)",
+	var img: Image = await Sheet.render(self, "Engine floor tiles, 1920x1080: three.js (original) | Godot (port) | difference, worst first (MAD 0..255, full resolution)",
 			["three.js", "Godot", "|godot - three|"], rows, Vector2i(480, 270))
 	for p in Sheet.publish(img, out.path_join("engine-floor-contact-sheet.png"), "engine-floor"):
 		print("engine_floor: saved ", p)
-	quit()
 
 
 # ------------------------------------------------------------------------------------ station
@@ -378,7 +627,7 @@ func _station() -> void:
 		sun.shadow_enabled = true
 		await _frames(12)
 		var lit_full := get_root().get_texture().get_image()
-		var lit := _half(lit_full)
+		var lit := _rgb(lit_full)
 		# the same view at the original's MSAA 4x: the AA setting's effect measured, not estimated
 		get_root().msaa_3d = Viewport.MSAA_4X
 		await _frames(12)
@@ -386,7 +635,7 @@ func _station() -> void:
 		get_root().msaa_3d = Viewport.MSAA_DISABLED
 		sun.shadow_enabled = false
 		await _frames(12)
-		var unshadowed := _half(get_root().get_texture().get_image())
+		var unshadowed := _rgb(get_root().get_texture().get_image())
 		sun.shadow_enabled = true
 		# class pass
 		for s in swaps:
@@ -396,7 +645,7 @@ func _station() -> void:
 				s[0].material_override = s[2]
 		_cam.environment = plain
 		await _frames(12)
-		var cls := _half(get_root().get_texture().get_image())
+		var cls := _rgb(get_root().get_texture().get_image())
 		_cam.environment = null
 		for s in swaps:
 			if s[1] >= 0:
@@ -428,7 +677,7 @@ func _station() -> void:
 	quit()
 
 
-## Class fractions of a half-size class render: sky, far, unlit, toon shadowed, toon lit (they sum
+## Class fractions of a full-resolution class render: sky, far, unlit, toon shadowed, toon lit (they sum
 ## to 1) and the edge fraction (class or depth jumps against a 4-neighbour).
 static func _mix(cls: Image, lit: Image, unshadowed: Image) -> Dictionary:
 	var w := cls.get_width()

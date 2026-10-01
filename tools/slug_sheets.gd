@@ -332,8 +332,7 @@ func _pixel_sheet() -> Image:
 		rows.append({"label": "%s (%d, %d): %s   max |GPU - ref| %.3f %s" % [p[0], p[1], p[2], p[3], dmax, "ok" if dmax <= 0.02 else "FAIL"],
 			"color": Color(1, 0.95, 0.7) if dmax <= 0.02 else Color(1, 0.4, 0.4),
 			"cells": [{"image": crop, "label": "GPU, 25 px around (boxed)"},
-				{"image": sw, "label": "GPU (%.3f %.3f %.3f)
-ref  (%.3f %.3f %.3f)" % [got.r, got.g, got.b, want.r, want.g, want.b]},
+				{"image": sw, "label": "GPU (%.3f %.3f %.3f)\nref  (%.3f %.3f %.3f)" % [got.r, got.g, got.b, want.r, want.g, want.b]},
 				{"image": whole, "label": "whole 256 px render"}]})
 	return await Sheet.render(self, "Slug GPU vs CPU reference (render.hpp coverage), linear RGB",
 			["GPU crop", "GPU (left) | reference (right)", "render"], rows, Vector2i(200, 200))

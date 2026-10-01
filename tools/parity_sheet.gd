@@ -1,7 +1,8 @@
 # The Hammersley parity contact sheet with its floors (residual ladder rung 0): one row per view,
 # worst (highest after-residual) first, columns original (tools/oracle/shot.mjs) | port before |
 # port after | |after - original| heat map. Each row's label carries the residual MAD before and
-# after (realize_check's measure: half size, RGB8, every 7th byte) and the two floors:
+# after (Sheet.mad: every pixel and RGB channel at full resolution, 0..255; the legacy half-size,
+# 1/7-sampled figure in brackets only for comparison with older reports) and the two floors:
 #   floor orig  the original against a second shot.mjs render with identical arguments
 #   floor port  the port against a second render of the same commit and settings
 # and the table printed (and drawn as the sheet's title block) is
@@ -82,28 +83,37 @@ func _make() -> void:
 		var f2 = _img(str(_a.get("after2", "")).path_join("port-view_%d.png" % i)) if _a.has("after2") else null
 		var mb: float = Sheet.mad(b, o) if b != null else -1.0
 		var ma := Sheet.mad(f, o)
+		var mb_l: float = Sheet.mad_legacy(b, o) if b != null else -1.0
+		var ma_l := Sheet.mad_legacy(f, o)
 		var fo := _floor(o, o2)
 		var fb := _floor(b, b2)
 		var fa := _floor(f, f2)
-		table.append([i, fo, fb, fa, mb, ma])
+		table.append([i, fo, fb, fa, mb, ma, mb_l, ma_l])
 		rows.append({"view": i, "mb": mb, "ma": ma, "cells": [
 			{"image": o, "label": "view %d %s\nfloor %s" % [i, names[0], fo.text]},
-			{"image": b, "label": "%s: residual %.1f\nfloor %s" % [names[1], mb, fb.text] if b != null else "(no before)"},
-			{"image": f, "label": "%s: residual %.1f (delta %+.1f)\nfloor %s" % [names[2], ma, ma - mb, fa.text]},
+			{"image": b, "label": "%s: residual %.2f (legacy %.1f)\nfloor %s" % [names[1], mb, mb_l, fb.text] if b != null else "(no before)"},
+			{"image": f, "label": "%s: residual %.2f (delta %+.2f; legacy %.1f)\nfloor %s" % [names[2], ma, ma - mb, ma_l, fa.text]},
 			{"image": Sheet.heat(f, o), "label": "|%s - %s|\nblack 0, red 85, yellow 170, white 255" % [names[2], names[0]]}]})
 		i += 1
 	rows.sort_custom(func(x, y): return x.ma > y.ma)
 	for r in rows.size():
 		var row: Dictionary = rows[r]
 		var t: Array = table[row.view]
-		row["label"] = "#%d worst: view %d   residual %s %.1f -> %s %.1f (delta %+.1f)   floors: %s %s, %s %s" % [
+		row["label"] = "#%d worst: view %d   residual %s %.2f -> %s %.2f (delta %+.2f)   floors: %s %s, %s %s" % [
 				r + 1, row.view, names[1], row.mb, names[2], row.ma, row.ma - row.mb, names[0], t[1].text.split(" ")[0],
 				names[2], t[3].text.split(" ")[0]]
 		row["color"] = Color(1, 0.55, 0.45) if r < 3 else Color(1, 0.95, 0.7)
-	print("parity_sheet: view | floor %s | floor %s | floor %s | residual %s | residual %s" % [names[0], names[1], names[2], names[1], names[2]])
+	print("parity_sheet: view | floor %s | floor %s | floor %s | residual %s | residual %s | legacy (half-size, 1/7 sample) %s | legacy %s" % [
+			names[0], names[1], names[2], names[1], names[2], names[1], names[2]])
+	var sb := 0.0
+	var sa := 0.0
 	for t in table:
-		print("parity_sheet: %d | %s | %s | %s | %.1f | %.1f" % [t[0], t[1].text, t[2].text, t[3].text, t[4], t[5]])
-	var title: String = _a.get("title", "Hammersley parity 8@-1,-11.4, 1920x1080 (MAD 0..255; floors = same side rendered twice): %s | %s | %s | heat map, worst first" % [names[0], names[1], names[2]])
+		print("parity_sheet: %d | %s | %s | %s | %.2f | %.2f | %.1f | %.1f" % [t[0], t[1].text, t[2].text, t[3].text, t[4], t[5], t[6], t[7]])
+		sb += t[4]
+		sa += t[5]
+	print("parity_sheet: mean of %d views (full resolution, every pixel and channel): %s %.2f, %s %.2f" % [
+			table.size(), names[1], sb / maxf(table.size(), 1), names[2], sa / maxf(table.size(), 1)])
+	var title: String = _a.get("title", "Hammersley parity 8@-1,-11.4, 1920x1080 (MAD 0..255 over every pixel and channel, full resolution; floors = same side rendered twice): %s | %s | %s | heat map, worst first" % [names[0], names[1], names[2]])
 	var img: Image = await Sheet.render(self, title, [names[0], names[1], names[2], "|%s - %s|" % [names[2], names[0]]], rows, CELL)
 	for p in Sheet.publish(img, out, _a.get("topic", "parity-hammersley")):
 		print("parity_sheet: %d views, saved %s" % [rows.size(), p])

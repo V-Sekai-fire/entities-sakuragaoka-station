@@ -585,6 +585,9 @@ static func _wraps(t) -> bool:
 func _mode(m) -> String:
 	if m == null or (m.map == null and m.alpha_map == null):
 		return ""
+	if m.user_data.has("draw_mode"):
+		# calibration only (tools/engine_floor.gd): draw this material's texture one way
+		return str(m.user_data["draw_mode"])
 	var key := _tex_key(m.map if m.map != null else m.alpha_map)
 	var in_atlas := _in_atlas(m.map) or _in_atlas(m.alpha_map)
 	var want: String = _baked.mode(key) if _baked != null and key != "" else ""

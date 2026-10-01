@@ -854,8 +854,7 @@
       "intensity": 2.5
      }
     }
-   ],
-   "same_as": null
+   ]
   },
   {
    "id": "e-outline",
@@ -877,8 +876,7 @@
     "vignette": 0,
     "dither": 0
    },
-   "objects": [],
-   "same_as": "e-post-off"
+   "objects": []
   },
   {
    "id": "e-bloom",
@@ -900,8 +898,7 @@
     "vignette": 0,
     "dither": 0
    },
-   "objects": [],
-   "same_as": "e-post-off"
+   "objects": []
   },
   {
    "id": "e-grade",
@@ -923,8 +920,7 @@
     "vignette": 0,
     "dither": 0
    },
-   "objects": [],
-   "same_as": "e-post-off"
+   "objects": []
   },
   {
    "id": "e-leak",
@@ -946,8 +942,7 @@
     "vignette": 0,
     "dither": 0
    },
-   "objects": [],
-   "same_as": "e-post-off"
+   "objects": []
   },
   {
    "id": "e-vignette",
@@ -969,8 +964,7 @@
     "vignette": 1,
     "dither": 0
    },
-   "objects": [],
-   "same_as": "e-post-off"
+   "objects": []
   },
   {
    "id": "e-dither",
@@ -992,8 +986,29 @@
     "vignette": 0,
     "dither": 1
    },
-   "objects": [],
-   "same_as": "e-post-off"
+   "objects": []
+  },
+  {
+   "id": "e-grade-block",
+   "class": "e",
+   "title": "post: grading, light leak and vignette together (the port's grade block)",
+   "cam": [
+    25000,
+    1.7,
+    10,
+    115,
+    10
+   ],
+   "shadows": false,
+   "post": {
+    "outline": 0,
+    "bloom": 0,
+    "grade": 1,
+    "leak": 1,
+    "vignette": 1,
+    "dither": 0
+   },
+   "objects": []
   },
   {
    "id": "e-post-all",
@@ -1015,8 +1030,267 @@
     "vignette": 1,
     "dither": 1
    },
+   "objects": []
+  },
+  {
+   "id": "chart-unlit",
+   "class": "chart",
+   "title": "chart, unlit (the original's basic material; the port's palette path)",
+   "cam": [
+    30000,
+    2.5,
+    0,
+    0,
+    0
+   ],
+   "shadows": false,
+   "post": {
+    "outline": 0,
+    "bloom": 0,
+    "grade": 0,
+    "leak": 0,
+    "vignette": 0,
+    "dither": 0
+   },
    "objects": [],
-   "same_as": "e-post-off"
+   "charts": [
+    {
+     "pos": [
+      30000,
+      2.5,
+      -5.3
+     ],
+     "yaw": 0,
+     "px": 0.01,
+     "mat": "emissive"
+    }
+   ]
+  },
+  {
+   "id": "chart-toon",
+   "class": "chart",
+   "title": "chart as toon colours: left in the sun, right in a cast shadow",
+   "cam": [
+    34991.843,
+    2.6,
+    3.804,
+    -65.0,
+    0
+   ],
+   "shadows": true,
+   "post": {
+    "outline": 0,
+    "bloom": 0,
+    "grade": 0,
+    "leak": 0,
+    "vignette": 0,
+    "dither": 0
+   },
+   "objects": [
+    {
+     "geo": "box",
+     "args": [
+      9,
+      0.4,
+      12
+     ],
+     "pos": [
+      34990.135,
+      10.355,
+      9.236
+     ],
+     "rot": [
+      0,
+      -65.0,
+      0
+     ],
+     "mat": {
+      "kind": "toon",
+      "color": "#4b4d52",
+      "paint": 0
+     },
+     "cast": true
+    }
+   ],
+   "charts": [
+    {
+     "pos": [
+      34998.225,
+      2.6,
+      -3.806
+     ],
+     "yaw": -65.0,
+     "px": 0.01,
+     "mat": "toon",
+     "receive": true,
+     "name": "lit"
+    },
+    {
+     "pos": [
+      35001.775,
+      2.6,
+      3.806
+     ],
+     "yaw": -65.0,
+     "px": 0.01,
+     "mat": "toon",
+     "receive": true,
+     "name": "shadow"
+    }
+   ]
+  },
+  {
+   "id": "chart-tex",
+   "class": "chart",
+   "title": "chart as a canvas texture in the original (fillRect), unlit quad",
+   "cam": [
+    40000,
+    2.5,
+    0,
+    0,
+    0
+   ],
+   "shadows": false,
+   "post": {
+    "outline": 0,
+    "bloom": 0,
+    "grade": 0,
+    "leak": 0,
+    "vignette": 0,
+    "dither": 0
+   },
+   "objects": [],
+   "charts": [],
+   "textured": {
+    "pos": [
+     40000,
+     2.5,
+     -5.3
+    ],
+    "yaw": 0,
+    "px": 0.01,
+    "key": "calib-chart24",
+    "draw": "three"
+   },
+   "engines": [
+    "three"
+   ]
+  },
+  {
+   "id": "chart-tex-baked",
+   "class": "chart",
+   "title": "chart texture through canvas_svg, slug.elf and the baked mesh (palette), unlit quad",
+   "cam": [
+    45000,
+    2.5,
+    0,
+    0,
+    0
+   ],
+   "shadows": false,
+   "post": {
+    "outline": 0,
+    "bloom": 0,
+    "grade": 0,
+    "leak": 0,
+    "vignette": 0,
+    "dither": 0
+   },
+   "objects": [],
+   "charts": [],
+   "textured": {
+    "pos": [
+     45000,
+     2.5,
+     -5.3
+    ],
+    "yaw": 0,
+    "px": 0.01,
+    "key": "calib-chart24",
+    "draw": "mesh"
+   },
+   "engines": [
+    "godot"
+   ]
+  },
+  {
+   "id": "chart-tex-runtime",
+   "class": "chart",
+   "title": "chart texture through canvas_svg, slug.elf and slug-runtime, unlit quad",
+   "cam": [
+    50000,
+    2.5,
+    0,
+    0,
+    0
+   ],
+   "shadows": false,
+   "post": {
+    "outline": 0,
+    "bloom": 0,
+    "grade": 0,
+    "leak": 0,
+    "vignette": 0,
+    "dither": 0
+   },
+   "objects": [],
+   "charts": [],
+   "textured": {
+    "pos": [
+     50000,
+     2.5,
+     -5.3
+    ],
+    "yaw": 0,
+    "px": 0.01,
+    "key": "calib-chart24",
+    "draw": "slug"
+   },
+   "engines": [
+    "godot"
+   ]
+  },
+  {
+   "id": "chart-unlit-swapped",
+   "class": "chart",
+   "title": "CONTROL: unlit chart with patches 3 and 4 swapped (port only)",
+   "cam": [
+    55000,
+    2.5,
+    0,
+    0,
+    0
+   ],
+   "shadows": false,
+   "post": {
+    "outline": 0,
+    "bloom": 0,
+    "grade": 0,
+    "leak": 0,
+    "vignette": 0,
+    "dither": 0
+   },
+   "objects": [],
+   "charts": [
+    {
+     "pos": [
+      55000,
+      2.5,
+      -5.3
+     ],
+     "yaw": 0,
+     "px": 0.01,
+     "mat": "emissive",
+     "swap": [
+      3,
+      4
+     ]
+    }
+   ],
+   "engines": [
+    "godot"
+   ]
   }
- ]
+ ],
+ "chart": "tools/calib/chart24.json"
 }

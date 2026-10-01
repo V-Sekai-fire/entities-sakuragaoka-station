@@ -4,6 +4,15 @@
 // core/renderer.js, exactly as it does the station. The tiles come from calib_scene.json (the same
 // file tools/engine_floor.gd builds the port's side from).
 //
+// Charts (tools/calib/chart24.json, served at /chart24.json): a tile's "charts" are 24-patch charts
+// laid out as chart24.svg (690 x 470 px canvas, 100 px patches, 10 px gaps, 20 px margin, #1a1a1a
+// ground), "px" metres a canvas pixel, facing +Z turned by "yaw", each patch its own unlit
+// (ctx.mat.emissive) or toon (ctx.mat.toon, paint 0) material. The same chart is also drawn as a
+// keyed canvas texture, calib-chart24, with fillRect in the patches' sRGB 8-bit colours, through the
+// original's ctx.tex.draw: a tile's "textured" quad shows it (three.js's own texture path), and
+// tools/oracle/calib_svg.mjs records it with canvas_svg.mjs for the port's texture path.
+// Tiles with "engines" not naming "three" are the port's alone and are skipped here.
+//
 // Post stages: window.__post = {outline, bloom, grade, leak, vignette, dither} (0/1 each) switches
 // the composite's stages for the next frames. Nothing in core/ is edited: renderer.render is
 // wrapped, and when the pipeline draws its composite pass the quad is drawn with a copy of the
@@ -92,9 +101,55 @@ function hookPost(renderer) {
   };
 }
 
+const hex = (c) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+
+/** The chart's canvas: fillRect per patch in its srgb8 colour, as chart24.svg draws it. */
+function drawChart(g, chart) {
+  g.fillStyle = '#1a1a1a';
+  g.fillRect(0, 0, 690, 470);
+  for (const p of chart.patches) {
+    g.fillStyle = hex(p.srgb8);
+    g.fillRect(20 + p.col * 110, 20 + p.row * 110, 100, 100);
+  }
+}
+
+/** A chart as quads: the ground 5 mm behind, a patch per material. */
+function chartMeshes(ctx, chart, c) {
+  const grp = new THREE.Group();
+  grp.position.set(c.pos[0], c.pos[1], c.pos[2]);
+  grp.rotation.set(0, deg(c.yaw), 0);
+  const px = c.px;
+  const colours = chart.patches.map((p) => hex(p.srgb8));
+  if (c.swap) { const a = c.swap[0] - 1, b = c.swap[1] - 1; [colours[a], colours[b]] = [colours[b], colours[a]]; }
+  const mat = (col) => (c.mat === 'toon' ? ctx.mat.toon(col, { paint: 0 }) : ctx.mat.emissive(col, 1.0));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(690 * px, 470 * px), mat('#1a1a1a'));
+  ground.position.z = -0.005;
+  grp.add(ground);
+  chart.patches.forEach((p, i) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(100 * px, 100 * px), mat(colours[i]));
+    const cx = 20 + p.col * 110 + 50, cy = 20 + p.row * 110 + 50;
+    m.position.set((cx - 345) * px, (235 - cy) * px, 0);
+    grp.add(m);
+  });
+  grp.traverse((o) => { if (o.isMesh) { o.receiveShadow = !!c.receive; o.castShadow = false; o.name = 'calib-chart-' + (c.name || ''); } });
+  return grp;
+}
+
 export async function build(ctx) {
   const scene = await (await fetch('/calib_scene.json', { cache: 'no-store' })).json();
+  const chart = await (await fetch('/chart24.json', { cache: 'no-store' })).json();
+  // the keyed canvas texture, drawn even when no tile shows it (canvas_svg.mjs records it)
+  const chartTex = ctx.tex.draw(690, 470, (g) => drawChart(g, chart), { key: 'calib-chart24' });
   for (const t of scene.tiles) {
+    if (t.engines && !t.engines.includes('three')) continue;
+    for (const c of t.charts || []) ctx.addStatic(chartMeshes(ctx, chart, c));
+    if (t.textured) {
+      const q = new THREE.Mesh(new THREE.PlaneGeometry(690 * t.textured.px, 470 * t.textured.px), ctx.mat.emissive('#ffffff', 1.0, { map: chartTex }));
+      q.position.set(t.textured.pos[0], t.textured.pos[1], t.textured.pos[2]);
+      q.rotation.set(0, deg(t.textured.yaw), 0);
+      q.name = 'calib-chart-texture';
+      ctx.addStatic(q);
+    }
     if (t.grid) grid(ctx, t.grid, [0, 0, 0]);
     for (const o of t.objects) {
       const mesh = new THREE.Mesh(geometry(o), material(ctx, o.mat));

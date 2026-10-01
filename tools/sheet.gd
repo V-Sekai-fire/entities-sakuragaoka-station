@@ -20,8 +20,7 @@ static func render(tree: SceneTree, title: String, columns: Array, rows: Array, 
 	var lines := 1
 	for r in rows:
 		for e in r.get("cells", []):
-			lines = maxi(lines, str(e.get("label", "")).count("
-") + 1)
+			lines = maxi(lines, str(e.get("label", "")).count("\n") + 1)
 	var row_h := ROW_LABEL_H + cell.y + lines * LINE_H + 4 + PAD
 	var h := TITLE_H + HEAD_H + rows.size() * row_h + PAD
 	var vp := SubViewport.new()
@@ -102,8 +101,26 @@ static func heat(a: Image, b: Image) -> Image:
 	return Image.create_from_data(x.get_width(), x.get_height(), false, Image.FORMAT_RGB8, out)
 
 
-## realize_check's mean absolute difference: both at half size, RGB8, every 7th byte, in [0, 255].
-static func mad(port: Image, orig: Image) -> float:
+## The parity measure: mean |a - b| over EVERY pixel and every RGB channel at full resolution, on
+## the 0..255 scale (no resize, no subsample, no mask). -1 when the sizes differ.
+static func mad(a: Image, b: Image) -> float:
+	if a == null or b == null or a.get_size() != b.get_size():
+		return -1.0
+	var x: Image = a.duplicate()
+	var y: Image = b.duplicate()
+	x.convert(Image.FORMAT_RGB8)
+	y.convert(Image.FORMAT_RGB8)
+	var da := x.get_data()
+	var db := y.get_data()
+	var sum := 0
+	for i in da.size():
+		sum += absi(da[i] - db[i])
+	return float(sum) / float(da.size())
+
+
+## The LEGACY measure, kept only to compare with older reports: both images halved (bilinear), then
+## every 7th byte of the RGB data. A blur and a subsample before the diff, so not the parity measure.
+static func mad_legacy(port: Image, orig: Image) -> float:
 	var w := port.get_width() / 2
 	var h := port.get_height() / 2
 	var a: Image = port.duplicate()

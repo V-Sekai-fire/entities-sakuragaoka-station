@@ -4,13 +4,14 @@
 # above the ground, "x,y,z,yaw,pitch" a free camera, yaw 0 north (-Z), Euler YXZ, 58 degree vertical
 # field of view. --hammersley n@x,z puts n eyes at (x,z) at the sphere Hammersley sequence's angles,
 # as shot.mjs does. --original=<prefix> sets each render beside <prefix>_<i>.png and prints the mean
-# absolute difference of the two.
+# absolute difference of the two over every pixel and channel at full resolution (0..255).
 #   godot --path . --resolution 1920x1080 --script tools/realize_check.gd -- --shots=<dir>
 #       [--hammersley=8@-1,-11.4 | --cams="x,z,yaw,pitch;..."] [--original=<prefix>] [--modules=...]
 #       [--q=high|medium|low]   the original's ?q= level (core/quality.gd), default high
 extends SceneTree
 
 const Layout = preload("res://addons/sakuragaoka_station/world/layout.gd")
+const Sheet = preload("res://tools/sheet.gd")
 const SlugAtlas = preload("res://addons/sakuragaoka_station/core/slug/atlas.gd")
 const Baked = preload("res://addons/sakuragaoka_station/core/slug/baked.gd")
 const Pack = preload("res://addons/sakuragaoka_station/core/slug/pack.gd")
@@ -173,11 +174,15 @@ static func _hammersley(spec: String) -> Array:
 	return out
 
 
-## The two renders side by side at half size, and their mean absolute difference over RGB in [0, 255].
+## The two renders side by side (a half-size picture only), and their mean absolute difference over
+## every pixel and RGB channel at full resolution, 0..255 (Sheet.mad); the legacy half-size, 1/7
+## sampled figure follows, labelled, for comparison with older reports.
 func _compare(port: Image, original_path: String) -> String:
 	var orig := Image.load_from_file(original_path)
 	if orig == null:
 		return "; FAIL (no original at %s)" % original_path
+	var mad := Sheet.mad(port, orig)
+	var legacy := Sheet.mad_legacy(port, orig)
 	var w := port.get_width() / 2
 	var h := port.get_height() / 2
 	var a: Image = port.duplicate()
@@ -186,17 +191,11 @@ func _compare(port: Image, original_path: String) -> String:
 	b.convert(Image.FORMAT_RGB8)
 	a.resize(w, h)
 	b.resize(w, h)
-	var da: PackedByteArray = a.get_data()
-	var db: PackedByteArray = b.get_data()
-	var sum := 0
-	for i in range(0, da.size(), 7):
-		sum += absi(da[i] - db[i])
-	var mad := float(sum) / float(ceili(da.size() / 7.0))
 	var pair := Image.create(w * 2, h, false, Image.FORMAT_RGB8)
 	pair.blit_rect(b, Rect2i(0, 0, w, h), Vector2i(0, 0))
 	pair.blit_rect(a, Rect2i(0, 0, w, h), Vector2i(w, 0))
 	pair.save_png(_out.path_join("compare_%d.png" % _view))
-	return "; original | port in compare_%d.png, mean abs diff %.1f" % [_view, mad]
+	return "; original | port in compare_%d.png, mean abs diff (full res) %.2f, legacy (half-size, 1/7 sample) %.1f" % [_view, mad, legacy]
 
 
 static func _mesh_tris(m: Mesh) -> int:

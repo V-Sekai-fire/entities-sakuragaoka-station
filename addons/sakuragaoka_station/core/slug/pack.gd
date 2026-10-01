@@ -115,8 +115,7 @@ static func svg_hash() -> String:
 	var hc := HashingContext.new()
 	hc.start(HashingContext.HASH_SHA256)
 	for k in manifest_keys():
-		hc.update((k + ":" + FileAccess.get_sha256(SVG_DIR.path_join(k + ".svg")) + "
-").to_utf8_buffer())
+		hc.update((k + ":" + FileAccess.get_sha256(SVG_DIR.path_join(k + ".svg")) + "\n").to_utf8_buffer())
 	return hc.finish().hex_encode()
 
 

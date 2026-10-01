@@ -22,7 +22,8 @@ const out = path.resolve(args.out || 'shots/calib/three');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json', '.css': 'text/css', '.png': 'image/png' };
-const OVERRIDES = { '/src/world/calib.js': path.join(here, 'calib_world.js'), '/calib_scene.json': path.join(here, 'calib_scene.json') };
+const OVERRIDES = { '/src/world/calib.js': path.join(here, 'calib_world.js'), '/calib_scene.json': path.join(here, 'calib_scene.json'),
+  '/chart24.json': path.join(here, '../calib/chart24.json') };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, 'http://x').pathname); if (p.endsWith('/')) p += 'index.html';
   const f = OVERRIDES[p] || path.join(root, p);
@@ -51,6 +52,7 @@ try {
   const errors = await page.evaluate(() => window.__errors);
   if (errors && errors.length) throw new Error('module errors: ' + JSON.stringify(errors).slice(0, 2000));
   for (const t of scene.tiles) {
+    if (t.engines && !t.engines.includes('three')) continue;
     await page.evaluate((post) => { window.__post = post; }, t.post);
     await page.evaluate((v) => window.__setCam(v[0], v[1], v[2], v[3], v[4]), t.cam);
     await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))))));
