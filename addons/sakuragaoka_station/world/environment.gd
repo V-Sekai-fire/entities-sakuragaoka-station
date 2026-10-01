@@ -20,7 +20,7 @@ func build(ctx) -> Dictionary:
 	var env := {"groundAt": Callable(C, "terrain_h"), "common": C}
 	ctx.services["environment"] = env
 	# near hills: painted forest crowns with valley mist
-	var forest_mat = Shaders.distant_material(ctx, {"vertexColors": true})
+	var forest_mat = Shaders.distant_material(ctx, {"vertexColors": true, "crown": 10.5, "crownAmt": 1.0, "pinkAmt": 0.5, "pink": "#ecc6d3", "youngAmt": 0.55, "darkAmt": 0.6, "patch": 75.0, "mistY0": 2.0, "mistY1": 32.0, "mistAmt": 0.28, "fogMul": 0.5, "hazeK": 0.0006, "hazeMax": 0.45, "haze": "#c3d3e6", "rim": 1.0})
 	var terrain := Terrain.build_terrain(ctx, C, tx, forest_mat)
 	var far: Dictionary = Far.build_far(ctx, C, tx)
 	var levee: Dictionary = Levee.build_levee(ctx, C, tx)

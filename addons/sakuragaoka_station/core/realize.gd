@@ -11,6 +11,7 @@ extends RefCounted
 const T = preload("res://addons/sakuragaoka_station/core/three.gd")
 const Svg = preload("res://addons/sakuragaoka_station/core/svg.gd")
 const SakuraTree = preload("res://addons/sakuragaoka_station/world/sakura/tree.gd")
+const Shaders = preload("res://addons/sakuragaoka_station/world/environment/shaders.gd")
 
 const MTOON := "res://addons/Godot-MToon-Shader/"
 ## Each keyed canvas texture's mean linear colour, read from the original's canvases by its
@@ -345,6 +346,8 @@ func _cell(o, gd: Dictionary) -> String:
 
 
 func _mat_key(m) -> String:
+	if m.user_data.has("distant"):
+		return m.key
 	var s: Dictionary = m.user_data.get("sakura", {})
 	return "%s|%s|%s|%.3f|%.3f|%s|%.2f|%s" % [m.type, m.side, m.transparent, m.opacity, m.alpha_test,
 			m.emissive.to_html(false), m.emissive_intensity, s.get("rim", 0)]
@@ -389,6 +392,11 @@ func _mtoon(m) -> ShaderMaterial:
 	var k := _mat_key(m)
 	if _materials.has(k):
 		return _materials[k]
+	if m.type == "shader":
+		var custom := Shaders.material(m, _palette_tex)
+		if custom != null:
+			_materials[k] = custom
+			return custom
 	var v := "mtoon"
 	if m.transparent:
 		v = "mtoon_trans"

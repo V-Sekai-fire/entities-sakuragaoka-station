@@ -4,6 +4,8 @@
 @tool
 extends CompositorEffect
 
+const Fog := preload("res://addons/sakuragaoka_station/core/fog.gd")
+
 const GLSL := """
 #version 450
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
@@ -165,7 +167,7 @@ static func compositor(sun: Vector3) -> Compositor:
 	var fx := new()
 	fx.sun_dir = sun
 	var c := Compositor.new()
-	c.compositor_effects = [fx]
+	c.compositor_effects = [Fog.new(), fx]
 	return c
 
 

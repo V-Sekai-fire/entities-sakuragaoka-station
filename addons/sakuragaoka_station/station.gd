@@ -44,7 +44,7 @@ func _ready() -> void:
 
 ## three.js divides a light's irradiance by pi where Godot folds pi into the light, so the original's
 ## intensities 2.75 (sun) and 1.62 (hemisphere) become 2.75 / pi and 1.62 / pi here. Its FogExp2 is
-## exp(-(density d)^2); depth fog with a quadratic curve stands in for it.
+## core/fog.gd in the compositor, since Godot's own fog has no squared exponential.
 func _environment() -> void:
 	var sm := ShaderMaterial.new()
 	sm.shader = SKY
@@ -58,13 +58,6 @@ func _environment() -> void:
 	env.ambient_light_color = Color("#a9b3ee").lerp(Color("#d9c6c8"), 0.5)
 	env.ambient_light_energy = 1.62 / PI
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
-	env.fog_enabled = true
-	env.fog_mode = Environment.FOG_MODE_DEPTH
-	env.fog_light_color = Color("#cfdcec")
-	env.fog_depth_begin = 0.0
-	env.fog_depth_end = 800.0
-	env.fog_depth_curve = 2.0
-	env.fog_sky_affect = 0.0
 	var we := WorldEnvironment.new()
 	we.name = "SkyAndFog"
 	we.environment = env
