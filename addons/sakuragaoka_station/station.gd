@@ -8,6 +8,7 @@ signal built(stats: Dictionary)
 const Ctx = preload("res://addons/sakuragaoka_station/core/ctx.gd")
 const Realize = preload("res://addons/sakuragaoka_station/core/realize.gd")
 const SKY := preload("res://addons/sakuragaoka_station/core/sky.gdshader")
+const Composite := preload("res://addons/sakuragaoka_station/core/composite.gd")
 
 @export var world_seed := 1
 @export var modules := PackedStringArray(["environment", "station", "plaza", "sakura"])
@@ -67,6 +68,7 @@ func _environment() -> void:
 	var we := WorldEnvironment.new()
 	we.name = "SkyAndFog"
 	we.environment = env
+	we.compositor = Composite.compositor(sun_dir)
 	add_child(we)
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
