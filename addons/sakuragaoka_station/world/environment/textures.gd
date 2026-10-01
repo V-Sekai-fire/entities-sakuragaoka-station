@@ -17,6 +17,7 @@ class EnvTextures extends RefCounted:
 	var path
 	var fields := Fields.new()
 	var railing
+	var school
 	var _rest
 
 	func _init(ctx) -> void:
@@ -27,6 +28,7 @@ class EnvTextures extends RefCounted:
 		for k in ["dry", "veg", "renge", "wheat", "nano", "grass"]:
 			fields.set(k, T.draw(256, 256, null, {"key": "env-field-" + k, "repeat": [1, 1]}))
 		railing = T.draw(256, 128, null, {"key": "env-railing", "repeat": [1, 1]})
+		school = T.draw(512, 128, null, {"key": "env-school"})
 
 	func _get(p: StringName):
 		return _rest.get(p)
