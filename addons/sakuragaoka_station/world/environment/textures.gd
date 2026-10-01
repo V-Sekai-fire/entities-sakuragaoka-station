@@ -1,5 +1,5 @@
 # environment/textures.js: the canvas textures at the original's sizes, keys and repeat, each key drawn
-# from its SVG in the Slug pack; the ones not keyed yet are sized stand-ins.
+# from its SVG in the Slug pack.
 extends RefCounted
 
 
@@ -14,6 +14,7 @@ class Fields extends RefCounted:
 
 class EnvTextures extends RefCounted:
 	var ground
+	var levee
 	var masonry
 	var path
 	var tufts
@@ -25,12 +26,11 @@ class EnvTextures extends RefCounted:
 	var shrub
 	var facade
 	var school
-	var _rest
 
 	func _init(ctx) -> void:
 		var T = ctx.tex
-		_rest = T.bag()
 		ground = T.draw(512, 512, null, {"key": "env-ground", "repeat": [1, 1]})
+		levee = T.draw(512, 512, null, {"key": "env-levee", "repeat": [1, 1]})
 		masonry = T.draw(512, 512, null, {"key": "env-masonry2", "repeat": [1, 1]})
 		path = T.draw(512, 512, null, {"key": "env-path", "repeat": [1, 1]})
 		tufts = T.draw(1024, 512, null, {"key": "env-tufts2"})
@@ -44,11 +44,8 @@ class EnvTextures extends RefCounted:
 		facade = T.draw(256, 128, null, {"key": "env-facade"})
 		school = T.draw(512, 128, null, {"key": "env-school"})
 
-	func _get(p: StringName):
-		return _rest.get(p)
-
 	func sub(name: String):
-		return fields if name == "fields" else _rest.sub(name)
+		return fields if name == "fields" else null
 
 
 static func create_env_textures(ctx):
