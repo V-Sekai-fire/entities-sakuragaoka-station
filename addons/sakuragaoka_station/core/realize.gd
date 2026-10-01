@@ -157,6 +157,8 @@ func finish() -> void:
 		var mi := MeshInstance3D.new()
 		mi.name = ("batch %s" % key).validate_node_name()
 		mi.mesh = am
+		if not b.get("cast", true):
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		_root.add_child(mi)
 		stats.batches += 1
 	_batches.clear()
@@ -561,8 +563,11 @@ func _slug_mtoon(m) -> ShaderMaterial:
 	if _materials.has(k):
 		return _materials[k]
 	var sm := ShaderMaterial.new()
-	sm.shader = load(SLUG + _variant(m, "mtoon_slug") + ".gdshader")
+	var sakura := RampSakura.wants(m, true)
+	sm.shader = load(SLUG + _variant(m, "mtoon_slug_sakura" if sakura else "mtoon_slug") + ".gdshader")
 	_toon_params(sm, m)
+	if sakura:
+		RampSakura.params(sm, m, _slug)
 	if m.type == "basic":
 		sm.set_shader_parameter("slug_emission", true)
 	if _in_atlas(m.map):
@@ -618,10 +623,10 @@ static func _wraps(t) -> bool:
 	return t != null and t.get("wrap_s") == "repeat"
 
 
-## How a material's canvas texture is drawn: "" untextured, else "mesh", "slug" or "mean". The
-## bake's recommendation wins; "mesh" needs a bake without radial paints, and a material without an
-## alpha map or an opacity under 1 (else Slug, else mean); with no recommendation, or another one
-## ("stamp"), a key in the atlas is drawn by Slug.
+## How a material's canvas texture is drawn: "" untextured, else "mesh", "slug" or "mean". An
+## alpha-cut foliage card in the atlas is always cut out by Slug at runtime; otherwise the bake's
+## recommendation wins, "mesh" needing a bake without radial paints and a material without an alpha
+## map or an opacity under 1 (else Slug, else mean); with none, or "stamp", Slug draws an atlas key.
 func _mode(m) -> String:
 	if m == null or (m.map == null and m.alpha_map == null):
 		return ""
@@ -630,6 +635,8 @@ func _mode(m) -> String:
 		return str(m.user_data["draw_mode"])
 	var key := _tex_key(m.map if m.map != null else m.alpha_map)
 	var in_atlas := _in_atlas(m.map) or _in_atlas(m.alpha_map)
+	if in_atlas and _foliage(m):
+		return "slug"
 	var want: String = _baked.mode(key) if _baked != null and key != "" else ""
 	# a bake carries one key's colours and shape: an alpha map (another texture's green) or a
 	# material opacity under 1 cannot be laid on it, so those surfaces are drawn by Slug
@@ -641,6 +648,10 @@ func _mode(m) -> String:
 	elif want == "mean":
 		return "mean"
 	return "slug" if in_atlas else "mean"
+
+
+static func _foliage(m) -> bool:
+	return m.alpha_test > 0.0 and m.side == "double" and m.user_data.has("sakura")
 
 
 func _in_atlas(t) -> bool:
@@ -697,10 +708,11 @@ func _slug_arrays(gd: Dictionary, idx: PackedInt32Array, m) -> Array:
 
 ## A Slug-drawn surface into its cell's batch for its material and texture.
 func _slug_batch(o, gd: Dictionary, m) -> void:
-	var key := _cell(o, gd) + "|" + _mat_key(m) + "|" + _slug_mat_key(m)
+	var cast: bool = o.cast_shadow or not _foliage(m)
+	var key := _cell(o, gd) + "|" + _mat_key(m) + "|" + _slug_mat_key(m) + ("" if cast else "|nc")
 	if not _batches.has(key):
 		_batches[key] = {"pos": PackedVector3Array(), "nor": PackedVector3Array(), "uv": PackedVector2Array(),
-				"idx": PackedInt32Array(), "tint": PackedColorArray(), "mat": _slug_mtoon(m)}
+				"idx": PackedInt32Array(), "tint": PackedColorArray(), "mat": _slug_mtoon(m), "cast": cast}
 	_append(key, _slug_arrays(gd, gd.idx, m), o.matrix_world)
 	_tally("Slug cards (batched)", gd.idx.size() / 3, o)
 	stats.slugged += 1

@@ -10,9 +10,9 @@ static func band(m) -> bool:
 			and m.alpha_test == 0.0 and m.side == "front"
 
 
-static func wants(m) -> bool:
+static func wants(m, cutout: bool = false) -> bool:
 	var s: Dictionary = m.user_data.get("sakura", {})
-	return m.type == "toon" and not m.transparent and m.alpha_test == 0.0 and (s.get("band", false) or s.get("edgeFade", false)
+	return m.type == "toon" and not m.transparent and (cutout or m.alpha_test == 0.0) and (s.get("band", false) or s.get("edgeFade", false)
 			or s.get("sway", false) or s.get("octNormal", false) or s.has("speck") or float(s.get("rim", 0.0)) > 0.0
 			or float(s.get("shade", 0.0)) > 0.0)
 
