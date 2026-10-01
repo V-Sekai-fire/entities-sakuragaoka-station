@@ -8,8 +8,10 @@ const Geo = preload("res://addons/sakuragaoka_station/core/geo.gd")
 const Util = preload("res://addons/sakuragaoka_station/world/station/util.gd")
 const Tex = preload("res://addons/sakuragaoka_station/world/station/tex.gd")
 const Mats = preload("res://addons/sakuragaoka_station/world/station/mats.gd")
-
-const PARTS := ["building", "interior", "platforms", "yards"]
+const Building = preload("res://addons/sakuragaoka_station/world/station/building.gd")
+const Interior = preload("res://addons/sakuragaoka_station/world/station/interior.gd")
+const Platforms = preload("res://addons/sakuragaoka_station/world/station/platforms.gd")
+const Yards = preload("res://addons/sakuragaoka_station/world/station/yards.gd")
 
 
 func build(ctx) -> void:
@@ -34,8 +36,10 @@ func build(ctx) -> void:
 	A.kd = ctx.kit(dyn)
 	A.atlases = tx.atlases.duplicate()
 	A.atlases["N"] = tx2.atlases.N
-	for part in PARTS:
-		load("res://addons/sakuragaoka_station/world/station/%s.gd" % part).call("build_" + part, A)
+	Building.build_building(A)
+	Interior.build_interior(A)
+	Platforms.build_platforms(A)
+	Yards.build_yards(A)
 	bake_colors(ctx, root)
 	ctx.add(dyn)
 	var benches := []
