@@ -18,7 +18,7 @@
 #   node tools/oracle/calib.mjs --out <dir>/three            (the original's tiles)
 #   node tools/oracle/calib_svg.mjs --out <dir>/svg          (the chart's canvas texture as SVG)
 #   godot --path . --resolution 1920x1080 --script tools/engine_floor.gd -- --three=<dir>/three --out=<dir>
-#       --chart-svg=<dir>/svg/calib-chart24.svg [--q=high] [--sheet-only]
+#       --chart-svg=<dir>/svg/calib-chart24.svg [--q=high] [--sheet-only] [--ramp-control=step|nohemi|nopaint]
 #   godot --path . --resolution 1920x1080 --script tools/engine_floor.gd -- --station --floors=<dir>/engine_floor.json
 #       --original=<prefix> --views=<dir> [--hammersley=8@-1,-11.4]
 # <prefix>_<tile id>.png are calib.mjs' renders; <dir>/godot_<tile id>.png are written here, with
@@ -26,6 +26,8 @@
 # first; also copied to the desktop as engine-floor-NN by Sheet.publish), then chart_calib.json and
 # chart-calib-sheet.png (chart-calib-NN). --chart-svg loads the SVG into a slug.elf of this run's own
 # for the textured chart tiles (no cache); --sheet-only re-measures the renders already in <dir>.
+# --ramp-control draws the toon-ramp materials with one of the ramp's calibration controls
+# (core/ramp/mtoon_ramp.gdshaderinc; tools/toon_ramp_check.gd reads the runs).
 extends SceneTree
 
 const T = preload("res://addons/sakuragaoka_station/core/three.gd")
@@ -77,10 +79,16 @@ func _make_station(modules: PackedStringArray) -> void:
 	get_root().add_child(_st)
 	await _st.built
 	_make_cam()
+	# the composite among the compositor's effects (core/fog.gd's exact fog runs first, as scene fog)
 	var we = _st.get_node_or_null("SkyAndFog")
-	if we != null and we.compositor != null and not we.compositor.compositor_effects.is_empty():
-		_fx = we.compositor.compositor_effects[0]
-		_fx_on = {"outline": _fx.outline, "grade": _fx.grade, "vignette": _fx.vignette}
+	if we != null and we.compositor != null:
+		for e in we.compositor.compositor_effects:
+			if e != null and "outline" in e and "grade" in e:
+				_fx = e
+	if _fx != null:
+		for k in PORT_STAGES:
+			if k in _fx:
+				_fx_on[k] = _fx.get(k)
 
 
 func _make_cam() -> void:
@@ -118,34 +126,49 @@ func _teardown() -> void:
 
 # ------------------------------------------------------------------------------------- tiles
 
-## The port's composite (core/composite.gd) set for a tile's post stages {outline, bloom, grade,
-## leak, vignette, dither}. Its outline is the original's outline stage; its grade block is the
-## original's grading, light leak and vignette under one switch (vignette is its amount), so it runs
-## only when all three are on; the port has no bloom or dither. A tile whose stages the port cannot
-## run (bloom, dither, or grading, leak or vignette alone) is drawn with those off, so its measure
-## is the stage's whole contribution. Returns what the port ran, for the labels.
+## The port composite's switches (core/composite.gd exports) and the original's post stage each
+## follows: outline the outline stage, bloom and glow the bloom stage, and grade (exposure, soft clip,
+## grading, light leak and vignette under one switch, vignette its amount) only when the original's
+## grading, leak and vignette are all on. The port has no dither.
+const PORT_STAGES := {"outline": "outline", "bloom": "bloom", "glow": "bloom", "grade": "block", "vignette": "block"}
+
+
+## The port's composite set for a tile's post stages {outline, bloom, grade, leak, vignette, dither}.
+## A tile whose stages the port cannot run (dither, or grading, leak or vignette alone) is drawn with
+## those off, so its measure is the stage's whole contribution. Returns what the port ran, for the labels.
 func _set_post(p: Dictionary) -> String:
 	if _fx == null:
 		return "port: no composite"
 	var block: bool = bool(p.grade) and bool(p.leak) and bool(p.vignette)
-	_fx.outline = _fx_on.outline if p.outline else 0.0
-	_fx.grade = _fx_on.grade if block else 0.0
-	_fx.vignette = _fx_on.vignette if block else 0.0
-	return _port_label(p)
+	for k in _fx_on:
+		var on: bool = block if PORT_STAGES[k] == "block" else bool(p[PORT_STAGES[k]])
+		_fx.set(k, _fx_on[k] if on else 0.0)
+	return _port_label(p, _fx_on.has("bloom"))
 
 
-static func _port_label(p: Dictionary) -> String:
+## The port's switches as a key for reusing a render, [] without a composite.
+func _post_key() -> Array:
+	var out := []
+	for k in _fx_on:
+		out.append(_fx.get(k))
+	return out
+
+
+static func _port_label(p: Dictionary, has_bloom: bool = true) -> String:
 	var block: bool = bool(p.grade) and bool(p.leak) and bool(p.vignette)
 	var on := PackedStringArray()
 	if p.outline:
 		on.append("outline")
+	if p.bloom and has_bloom:
+		on.append("bloom")
 	if block:
 		on.append("grade block")
 	var s := "port composite: " + (" + ".join(on) if not on.is_empty() else "off")
 	var not_run := PackedStringArray()
-	for k in ["bloom", "dither"]:
-		if p[k]:
-			not_run.append(k + " (not in the port)")
+	if p.dither:
+		not_run.append("dither (not in the port)")
+	if p.bloom and not has_bloom:
+		not_run.append("bloom (not in the port)")
 	if not block:
 		for k in ["grade", "leak", "vignette"]:
 			if p[k]:
@@ -257,6 +280,8 @@ func _tiles() -> void:
 	await process_frame
 	await process_frame
 	r.finish()
+	if _a.has("ramp-control"):
+		print("engine_floor: CONTROL %s on %d toon-ramp materials" % [_a["ramp-control"], ramp_control(holder, str(_a["ramp-control"]))])
 	var sun: DirectionalLight3D = _st.get_node("Sun")
 	var renders := {}
 	var rects := _chart_rects(scene, chart)
@@ -268,7 +293,7 @@ func _tiles() -> void:
 			continue
 		ports[t.id] = _set_post(t.post)
 		# a tile the port draws exactly as an earlier one (same camera, shadows and composite) reuses it
-		var same := JSON.stringify([t.cam, t.shadows, _fx.outline, _fx.grade, _fx.vignette] if _fx != null else [t.cam, t.shadows])
+		var same := JSON.stringify([t.cam, t.shadows, _post_key() if _fx != null else []])
 		if drawn.has(same):
 			renders[t.id] = renders[drawn[same]]
 			renders[t.id].save_png(out.path_join("godot_%s.png" % t.id))
@@ -299,6 +324,41 @@ func _tiles() -> void:
 	await _chart_report(scene, chart, renders, rects, out)
 	_teardown()
 	quit()
+
+
+## The calibration controls of core/ramp/mtoon_ramp.gdshaderinc, by --ramp-control name.
+const RAMP_CONTROLS := {"step": "RAMP_CONTROL_STEP", "nohemi": "RAMP_CONTROL_NO_HEMI", "nopaint": "RAMP_CONTROL_NO_PAINT"}
+
+
+## Every toon-ramp material under root (palette and Slug variants) redrawn with one control's define
+## before the ramp's include; returns how many materials were switched.
+static func ramp_control(root: Node, which: String) -> int:
+	var define: String = RAMP_CONTROLS[which]
+	var mats := []
+	for n in root.find_children("*", "MeshInstance3D", true, false):
+		if n.material_override != null:
+			mats.append(n.material_override)
+		for i in n.mesh.get_surface_count():
+			mats.append(n.mesh.surface_get_material(i))
+	for n in root.find_children("*", "MultiMeshInstance3D", true, false):
+		mats.append(n.material_override)
+		if n.multimesh.mesh != null:
+			for i in n.multimesh.mesh.get_surface_count():
+				mats.append(n.multimesh.mesh.surface_get_material(i))
+	var seen := {}
+	var made := {}
+	for m in mats:
+		if not m is ShaderMaterial or seen.has(m) or m.shader == null or not m.shader.code.contains("mtoon_ramp.gdshaderinc"):
+			continue
+		seen[m] = true
+		var sh: Shader = m.shader
+		if not made.has(sh):
+			var c := Shader.new()
+			var code: String = sh.code.replace("shader_type spatial;", "shader_type spatial;\n#define " + define)
+			c.code = code.replace("#include \"./", "#include \"" + sh.resource_path.get_base_dir() + "/")
+			made[sh] = c
+		m.shader = made[sh]
+	return seen.size()
 
 
 static func _texture_tiles(scene: Dictionary) -> bool:
