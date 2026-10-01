@@ -124,6 +124,7 @@ class Textures extends RefCounted:
 			t.repeat = Vector2(opts.repeat[0], opts.repeat[1])
 		if key != null:
 			_keyed[key] = t
+			t.user_data["key"] = key
 		return t
 
 	func canvas(w: int, h: int) -> Dictionary:
@@ -132,8 +133,11 @@ class Textures extends RefCounted:
 	func finish(c, _opts = {}) -> T.Tex:
 		return _stub(int(c.canvas.width), int(c.canvas.height))
 
-	func sign(_a = null, _b = null, _c = null, _d = null) -> T.Tex:
-		return _stub(256, 64)
+	func sign(opts = null, _b = null, _c = null, _d = null) -> T.Tex:
+		var t := _stub(256, 64)
+		if opts is Dictionary:
+			t.user_data["sign"] = opts
+		return t
 
 	static func measure(text: String, size: float) -> float:
 		return text.length() * size * 0.92
