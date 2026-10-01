@@ -10,7 +10,10 @@
 //   _EmissionMap   the same colour when slug_emission (an unlit "basic" material), else the map
 //   the rest       MToon's own optional maps at mip 0 (the station sets none, so they read their
 //                  1x1 defaults exactly as texture() would)
-// Shading, shade colour, rim, matcap, emission, cutout/blend and the outline path are MToon's.
+// The variants include core/ramp/mtoon_ramp.gdshaderinc after this file: the shading is the original's
+// toon ramp (gradient map, hemisphere light, hand paint) as on the palette path, the emission is the
+// map's above; cutout/blend are MToon's. An unlit material (_Color black) has a zero albedo there, so
+// it shows its emission alone.
 // Stamp layers (slug.gdshaderinc) draw in the map and the alpha map alike: bind core/slug/stamps.gd's
 // textures beside the atlas's (Stamps.bind(sm); slug_stamp_fade sets the VR distance fade).
 
