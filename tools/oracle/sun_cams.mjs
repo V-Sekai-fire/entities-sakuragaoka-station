@@ -1,17 +1,7 @@
-// The original's cameras, sun and per-pixel geometry at given views, for tools/sun_locate.gd --analyze:
-// what the three.js original actually ran with, read from its live objects rather than from its code.
-// Per view it saves
-//   <out>/meta.json             THREE.REVISION; per view the camera (position, Euler, matrixWorld,
-//                               projectionMatrix, fov, aspect, near, far), the player's feet; the sun
-//                               light's position and target (its light travels target - position), the
-//                               shadow camera box, map size, bias, normal bias, radius and matrix, the
-//                               shadow map type, the hemisphere light
-//   <out>/beauty_<i>.png        the render shot.mjs takes (a check that this run is the oracle's)
-//   <out>/noshadow_<i>.png      the same with the sun's shadow intensity at 0 (r170 LightShadow.intensity)
-//   <out>/geo_<i>.f32           world normal xyz and view depth per pixel, float32 RGBA, rows from the
-//                               bottom (GL order), drawn with an override material on every layer and the
-//                               sky dome hidden (alpha cut-outs draw as their full cards)
-// Serves the checkout at --root as tools/oracle/shot.mjs does (Kenton-GMI/sakuragaoka-station 4112f57, MIT).
+// The original's live cameras and sun at given views, for tools/sun_locate.gd --analyze, served as
+// tools/oracle/shot.mjs serves it. Per view: meta.json (camera matrices, the sun light and its shadow
+// settings), beauty_<i>.png (shot.mjs's render), noshadow_<i>.png (shadow intensity 0) and
+// geo_<i>.f32 (world normal and view depth, float32 RGBA, rows from the bottom).
 //   node tools/oracle/sun_cams.mjs --hammersley 8@-1,-11.4 --w 1920 --h 1080 --only environment,station,plaza,sakura --out <dir>
 import http from 'node:http';
 import fs from 'node:fs';
@@ -66,7 +56,6 @@ try {
   q.set('cam', cams[0]);
   await page.goto(`http://127.0.0.1:${port}/index.html?${q}`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction('window.__ready === true', { timeout: 280000, polling: 250 });
-  // the geometry pass: an override material writing the world normal the toon shading sees and the view depth
   await page.evaluate((W, H) => {
     const THREE = window.THREE;
     window.__geoRT = new THREE.WebGLRenderTarget(W, H, { type: THREE.FloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, samples: 0, depthBuffer: true });
@@ -117,12 +106,10 @@ try {
       };
     });
     meta.views.push(vm);
-    // no shadow: same frame with the sun's shadow intensity at 0
     await page.evaluate(() => { window.__ctx.sky.sun.shadow.intensity = 0; });
     await frames(page);
     await page.screenshot({ path: path.join(out, `noshadow_${i}.png`) });
     await page.evaluate(() => { window.__ctx.sky.sun.shadow.intensity = 1; });
-    // geometry: normal + depth into a float target, read back in row bands
     const rows = 120;
     const fd = fs.openSync(path.join(out, `geo_${i}.f32`), 'w');
     await page.evaluate(() => {

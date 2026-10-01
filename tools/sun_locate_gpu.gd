@@ -1,17 +1,7 @@
-# The compute side of tools/sun_locate.gd: everything that touches pixels or candidate suns runs
-# here as GLSL compute through a local RenderingDevice (as core/composite.gd runs its passes);
-# GDScript only uploads buffers, dispatches, and reads back a handful of numbers per post.
-#   Buffers per view: the port's position, normal, albedo and depth passes, decoded on the GPU; the
-#   image under test (an sRGB PNG) over a reference (the port's albedo, or a render without the
-#   sun's shadow when scoring the segmentation itself), as log luminance ratio per pixel.
-#   Per post: two levels (lit, shadow) by EM over the window's histogram; the strip leaving the base,
-#   searched over every azimuth; a corridor along it, less the 5 cm slices that hold another
-#   object's shadow; the strip's centre line. The kept pixels become the post's window.
-#   The model: each post as convex parts (cylinders, cones, ellipsoids, boxes, discs), projected
-#   along L into the light plane through their support functions; a window pixel's lookup point
-#   (moved by a normal bias b across L) against them gives a signed distance, the shadow fraction
-#   Phi((sd + d) / s). A candidate's cost is the soft-L1 sum of image minus model over the windows;
-#   grids of candidates (sun and edge model) are scored in one dispatch and refined coarse to fine.
+# The compute side of tools/sun_locate.gd: every pixel and every candidate sun is GLSL compute on a
+# local RenderingDevice; GDScript uploads, dispatches and reads back a few numbers per post.
+# Posts are convex parts projected along L into the light plane by their support functions; a
+# candidate's cost is the soft-L1 sum of image minus Phi((sd + d) / s) over the posts' windows.
 extends RefCounted
 
 const W := 1920
@@ -73,13 +63,12 @@ bool ground(uint i) { vec4 p = pos[i]; return p.w > 0.5 && nrm[i].y > 0.97 && ab
 vec3 srgb_lin(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }
 vec3 sun_dir(float az, float el) { float a = radians(az), e = radians(el); return vec3(-cos(e) * cos(a), sin(e), -cos(e) * sin(a)); }
 float phi(float x) {
-	// standard normal CDF via Abramowitz-Stegun 7.1.26 (|error| < 1.5e-7)
+	// Abramowitz-Stegun 7.1.26, |error| < 1.5e-7
 	float z = abs(x) * 0.7071067811865476;
 	float t = 1.0 / (1.0 + 0.3275911 * z);
 	float y = 1.0 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * exp(-z * z);
 	return x >= 0.0 ? 0.5 * (1.0 + y) : 0.5 * (1.0 - y);
 }
-// support of primitive k (4 vec4 each) in direction n
 float support(int k, vec3 n) {
 	vec4 a = prt[PARTS_OFF + 4 * k], c = prt[PARTS_OFF + 4 * k + 1], b = prt[PARTS_OFF + 4 * k + 2];
 	int t = int(a.x + 0.5);
@@ -93,11 +82,9 @@ float support(int k, vec3 n) {
 		vec3 ax = vec3(b.x, 0.0, -b.y), az = vec3(b.y, 0.0, b.x);
 		return dot(n, c.xyz) + a.y * abs(dot(n, ax)) + a.z * abs(n.y) + a.w * abs(dot(n, az));
 	}
-	// disc: radius, thickness, axis b.xyz
 	float na = dot(n, b.xyz);
 	return dot(n, c.xyz) + 0.5 * a.z * abs(na) + a.y * sqrt(max(0.0, 1.0 - na * na));
 }
-// signed distance (positive inside) in the light plane from g to post's projected parts
 float post_sd(int post, vec3 g, vec3 e1, vec3 e2) {
 	vec4 pt = prt[post];
 	int k0 = int(pt.x + 0.5), k1 = k0 + int(pt.y + 0.5);
@@ -135,9 +122,8 @@ void main() {
 }
 """
 
-# rel = log(numerator luminance / denominator luminance). i0.x: numerator 0 = sRGB image in img[],
-# 1 = linear plane 6 of raw[]; i0.y: denominator 0 = the port's albedo, 1 = sRGB image in outp[],
-# 2 = linear plane 7 of raw[]
+# rel = log(numerator / denominator luminance): i0.x 0 img[] (sRGB), 1 raw plane 6; i0.y 0 albedo,
+# 1 outp[] (sRGB), 2 raw plane 7
 const K_REL := """
 layout(local_size_x = 256) in;
 vec4 plane(uint p, uint i) { uint b = (p * uint(NPIX) + i) * 2u; return vec4(unpackHalf2x16(raw[b]), unpackHalf2x16(raw[b + 1u])); }
@@ -166,7 +152,7 @@ void main() {
 }
 """
 
-# two-level EM over the histogram (percentile start, as a 1-D Gaussian mixture), one thread
+# two-level EM (a 1-D Gaussian mixture) over the histogram, one thread
 const K_LEVELS := """
 layout(local_size_x = 1) in;
 float bc(int b) { return -6.0 + (float(b) + 0.5) * 8.0 / float(HIST); }
@@ -215,8 +201,7 @@ void main() {
 }
 """
 
-# score per candidate angle over list A's near annulus (one workgroup per angle); i0 = (job, n),
-# f0 = (first angle, step)
+# score per candidate angle (one workgroup each) over list A's near annulus; f0 = (first angle, step)
 const K_SEARCH := """
 layout(local_size_x = 256) in;
 shared float red[256][8];
@@ -271,8 +256,7 @@ void main() {
 }
 """
 
-# corridor along the strip (angle a0 = J 21): list B, and per 5 cm slice the flank shadow, the
-# corridor count and the centre-line sums (fixed point, x65536)
+# corridor along the strip: list B, and per 5 cm slice the flank shadow and centre-line sums (x65536)
 const K_CORR := """
 layout(local_size_x = 256) in;
 void main() {
@@ -345,8 +329,7 @@ void main() {
 		for (int b = 0; b < nb; b++) { float d = by[b] - kk * bx[b]; rr += bw[b] * d * d; mx2 += bx[b] * bx[b]; len = max(len, bx[b] - 0.025 - r_lo); }
 		se = sqrt(rr / sw / float(max(1, nb - 1))) / sqrt(mx2 / float(nb));
 	}
-	// the window ends past the strip's own dark run (its far end, plus max(1 m, 0.75 x run)), so it
-	// sees lit ground beyond the tip without reaching other objects' shadows further out
+	// the window ends max(1 m, 0.75 x run) past the strip's dark run, short of other shadows
 	float run = r_lo + len;
 	float stop = min(reach, run + max(1.0, 0.75 * run));
 	kept = 0.0;
@@ -366,10 +349,8 @@ void main() {
 }
 """
 
-# list B pixels in kept slices (a hash-thinned sample of at most ~20000) -> window entries:
-# win[3m] = (P, s), win[3m + 1] = (N, post + 32 * view + 8192 * window), win[3m + 2] = (view depth,
-# texel of the port's PSSM split that depth falls in, 0, 0); i0 = (job, window id), f0 = the
-# splits' far distances, f1 = their texels (Godot: 2 x bounding radius of the frustum slice / 2048)
+# kept list B pixels (hash-thinned to ~20000) -> win[3m..3m+2] = (P, s), (N, post + 32 view + 8192
+# window), (view depth, its PSSM split's texel); f0 = split far distances, f1 = their texels
 const K_WINDOW := """
 layout(local_size_x = 256) in;
 void main() {
@@ -396,11 +377,9 @@ void main() {
 }
 """
 
-# cost of each candidate (one workgroup each) over window entries [i0.x, i0.y): grid of
-# i1 = (n_az, n_el, n_d, n_b) and f2.z = n_s around f0 = (az, el, d, b), f2.x = log s, steps
-# f1 = (az, el, d, b), f2.y = log s; f2.w = bootstrap replicate (0: none) over windows
-# [i0.z, i0.w); f3.x = soft-L1 scale; f3.y = edge units: 0 metres (one shadow map, three.js),
-# 1 texels of each pixel's split (d and b times that texel: Godot's PSSM)
+# cost per candidate (one workgroup each) over entries [i0.x, i0.y): a grid of i1, f2.z counts around
+# f0 / f2.x with steps f1 / f2.y; f2.w bootstrap replicate over windows [i0.z, i0.w); f3.y edge units
+# (0 metres, 1 texels of each pixel's PSSM split)
 const K_COST := """
 layout(local_size_x = 256) in;
 shared float red[256];
@@ -431,7 +410,7 @@ void main() {
 	vec3 L = sun_dir(az, el), e1, e2;
 	basis(L, e1, e2);
 	float fs = pc.f3.x, sum = 0.0;
-	// physical bounds on the sun and the edge model, par[RES + 32 ..]: el, d, b, s (min, max)
+	// bounds, par[RES + 32 ..]: el, d, b, s as (min, max)
 	bool outside = el < par[RES + 32] || el > par[RES + 33] || dd < par[RES + 34] || dd > par[RES + 35]
 			|| bb < par[RES + 36] || bb > par[RES + 37] || ss < par[RES + 38] || ss > par[RES + 39];
 	for (int e = pc.i0.x + int(lid); e < (outside ? pc.i0.x : pc.i0.y); e += 256) {
@@ -465,10 +444,8 @@ void main() {
 }
 """
 
-# model tip of post i0.x along the shadow's centre line, for f0 = (az, el, d, b): the farthest point
-# whose lookup is inside (sd > -d); f1 = (reach, base x, base z, edge units). In texel units (Godot)
-# each point takes the texel of the split its view depth falls in: camera origin par[RES + 16..18],
-# forward [19..21], split far distances [22..25], texels [26..29]; writes par[RES + 8 + post]
+# model tip of post i0.x for f0 = (az, el, d, b): the farthest centre-line point inside (sd > -d); in
+# texels each point takes its split's (camera and splits at par[RES + 16 ..])
 const K_TIP := """
 layout(local_size_x = 256) in;
 shared float red[256];
@@ -501,9 +478,8 @@ void main() {
 }
 """
 
-# observed tip of window i0.x (entries [i0.y, i0.z)) along the fitted line from the base: mean
-# shadow fraction in 2 cm bins of the core (|lateral| < f1.w), last 0.5 crossing within +-0.6 m of
-# the model tip f1.x that has 10 cm of lit, visible ground beyond it; f0 = (dir rad, base x, base z)
+# observed tip of window i0.x: the last 0.5 crossing of the core's shadow (2 cm bins) within 0.6 m of
+# the model tip f1.x, with 10 cm of lit, visible ground beyond it
 const K_OBSTIP := """
 layout(local_size_x = 256) in;
 shared int bs[1024];
@@ -530,7 +506,6 @@ void main() {
 			if (bn[b] == 0) continue;
 			float pb = float(bs[b]) / 65536.0 / float(bn[b]);
 			if (pb < 0.5) continue;
-			// next visible bins beyond b must be lit
 			int seen = 0; float acc2 = 0.0; int nxt = -1;
 			for (int k = b + 1; k < 60 && seen < 5; k++) if (bn[k] > 0) { if (nxt < 0) nxt = k; seen++; acc2 += float(bs[k]) / 65536.0 / float(bn[k]); }
 			if (seen >= 3 && nxt - b <= 2 && acc2 / float(seen) < 0.35) {
@@ -546,11 +521,8 @@ void main() {
 """
 
 # ---------------------------------------------------------------------------- toon bands
-# Post surfaces: a pixel on a post (within its parts' reach of the axis, above the paving), away from
-# depth edges (2 px, 1.5 %), not grazing (N.V >= 0.3), and lit in the port's own shadow mask when the
-# sun passes are loaded (i0.y = 1). Entries win[TB + e] = (N, log luminance), keys wpx[TK + e] =
-# post * 512 + albedo bin (8 levels a channel, sRGB); key counts at acc[KEYS + key].
-# i0 = (view, use mask, n posts, 0), f0 = camera origin
+# post-surface pixels away from depth edges, not grazing, lit in the port's mask: win[TB + e] =
+# (N, log luminance), wpx[TK + e] = post * 512 + albedo bin; key counts at acc[KEYS + key]
 const K_TB_COLLECT := """
 layout(local_size_x = 256) in;
 vec4 plane(uint p, uint i) { uint b = (p * uint(NPIX) + i) * 2u; return vec4(unpackHalf2x16(raw[b]), unpackHalf2x16(raw[b + 1u])); }
@@ -563,7 +535,6 @@ void main() {
 	for (int k = 0; k < pc.i0.z; k++) {
 		vec4 t = prt[k];
 		vec4 c = prt[PARTS_OFF + 4 * int(t.x + 0.5) + 1];
-		// the post's axis: its first part's centre (every post's parts share its axis)
 		float r = length(p.xz - c.xz);
 		if (r < t.z + 0.015 && p.y > 0.06 && p.y < t.w + 0.02) { post = k; break; }
 	}
@@ -609,12 +580,8 @@ void main() {
 }
 """
 
-# per candidate (one workgroup each, a grid as in K_COST over az and el), the sum of squares of
-# each region's log luminance about its model, less a constant (the regions' total sum of squares):
-# f3.x = 0, steps (three.js MeshToonMaterial): one level per band, band edges f2.x, f2.y, f2.z on N.L,
-# cost = -sum (sum I)^2 / count over regions and bands; f3.x = 1, a ramp (MToon): I = a + c t with
-# t = clamp(N.L / f2.y, 0, 1), a and c per region by least squares. Entries [i0.x, i0.y); f2.w
-# bootstrap replicate over regions
+# per candidate, each region's sum of squares about its band model less a constant: f3.x 0 one level
+# per band (edges f2.xyz on N.L), 1 a ramp a + c clamp(N.L / f2.y, 0, 1); f2.w bootstrap replicate
 const K_TB_COST := """
 layout(local_size_x = 256) in;
 shared int s1[128 * 4];
@@ -649,7 +616,6 @@ void main() {
 			atomicAdd(s1[r * 4 + b], int(round(en.w * 1024.0)));
 			atomicAdd(sn[r * 4 + b], 1);
 		} else {
-			// per region: n, sum t, sum t^2, sum I, sum t I (t x 4096, I x 1024)
 			float t = clamp(nl / pc.f2.y, 0.0, 1.0);
 			atomicAdd(sn[r * 4], 1);
 			atomicAdd(sn[r * 4 + 1], int(round(t * 4096.0)));
@@ -683,11 +649,9 @@ void main() {
 """
 
 # ---------------------------------------------------------------------------- contact sheet
-# msk[i] bytes: 0 oracle shadow fraction, 1 port shadow fraction (each from its image over the
-# port's albedo, two levels over the view's paving), 2 oracle model shadow, 3 port model shadow.
+# msk[i] bytes: the oracle's and the port's shadow fraction, then their model shadows
 
-# the current rel field's paving pixels as a shadow fraction into byte i0.x of msk[], levels from
-# job i0.y
+# the rel field's paving pixels as a shadow fraction into msk byte i0.x, levels from job i0.y
 const K_MASKW := """
 layout(local_size_x = 256) in;
 void main() {
@@ -703,8 +667,7 @@ void main() {
 }
 """
 
-# a model's shadow on the paving near the view's measured posts into byte i0.x: posts listed at
-# par[RES + 64 ...] (i0.y of them), sun f0 = (az, el, d, b), f1.x = blur, f1.y = edge units
+# a model's shadow near the listed posts (par[RES + 64 ..]) into msk byte i0.x
 const K_MASKM := """
 layout(local_size_x = 256) in;
 void main() {
@@ -733,11 +696,8 @@ void main() {
 }
 """
 
-# the sheet body, 1920 x 1080: oracle | port with markers at half size, the shadow masks over the
-# oracle at half size, and a crop of them at full size (or 2x) around the posts. Markers at
-# par[RES + 128 ...]: i0.x of them, 8 floats each: kind (0 segment, 1 circle, 2 cross), panel (0
-# oracle, 1 port, 2 both), x0, y0, x1 (or radius), y1, rgb packed, width. i0.y, i0.z: crop origin,
-# f0.x: crop scale (source pixels per sheet pixel); colours as r + 256 g + 65536 b
+# the sheet body: oracle | port with markers, the masks, and a crop; markers at par[RES + 128 ..]:
+# kind, panel, x0, y0, x1 (or radius), y1, r + 256 g + 65536 b, width
 const K_SHEET := """
 layout(local_size_x = 256) in;
 vec3 px8(uint w) { return unpackUnorm4x8(w).rgb; }
@@ -768,7 +728,6 @@ bool contour(uint j, int byte_ix) {
 	}
 	return false;
 }
-// markers drawn in source-pixel coordinates (sx, sy) with a pixel footprint of `scale` source px
 vec4 markers(int panel, float sx, float sy, float scale) {
 	vec4 o = vec4(0.0);
 	for (int k = 0; k < pc.i0.x; k++) {
@@ -824,9 +783,7 @@ void main() {
 }
 """
 
-# the original's own depth (sun_cams.mjs geo_<i>.f32: normal xyz and view depth per pixel, rows from
-# the bottom, in raw[] from float index 0) against the port's: |difference| in a log histogram
-# acc[0..256) from 1e-6 to 10 m, pixels where both see geometry
+# |original depth - port depth| (sun_cams.mjs geo_<i>.f32 in raw[]) into a log histogram acc[0..256)
 const K_DEPTHCMP := """
 layout(local_size_x = 256) in;
 void main() {
@@ -951,8 +908,7 @@ func clear(buf: String, offset_bytes := 0, size_bytes := -1) -> void:
 
 # ---------------------------------------------------------------------------- loading
 
-## The port's buffers at view i (tools/sun_locate.gd's .f16 passes) into raw planes 0..5, and
-## optionally the sun-alone passes into planes 6 (shadow) and 7 (no shadow); then decode.
+## The port's .f16 passes at view i into raw planes 0..5 (and the sun-alone ones into 6, 7), decoded.
 func load_view(dir: String, i: int, sun_passes := false) -> void:
 	var names := ["posx", "posy", "posz", "normal", "albedo", "dist"]
 	if sun_passes:
@@ -977,16 +933,13 @@ func load_png(path: String, into := "img") -> bool:
 	return true
 
 
-## rel = log(numerator / denominator) luminance; num 0 = img[] (sRGB), 1 = plane 6 (linear);
-## den 0 = port albedo, 1 = outp[] (sRGB), 2 = plane 7 (linear).
 func make_rel(num: int, den: int) -> void:
 	run("rel", (NPIX + 255) / 256, [num, den, 0, 0])
 
 
 # ---------------------------------------------------------------------------- posts
 
-## Posts as convex primitives (furniture.js numbers), written to prt[]: table at [0, n), then 4
-## vec4 per primitive from PARTS_OFF.
+## Posts as convex primitives into prt[]: a table, then 4 vec4 per primitive from PARTS_OFF.
 func set_posts(defs: Array) -> void:
 	posts = defs
 	var table := PackedFloat32Array()
@@ -1018,8 +971,7 @@ static func _prim(q: Array, x: float, z: float) -> PackedFloat32Array:
 
 # ---------------------------------------------------------------------------- per post
 
-## Measures post k's strip in the current rel field; returns its job record or {} when the post
-## casts no readable strip. Window entries go to win[] when window_id >= 0.
+## Post k's strip in the current rel field, or {} when it casts none; window_id >= 0 adds its window.
 func measure(job: int, k: int, view: int, window_id: int) -> Dictionary:
 	var p: Dictionary = posts[k]
 	var r_lo: float = p.r_max + 0.12
@@ -1037,7 +989,6 @@ func measure(job: int, k: int, view: int, window_id: int) -> Dictionary:
 	var lv := floats("par", job * JOB + 16, 3)
 	if lv[2] < 0.5:
 		return {}
-	# near-annulus count must be readable: the search reports -1 when the annulus is too sparse
 	run("search", 360, [job, 360, 0, 0], [], [0.0, deg_to_rad(1.0)])
 	run("pick_angle", 1, [job, 360, 19, 0], [], [0.0, deg_to_rad(1.0)])
 	var co := floats("par", job * JOB + 19, 2)
@@ -1065,11 +1016,8 @@ func measure(job: int, k: int, view: int, window_id: int) -> Dictionary:
 
 # ---------------------------------------------------------------------------- the fit
 
-## Scores a grid of candidates over entries [e0, e1) and returns the best: {az, el, d, b, ls, cost}
-## and, per parameter, whether it landed on the grid's edge. grid: centres {az, el, d, b, ls (log
-## s)}, counts {n_*} and steps {st_*}.
-## Physical bounds the fit keeps to: elevation 10..70 deg; dilation, normal-bias shift and blur
-## within what a shadow map does (metres for one map, texels of the split for PSSM).
+## The best of a grid of candidates over entries [e0, e1), and which parameters sat on its edge.
+## Physical bounds: elevation 10..70 deg, and the edge model within what a shadow map does.
 func set_bounds() -> void:
 	var b := [10.0, 70.0, -0.05, 0.08, -0.05, 0.15, 0.0005, 0.08]
 	if edge_units > 0.5:
@@ -1097,11 +1045,8 @@ func grid(e0: int, e1: int, k0: int, k1: int, g: Dictionary, rep := 0, fs := 0.2
 	return out
 
 
-## The sun (and, unless nuis is given, the edge model) over entries [e0, e1), coarse to fine: a
-## 7 x 9 x 9 grid over azimuth, elevation and the normal-bias shift b together (a shorter shadow is
-## either a higher sun or a larger b, so the two are searched as a pair), then, with the edge model
-## free, a 7 x 7 x 5 grid over dilation, b and blur; a step halves each round unless its best sat on
-## the grid's edge, where the grid moves instead. free_b with nuis keeps b in the sun grid.
+## The sun (and, unless nuis is given, the edge model), coarse to fine; elevation and the normal-bias
+## shift b are searched as a pair, since a shorter shadow is either.
 func fit(e0: int, e1: int, k0: int, k1: int, start: Dictionary, nuis = null, rep := 0, rounds := 12, free_b := false) -> Dictionary:
 	var cur := {"az": start.az, "el": start.el, "d": start.get("d", 0.0), "b": start.get("b", 0.0),
 		"ls": start.get("ls", log(0.03)), "cost": 0.0}
@@ -1144,8 +1089,7 @@ func fit(e0: int, e1: int, k0: int, k1: int, start: Dictionary, nuis = null, rep
 	return cur
 
 
-## Curvature of the cost around (az, el): a 7 x 7 grid at the given steps, fitted with a quadratic
-## by the GPU-side cost values (read back: 49 numbers); returns the 2 x 2 Hessian and cost centre.
+## The cost's curvature in (az, el) by central differences.
 func curvature(e0: int, e1: int, k0: int, k1: int, cur: Dictionary, h_az: float, h_el: float) -> Dictionary:
 	var g := {"az": cur.az, "el": cur.el, "d": cur.d, "b": cur.b, "ls": cur.ls, "n_az": 3, "n_el": 3, "n_d": 1, "n_b": 1,
 		"n_s": 1, "st_az": h_az, "st_el": h_el, "st_d": 0.0, "st_b": 0.0, "st_ls": 0.0}
@@ -1163,8 +1107,7 @@ func set_tip_camera(origin: Vector3, forward: Vector3) -> void:
 	put_floats("par", RES + 16, PackedFloat32Array([origin.x, origin.y, origin.z, forward.x, forward.y, forward.z] + split_far + split_texel))
 
 
-## Hessian of the cost over (az, el, b) at cur, by central differences on a 3 x 3 x 3 grid: the
-## residual-based error of the sun with the normal-bias shift profiled out.
+## The cost's Hessian in (az, el, b) by central differences, for errors with b profiled out.
 func curvature3(e0: int, e1: int, k0: int, k1: int, cur: Dictionary, h: Array) -> Dictionary:
 	run("cost", 27, [e0, e1, k0, k1], [3, 3, 1, 3],
 			[cur.az, cur.el, cur.d, cur.b, h[0], h[1], 0.0, h[2], cur.ls, 0.0, 1.0, 0.0, 0.2, edge_units, 0, 0])
@@ -1200,9 +1143,7 @@ func obs_tip(window_id: int, e0: int, e1: int, dir_rad: float, post_index: int, 
 	return floats("par", RES + 40 + window_id, 1)[0]
 
 
-## Godot's PSSM for a camera: each split's far distance and texel (renderer_scene_cull.cpp: the split's
-## frustum slice, its 8 corners' bounding radius from their mean, plus a texel each side, times 2 over
-## the split's side, half the atlas for 4 splits).
+## Godot's PSSM split far distances and texels for a camera (renderer_scene_cull.cpp's bounding radius).
 static func godot_splits(yfov_deg: float, aspect: float, near: float, max_distance: float, offsets: Array, atlas: int) -> Dictionary:
 	var dist := [near]
 	for o in offsets:
@@ -1253,7 +1194,6 @@ func tb_fit(e0: int, e1: int, edges: Array, rep := 0, start = null, ramp := fals
 	var st := {"az": 2.0, "el": 2.0}
 	var n := [9, 9]
 	if start == null:
-		# a wide first look: azimuth -90..+40, elevation 6..66, 5 degree steps
 		cur = {"az": -25.0, "el": 36.0}
 		st = {"az": 5.0, "el": 5.0}
 		n = [27, 13]
@@ -1285,8 +1225,7 @@ func tb_fit(e0: int, e1: int, edges: Array, rep := 0, start = null, ramp := fals
 
 # ---------------------------------------------------------------------------- contact sheet
 
-## Shadow fraction of the image in rel[] over the whole view's paving into msk byte (two levels
-## from all of the view's paving).
+## The image in rel[] as a shadow fraction over the view's paving, into a msk byte.
 func mask_image(byte_ix: int, job: int) -> void:
 	var rec := PackedFloat32Array()
 	rec.resize(JOB)
@@ -1320,8 +1259,7 @@ func sheet(markers: Array, crop: Rect2, scale: float) -> Image:
 	return Image.create_from_data(1920, 1080, false, Image.FORMAT_RGBA8, d)
 
 
-## The original's depth (geo_<i>.f32 from tools/oracle/sun_cams.mjs) against the port's decoded view:
-## the median and 95th percentile of |difference| (m) and the pixels compared.
+## Median and 95th percentile of |original depth - port depth| (m) over the pixels both see.
 func depth_check(geo_path: String) -> Dictionary:
 	var bytes := FileAccess.get_file_as_bytes(geo_path)
 	if bytes.size() != NPIX * 16:
