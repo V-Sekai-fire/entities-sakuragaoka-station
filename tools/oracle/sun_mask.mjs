@@ -5,7 +5,8 @@
 // one (1, 0, 0, 1), the background (0, 0, 1, 1). --shift moves the snapped shadow box by that many
 // texels along both light-space axes, the original against itself at another texel phase.
 //   node tools/oracle/sun_mask.mjs --hammersley 8@-1,-11.4 --w 1920 --h 1080 --only environment,station,plaza,sakura
-//       --out <dir> [--angle d3d11|vulkan] [--shift 0.5]
+//       --out <dir> [--angle d3d11-warp|d3d11|vulkan] [--shift 0.5] [--self-test]
+// The page's GL renderer must be the backend asked for (WARP by default, the canonical oracle); --self-test checks that.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,12 +43,28 @@ await new Promise(r => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
 
 const CHROME = args.chrome || ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(p => fs.existsSync(p));
-const ANGLE = args.angle || { darwin: 'metal', win32: 'd3d11' }[process.platform] || 'vulkan';
+const ANGLE = args.angle || 'd3d11-warp';
+const SOFT = /Basic Render Driver|SwiftShader|llvmpipe/;
+const RENDERER = { 'd3d11-warp': (g) => /Basic Render Driver/.test(g) && /Direct3D11/.test(g), d3d11: (g) => /Direct3D11/.test(g) && !SOFT.test(g),
+  vulkan: (g) => /Vulkan/.test(g) && !SOFT.test(g), metal: (g) => /Metal/.test(g) };
+const rendererFault = (angle, g) => !RENDERER[angle] ? `no renderer check is known for --angle ${angle}` : RENDERER[angle](g) ? '' : `asked for ANGLE ${angle}, the page got ${g}`;
+if (args['self-test']) {
+  const WARP = 'ANGLE (Microsoft, Microsoft Basic Render Driver (0x0000008C) Direct3D11 vs_5_0 ps_5_0, D3D11)';
+  const D3D = 'ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)';
+  const VK = 'ANGLE (NVIDIA, Vulkan 1.4.351 (NVIDIA NVIDIA GeForce RTX 4090 (0x00002684)), NVIDIA)';
+  const SWVK = 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)';
+  const cases = [['d3d11-warp', WARP, 1], ['d3d11', D3D, 1], ['vulkan', VK, 1], ['d3d11-warp', D3D, 0], ['d3d11', WARP, 0],
+    ['vulkan', SWVK, 0], ['vulkan', D3D, 0], ['bogus', WARP, 0]];
+  let bad = 0;
+  for (const [a, g, ok] of cases) { const right = !rendererFault(a, g) === !!ok; bad += right ? 0 : 1; console.log(`${right ? 'ok  ' : 'FAIL'} --angle ${a} ${ok ? 'accepts' : 'refuses'} ${g}`); }
+  console.log(`${cases.length} controls, ${bad} failed`);
+  process.exit(bad ? 1 : 0);
+}
 const browser = await puppeteer.launch({
   executablePath: CHROME, headless: true,
   args: [`--use-angle=${ANGLE}`, '--enable-gpu', '--ignore-gpu-blocklist', '--enable-webgl', '--disable-gpu-sandbox', '--no-first-run', '--disable-extensions', `--window-size=${W},${H}`],
   defaultViewport: { width: W, height: H, deviceScaleFactor: 1 },
-  protocolTimeout: 600000,
+  protocolTimeout: 3600000,
 });
 const logs = [];
 const frames = (page) => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
@@ -58,8 +75,8 @@ try {
   const q = new URLSearchParams({ shot: '1', w: String(W), h: String(H), t: String(args.t || 0), q: args.q || 'high' });
   if (args.only) q.set('only', args.only);
   q.set('cam', cams[0]);
-  await page.goto(`http://127.0.0.1:${port}/index.html?${q}`, { waitUntil: 'load', timeout: 120000 });
-  await page.waitForFunction('window.__ready === true', { timeout: 280000, polling: 250 });
+  await page.goto(`http://127.0.0.1:${port}/index.html?${q}`, { waitUntil: 'load', timeout: 600000 });
+  await page.waitForFunction('window.__ready === true', { timeout: 1800000, polling: 250 });
   const census = await page.evaluate((W, H, SHIFT) => {
     const THREE = window.THREE, c = window.__ctx, sky = c.sky;
     window.__maskRT = new THREE.WebGLRenderTarget(W, H, { type: THREE.FloatType, format: THREE.RGBAFormat, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, samples: 0, depthBuffer: true });
@@ -111,8 +128,13 @@ vec4 sunMaskOut() {
     });
     return n;
   }, W, H, SHIFT);
-  const info = await page.evaluate(() => ({ revision: window.THREE.REVISION, errors: window.__errors }));
-  const meta = { revision: info.revision, size: [W, H], cams, angle: ANGLE, shift_texels: SHIFT, census, views: [], only: args.only || null, q: args.q || 'high', t: Number(args.t || 0) };
+  const info = await page.evaluate(() => {
+    const gl = window.__ctx.renderer.getContext(), e = gl.getExtension('WEBGL_debug_renderer_info');
+    return { revision: window.THREE.REVISION, errors: window.__errors, renderer: e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'n/a' };
+  });
+  const fault = rendererFault(ANGLE, info.renderer);
+  if (fault) throw new Error(fault);
+  const meta = { revision: info.revision, size: [W, H], cams, angle: ANGLE, renderer: info.renderer, shift_texels: SHIFT, census, views: [], only: args.only || null, q: args.q || 'high', t: Number(args.t || 0) };
   for (let i = 0; i < cams.length; i++) {
     const v = cams[i].split(',').map(Number);
     await page.evaluate((v) => { if (v.length === 4) window.__setCam(v[0], null, v[1], v[2], v[3]); else window.__setCam(v[0], v[1], v[2], v[3], v[4]); }, v);
@@ -147,7 +169,7 @@ vec4 sunMaskOut() {
     console.log(`view ${i} cam=[${cams[i]}] eye=(${vm.position.map(x => x.toFixed(4)).join(', ')}) shadow target=(${vm.sunTarget.map(x => x.toFixed(4)).join(', ')})`);
   }
   fs.writeFileSync(path.join(out, 'meta.json'), JSON.stringify(meta, null, 1));
-  console.log('three r' + info.revision, 'angle', ANGLE, 'shift', SHIFT, 'materials', JSON.stringify(census));
+  console.log('three r' + info.revision, 'angle', ANGLE, info.renderer, 'shift', SHIFT, 'materials', JSON.stringify(census));
   if (info.errors && info.errors.length) { console.log('MODULE ERRORS:'); for (const e of info.errors) console.log(` - [${e.module}] ${e.message.split('\n').slice(0, 6).join('\n   ')}`); process.exitCode = 1; }
 } catch (e) {
   console.log('SUN_MASK FAILED:', e.message);
