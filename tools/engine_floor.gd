@@ -55,6 +55,7 @@ func _place(c: Array) -> void:
 func _make_station(modules: PackedStringArray) -> void:
 	_st = load("res://addons/sakuragaoka_station/station.tscn").instantiate()
 	_st.modules = modules
+	_st.quality = _a.get("q", "high")
 	get_root().add_child(_st)
 	await _st.built
 	_cam = Camera3D.new()
@@ -125,7 +126,8 @@ func _tiles() -> void:
 		var have := {}
 		for t in scene.tiles:
 			have[t.id] = Image.load_from_file(out.path_join("godot_%s.png" % (t.id if not (t.has("same_as") and t.same_as != null) else t.same_as)))
-		_compare(scene, have, Image.load_from_file(out.path_join("godot_%s-msaa4.png" % scene.tiles[0].id)), out)
+		_compare(scene, have, Image.load_from_file(out.path_join("godot_%s-msaa4.png" % scene.tiles[0].id)), out,
+				Image.load_from_file(out.path_join("godot_%s-msaa-off.png" % scene.tiles[0].id)))
 		return
 	await _make_station(PackedStringArray())
 	var mats = Materials.new()
@@ -164,16 +166,20 @@ func _tiles() -> void:
 		img.save_png(out.path_join("godot_%s.png" % t.id))
 		renders[t.id] = img
 		print("engine_floor: rendered ", t.id)
-	# tile a again with the port at MSAA 4x: how much of its floor is the AA setting
+	# tile a again at both AA settings, whatever the quality level runs: how much of its floor is AA
 	var ta: Dictionary = scene.tiles[0]
+	var as_run := get_root().msaa_3d
 	sun.shadow_enabled = bool(ta.shadows)
-	get_root().msaa_3d = Viewport.MSAA_4X
 	_place(ta.cam)
-	await _frames(12)
-	var a4 := get_root().get_texture().get_image()
-	a4.save_png(out.path_join("godot_%s-msaa4.png" % ta.id))
-	get_root().msaa_3d = Viewport.MSAA_DISABLED
-	_compare(scene, renders, a4, out)
+	var alt := {}
+	for m in [[Viewport.MSAA_DISABLED, "msaa-off"], [Viewport.MSAA_4X, "msaa4"]]:
+		get_root().msaa_3d = m[0]
+		await _frames(12)
+		alt[m[1]] = get_root().get_texture().get_image()
+		alt[m[1]].save_png(out.path_join("godot_%s-%s.png" % [ta.id, m[1]]))
+	get_root().msaa_3d = as_run
+	print("engine_floor: quality %s, MSAA %s as run" % [_st.quality, ["off", "2x", "4x", "8x"][as_run]])
+	_compare(scene, renders, alt.msaa4, out, alt["msaa-off"])
 
 
 ## The class verdict the measure supports: FLOOR only where the math is identical on both sides.
@@ -232,7 +238,7 @@ static func _split(a: Image, b: Image) -> Array:
 	return [(se + si) / maxf(ne + ni, 1), se / maxf(ne, 1), si / maxf(ni, 1), float(ne) / maxf(ne + ni, 1)]
 
 
-func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String) -> void:
+func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String, a0: Image = null) -> void:
 	var three: String = _a.get("three", "")
 	var rows := []
 	var res := {"tiles": {}}
@@ -253,6 +259,11 @@ func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String) ->
 			e["mad_msaa4"] = Sheet.mad(a4, ti)
 			e["edge_msaa4"] = s4[1]
 			e["interior_msaa4"] = s4[2]
+			if a0 != null:
+				var s0 := _split(ti, a0)
+				e["mad_msaa_off"] = Sheet.mad(a0, ti)
+				e["edge_msaa_off"] = s0[1]
+				e["interior_msaa_off"] = s0[2]
 		res.tiles[t.id] = e
 		rows.append({"id": t.id, "mad": m, "cells": [
 			{"image": ti, "label": "three.js (original's modules)"},
@@ -278,8 +289,9 @@ func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String) ->
 		var e: Dictionary = res.tiles[id]
 		print("engine_floor: %-14s %s  %6.2f  %s" % [id, e["class"], e.mad, e.title])
 	if ta != null:
-		print("engine_floor: a-unlit split: edge %.2f, interior %.3f, edge fraction %.3f; port at MSAA 4x: MAD %.2f, edge %.2f, interior %.3f" % [
-				ta.edge, ta.interior, ta.edge_fraction, ta.mad_msaa4, ta.edge_msaa4, ta.interior_msaa4])
+		print("engine_floor: a-unlit as run: MAD %.2f, edge %.2f, interior %.3f, edge fraction %.3f; port at MSAA 4x: MAD %.2f, edge %.2f, interior %.3f; at MSAA off: MAD %.2f, edge %.2f, interior %.3f" % [
+				ta.mad, ta.edge, ta.interior, ta.edge_fraction, ta.mad_msaa4, ta.edge_msaa4, ta.interior_msaa4,
+				ta.get("mad_msaa_off", -1.0), ta.get("edge_msaa_off", -1.0), ta.get("interior_msaa_off", -1.0)])
 	var f := FileAccess.open(out.path_join("engine_floor.json"), FileAccess.WRITE)
 	f.store_string(JSON.stringify(res, " "))
 	f.close()

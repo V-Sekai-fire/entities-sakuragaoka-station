@@ -7,6 +7,7 @@
 # absolute difference of the two.
 #   godot --path . --resolution 1920x1080 --script tools/realize_check.gd -- --shots=<dir>
 #       [--hammersley=8@-1,-11.4 | --cams="x,z,yaw,pitch;..."] [--original=<prefix>] [--modules=...]
+#       [--q=high|medium|low]   the original's ?q= level (core/quality.gd), default high
 extends SceneTree
 
 const Layout = preload("res://addons/sakuragaoka_station/world/layout.gd")
@@ -29,6 +30,7 @@ var _view := 0
 var _last := PackedByteArray()
 var _t0 := Time.get_ticks_msec()
 var _layout = Layout.new("")
+var _quality := "high"
 
 
 func _initialize() -> void:
@@ -40,6 +42,8 @@ func _initialize() -> void:
 			_original = a.substr(11)
 		elif a.begins_with("--modules="):
 			mods = a.substr(10)
+		elif a.begins_with("--q="):
+			_quality = a.substr(4)
 		elif a.begins_with("--hammersley="):
 			_cams = _hammersley(a.substr(13))
 		elif a.begins_with("--cams="):
@@ -48,6 +52,7 @@ func _initialize() -> void:
 	_st = load("res://addons/sakuragaoka_station/station.tscn").instantiate()
 	if mods != "":
 		_st.modules = PackedStringArray(mods.split(","))
+	_st.quality = _quality
 	_st.built.connect(_on_built)
 	get_root().add_child(_st)
 
@@ -77,6 +82,7 @@ func _on_built(s: Dictionary) -> void:
 			"on" if SandboxUtil.translated else "off (no res://bintr/ library)"] if Pack.shared() != null else "none (%s)" % Pack.reason])
 	print("realize: %d batches; %d draws, %d triangles; build %d ms, realize %d ms" % [
 			s.batches, draws, tris, s.build_ms, s.realize_ms])
+	print("realize: quality %s (MSAA %s)" % [_quality, ["off", "2x", "4x", "8x"][get_root().msaa_3d]])
 	if _out == "" or _cams.is_empty():
 		_teardown()
 		quit()

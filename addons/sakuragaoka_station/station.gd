@@ -9,12 +9,15 @@ const Ctx = preload("res://addons/sakuragaoka_station/core/ctx.gd")
 const Realize = preload("res://addons/sakuragaoka_station/core/realize.gd")
 const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
+const Quality = preload("res://addons/sakuragaoka_station/core/quality.gd")
 const SKY := preload("res://addons/sakuragaoka_station/core/sky.gdshader")
 
 @export var world_seed := 1
 @export var modules := PackedStringArray(["environment", "station", "plaza", "sakura"])
 ## src/core/sky.js's light: the dome, the sun, the hemisphere light's mean as ambient, and fog.
 @export var with_environment := true
+## The original's ?q= level (core/quality.gd): high is its desktop default, MSAA 4x.
+@export_enum("high", "medium", "low") var quality := "high"
 
 var stats := {}
 var sun_dir := Vector3.UP
@@ -27,6 +30,7 @@ func _exit_tree() -> void:
 
 
 func _ready() -> void:
+	Quality.apply(get_viewport(), quality)
 	var t0 := Time.get_ticks_msec()
 	var ctx = Ctx.new(world_seed)
 	sun_dir = ctx.sun_dir
