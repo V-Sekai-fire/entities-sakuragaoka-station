@@ -82,23 +82,26 @@ static func de2000(l1: Vector3, l2: Vector3) -> float:
 	return sqrt(pow(dlp / sl, 2) + pow(dcp / sc, 2) + pow(dhhp / sh, 2) + rt * (dcp / sc) * (dhhp / sh))
 
 
+static func chart_basis(c: Dictionary) -> Basis:
+	return Basis.from_euler(Vector3(deg_to_rad(float(c.get("pitch", 0.0))), deg_to_rad(float(c.yaw)), 0.0), EULER_ORDER_YXZ)
+
+
+static func chart_point(c: Dictionary, u: float, v: float) -> Vector3:
+	var px := float(c.px)
+	return Vector3(c.pos[0], c.pos[1], c.pos[2]) + chart_basis(c) * Vector3((u - 345.0) * px, (235.0 - v) * px, 0.0)
+
+
 ## The central 60% of each patch square on screen, by projecting it with cam (placed at the tile).
-## c: a chart placement (calib_scene.json "charts" / "textured": pos, yaw, px).
+## c: a chart placement (calib_scene.json "charts" / "textured": pos, yaw, optional pitch, px).
 static func patch_rects(cam: Camera3D, c: Dictionary, chart: Dictionary) -> Array:
 	var out := []
-	var yaw := deg_to_rad(float(c.yaw))
-	var px := float(c.px)
-	var pos := Vector3(c.pos[0], c.pos[1], c.pos[2])
 	for p in chart.patches:
 		var cx: float = 20.0 + p.col * 110.0 + 50.0
 		var cy: float = 20.0 + p.row * 110.0 + 50.0
 		var lo := Vector2(INF, INF)
 		var hi := -lo
 		for k in [Vector2(-30, -30), Vector2(30, -30), Vector2(30, 30), Vector2(-30, 30)]:
-			var x: float = (cx + k.x - 345.0) * px
-			var y: float = (235.0 - (cy + k.y)) * px
-			var w := pos + Vector3(x * cos(yaw), y, -x * sin(yaw))
-			var s := cam.unproject_position(w)
+			var s := cam.unproject_position(chart_point(c, cx + k.x, cy + k.y))
 			lo = lo.min(s)
 			hi = hi.max(s)
 		out.append(Rect2i(Vector2i(ceili(lo.x), ceili(lo.y)), Vector2i(floori(hi.x) - ceili(lo.x), floori(hi.y) - ceili(lo.y))))

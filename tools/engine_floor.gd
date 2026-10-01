@@ -354,7 +354,7 @@ static func _chart(mats, chart: Dictionary, c: Dictionary):
 	var grp := T.Group.new()
 	grp.name = "calib-chart-" + str(c.get("name", ""))
 	grp.position = Vector3(c.pos[0], c.pos[1], c.pos[2])
-	grp.rotation = Vector3(0, deg_to_rad(c.yaw), 0)
+	grp.set_rotation(deg_to_rad(float(c.get("pitch", 0.0))), deg_to_rad(c.yaw), 0.0, "YXZ")
 	var px: float = c.px
 	var cols := []
 	for p in chart.patches:
