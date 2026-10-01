@@ -1,5 +1,7 @@
 # The port's three-shaped scene graph as Godot nodes, batched as src/core/batch2.js batches it
-# (48 m cells near the play area, 200 m beyond 150 m) and shaded with godot-vrm's MToon. MToon
+# (48 m cells near the play area, 200 m beyond 150 m) and shaded with godot-vrm's MToon; a toon
+# material through the original's toon ramp (core/ramp/mtoon_ramp.gdshaderinc: the gradient map,
+# hemisphere light and hand paint, hooked into MToon), an unlit one through plain MToon. MToon
 # reads its colour from a texture, so each face's colour is an index into a palette texture carried
 # in UV; CSG keeps UV through a union where it would drop vertex colour, and every closed solid of
 # a cell goes through CSG. A cell keeps the union only when it comes out no larger than its solids.
@@ -20,6 +22,7 @@ const SlugAtlas = preload("res://addons/sakuragaoka_station/core/slug/atlas.gd")
 const Baked = preload("res://addons/sakuragaoka_station/core/slug/baked.gd")
 const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const SLUG := "res://addons/sakuragaoka_station/core/slug/"
+const RAMP := "res://addons/sakuragaoka_station/core/ramp/"
 
 const MTOON := "res://addons/Godot-MToon-Shader/"
 ## Each keyed canvas texture's mean linear colour, read from the original's canvases by its
@@ -460,8 +463,27 @@ func _mat_key(m) -> String:
 	if m.user_data.has("distant"):
 		return m.key
 	var s: Dictionary = m.user_data.get("sakura", {})
-	return "%s|%s|%s|%.3f|%.3f|%s|%.2f|%s%s" % [m.type, m.side, m.transparent, m.opacity, m.alpha_test,
-			m.emissive.to_html(false), m.emissive_intensity, s.get("rim", 0), "|ov" if m.user_data.get("overlay", false) else ""]
+	return "%s|%s|%s|%.3f|%.3f|%s|%.2f|%s%s%s" % [m.type, m.side, m.transparent, m.opacity, m.alpha_test,
+			m.emissive.to_html(false), m.emissive_intensity, s.get("rim", 0), "|ov" if m.user_data.get("overlay", false) else "",
+			_ramp_key(m)]
+
+
+## A toon material's hand-paint amount: materials.js toon()'s `paint` (0.05 unless given), carried in
+## user_data.toon; a toon material made elsewhere has no paint patch in the original, so 0.
+static func _ramp_paint(m) -> float:
+	return float(m.user_data.get("toon", {}).get("paint", 0.0))
+
+
+## three.js flips a double-sided material's normal on back faces; the sakura NOFLIP materials do not.
+static func _ramp_flip(m) -> bool:
+	return not bool(m.user_data.get("sakura", {}).get("noFlip", false))
+
+
+## The ramp's per-material uniforms in the batch and material key, as batch2.js's signature keys paint.
+static func _ramp_key(m) -> String:
+	if m.type != "toon":
+		return ""
+	return "|p%.4f%s" % [_ramp_paint(m), "" if _ramp_flip(m) else "|nf"]
 
 
 func _batch(key: String, m) -> Dictionary:
@@ -499,8 +521,9 @@ func _append(key: String, a: Array, xform: Transform3D) -> void:
 	b.idx.append_array(out)
 
 
-## MToon for a material: the palette is both its lit and its shade texture; an unlit ("basic")
-## material shows the palette as emission with its lit and shade colours black.
+## MToon for a material: the palette is both its lit and its shade texture; a toon material is drawn
+## with the toon ramp variant (core/ramp/), an unlit ("basic") material with plain MToon, showing the
+## palette as emission with its lit and shade colours black.
 func _mtoon(m) -> ShaderMaterial:
 	var k := _mat_key(m)
 	if _materials.has(k):
@@ -511,7 +534,10 @@ func _mtoon(m) -> ShaderMaterial:
 			_materials[k] = custom
 			return custom
 	var sm := ShaderMaterial.new()
-	sm.shader = load(MTOON + _variant(m, "mtoon") + ".gdshader")
+	if m.type == "toon":
+		sm.shader = load(RAMP + _variant(m, "mtoon_ramp") + ".gdshader")
+	else:
+		sm.shader = load(MTOON + _variant(m, "mtoon") + ".gdshader")
 	sm.set_shader_parameter("_MainTex", _palette_tex)
 	sm.set_shader_parameter("_ShadeTexture", _palette_tex)
 	_toon_params(sm, m)
@@ -522,7 +548,8 @@ func _mtoon(m) -> ShaderMaterial:
 
 
 ## MToon for a material whose canvas texture Slug draws: the texture at the geometry's own UVs,
-## tinted per vertex (COLOR); an unlit material shows it as emission.
+## tinted per vertex (COLOR), shaded by the toon ramp the Slug variants include; an unlit material
+## shows it as emission.
 func _slug_mtoon(m) -> ShaderMaterial:
 	var k := _mat_key(m) + "|" + _slug_mat_key(m)
 	if _materials.has(k):
@@ -568,10 +595,12 @@ func _toon_params(sm: ShaderMaterial, m) -> void:
 		sm.set_shader_parameter("_EmissionColor", Color(1, 1, 1))
 	elif m.emissive != Color(0, 0, 0):
 		sm.set_shader_parameter("_EmissionColor", (m.emissive * m.emissive_intensity).linear_to_srgb())
-	var rim: float = float(m.user_data.get("sakura", {}).get("rim", 0.0))
-	if rim > 0.0:
-		sm.set_shader_parameter("_RimColor", Color(1.0, 0.64, 0.75) * rim)
-		sm.set_shader_parameter("_RimFresnelPower", 2.2)
+	if m.type == "toon":
+		# the toon ramp's own uniforms; it has no MToon rim, matcap or shade colour (the sakura rim glow
+		# is the original's sakura/materials.js extension, not yet ported). _ShadeColor and the step
+		# above stay for the ramp's MToon-step control.
+		sm.set_shader_parameter("ramp_paint", _ramp_paint(m))
+		sm.set_shader_parameter("ramp_flip", _ramp_flip(m))
 	if m.user_data.get("overlay", false):
 		sm.render_priority = 1
 
