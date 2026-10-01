@@ -1,5 +1,6 @@
 # src/core/renderer.js's composite pass, run in place on the colour buffer after transparents:
-# colour-aware outlines from depth and normals, then exposure, soft clip, grading, light leak and vignette.
+# colour-aware outlines from depth and normals, bloom and glow, then exposure, soft clip, grading,
+# light leak and vignette.
 @tool
 extends CompositorEffect
 
@@ -9,6 +10,8 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 layout(rgba16f, set = 0, binding = 0) uniform image2D color_image;
 layout(set = 0, binding = 1) uniform sampler2D depth_tex;
 layout(set = 0, binding = 2) uniform sampler2D normal_tex;
+layout(set = 0, binding = 3) uniform sampler2D bloom_tex;
+layout(set = 0, binding = 4) uniform sampler2D glow_tex;
 layout(push_constant, std430) uniform Params {
 	vec2 raster;
 	float near;
@@ -18,6 +21,10 @@ layout(push_constant, std430) uniform Params {
 	float grade;
 	float exposure;
 	float vignette;
+	float bloom;
+	float glow;
+	float pad0;
+	float pad1;
 } p;
 
 const vec3 LINE = vec3(0.0272, 0.0203, 0.0513);
@@ -74,14 +81,15 @@ void main() {
 	float fade = 1.0 - smoothstep(35.0, 190.0, min(d0, dmin));
 	float edge = max(d_edge, n_edge * 0.85) * fade * p.outline;
 	col = mix(col, mix(col * vec3(0.42, 0.38, 0.5), LINE, 0.35), edge * 0.82);
+	vec2 tuv = (vec2(c) + 0.5) / p.raster;
+	col += texture(bloom_tex, tuv).rgb * p.bloom + texture(glow_tex, tuv).rgb * p.glow;
 	if (p.grade > 0.0) {
 		vec3 g = soft_clip(col * p.exposure);
 		float l = lum(g);
 		g = mix(g, g * vec3(0.9, 0.92, 1.1), (1.0 - smoothstep(0.08, 0.55, l)) * 0.55);
 		g += vec3(0.022, 0.012, -0.012) * smoothstep(0.55, 1.0, l);
 		g = mix(vec3(lum(g)), g, 1.07);
-		vec2 uv = (vec2(c) + 0.5) / p.raster;
-		uv.y = 1.0 - uv.y;
+		vec2 uv = vec2(tuv.x, 1.0 - tuv.y);
 		vec2 asp = vec2(p.raster.x / p.raster.y, 1.0);
 		float ds = length((uv - p.sun.xy) * asp);
 		float leak = exp(-ds * ds * 1.8) * 0.10 + exp(-ds * ds * 10.0) * 0.09 * p.sun.z;
@@ -94,16 +102,64 @@ void main() {
 }
 """
 
+## The original's bloom chain: a soft-knee bright pass at a quarter size, three separable 9-tap blurs,
+## then a sixteenth-size glow from the blurred bloom with four more. mode 0 is the bright pass.
+const BLOOM_GLSL := """
+#version 450
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(set = 0, binding = 0) uniform sampler2D src;
+layout(rgba16f, set = 0, binding = 1) uniform restrict writeonly image2D dst;
+layout(push_constant, std430) uniform Params {
+	vec2 size;
+	vec2 dir;
+	float mode;
+	float pad0;
+	float pad1;
+	float pad2;
+} p;
+
+void main() {
+	ivec2 c = ivec2(gl_GlobalInvocationID.xy);
+	if (c.x >= int(p.size.x) || c.y >= int(p.size.y)) {
+		return;
+	}
+	vec2 uv = (vec2(c) + 0.5) / p.size;
+	vec3 o;
+	if (p.mode < 0.5) {
+		vec3 col = texture(src, uv).rgb;
+		float l = max(col.r, max(col.g, col.b));
+		float soft = clamp(l - 1.05 + 0.5, 0.0, 1.0);
+		soft = soft * soft / (4.0 * 0.5 + 1e-4);
+		float w = max(soft, l - 1.05) / max(l, 1e-4);
+		o = min(col * w, vec3(8.0));
+	} else {
+		o = texture(src, uv).rgb * 0.2270270270;
+		o += texture(src, uv + p.dir * 1.3846153846).rgb * 0.3162162162;
+		o += texture(src, uv - p.dir * 1.3846153846).rgb * 0.3162162162;
+		o += texture(src, uv + p.dir * 3.2307692308).rgb * 0.0702702703;
+		o += texture(src, uv - p.dir * 3.2307692308).rgb * 0.0702702703;
+	}
+	imageStore(dst, c, vec4(o, 1.0));
+}
+"""
+
+const CONTEXT := &"sakuragaoka_composite"
+
 @export_range(0.0, 1.0) var outline := 1.0
 @export_range(0.0, 1.0) var grade := 1.0
 @export var exposure := 1.0
 @export var vignette := 0.22
+@export var bloom := 0.32
+@export var glow := 0.14
 @export var sun_dir := Vector3.UP
 
 var _rd: RenderingDevice
 var _shader := RID()
 var _pipeline := RID()
-var _sampler := RID()
+var _bloom_shader := RID()
+var _bloom_pipeline := RID()
+var _nearest := RID()
+var _linear := RID()
 
 
 static func compositor(sun: Vector3) -> Compositor:
@@ -122,23 +178,57 @@ func _init() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE and _rd != null and _shader.is_valid():
-		_rd.free_rid(_sampler)
-		_rd.free_rid(_shader)
+		for r in [_nearest, _linear, _bloom_shader, _shader]:
+			_rd.free_rid(r)
+
+
+func _compile(glsl: String) -> RID:
+	var src := RDShaderSource.new()
+	src.source_compute = glsl
+	var spirv := _rd.shader_compile_spirv_from_source(src)
+	if spirv.compile_error_compute != "":
+		push_error("composite: %s" % spirv.compile_error_compute)
+		return RID()
+	return _rd.shader_create_from_spirv(spirv)
 
 
 func _create() -> void:
 	_rd = RenderingServer.get_rendering_device()
 	if _rd == null:
 		return
-	var src := RDShaderSource.new()
-	src.source_compute = GLSL
-	var spirv := _rd.shader_compile_spirv_from_source(src)
-	if spirv.compile_error_compute != "":
-		push_error("composite: %s" % spirv.compile_error_compute)
+	_shader = _compile(GLSL)
+	_bloom_shader = _compile(BLOOM_GLSL)
+	if not _shader.is_valid() or not _bloom_shader.is_valid():
 		return
-	_shader = _rd.shader_create_from_spirv(spirv)
 	_pipeline = _rd.compute_pipeline_create(_shader)
-	_sampler = _rd.sampler_create(RDSamplerState.new())
+	_bloom_pipeline = _rd.compute_pipeline_create(_bloom_shader)
+	_nearest = _rd.sampler_create(RDSamplerState.new())
+	var ls := RDSamplerState.new()
+	ls.min_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
+	ls.mag_filter = RenderingDevice.SAMPLER_FILTER_LINEAR
+	_linear = _rd.sampler_create(ls)
+
+
+func _uniform(type: int, binding: int, ids: Array) -> RDUniform:
+	var u := RDUniform.new()
+	u.uniform_type = type
+	u.binding = binding
+	for id in ids:
+		u.add_id(id)
+	return u
+
+
+func _pass(src: RID, dst: RID, size: Vector2i, dir: Vector2, mode: float) -> void:
+	var set := UniformSetCacheRD.get_cache(_bloom_shader, 0, [
+			_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 0, [_linear, src]),
+			_uniform(RenderingDevice.UNIFORM_TYPE_IMAGE, 1, [dst])])
+	var bytes := PackedFloat32Array([size.x, size.y, dir.x, dir.y, mode, 0.0, 0.0, 0.0]).to_byte_array()
+	var list := _rd.compute_list_begin()
+	_rd.compute_list_bind_compute_pipeline(list, _bloom_pipeline)
+	_rd.compute_list_bind_uniform_set(list, set, 0)
+	_rd.compute_list_set_push_constant(list, bytes, bytes.size())
+	_rd.compute_list_dispatch(list, (size.x + 7) / 8, (size.y + 7) / 8, 1)
+	_rd.compute_list_end()
 
 
 func _render_callback(type: int, data: RenderData) -> void:
@@ -151,6 +241,15 @@ func _render_callback(type: int, data: RenderData) -> void:
 	var size := buffers.get_internal_size()
 	if size.x == 0 or size.y == 0:
 		return
+	var views := buffers.get_view_count()
+	var quarter := Vector2i(maxi(4, size.x >> 2), maxi(4, size.y >> 2))
+	var sixteenth := Vector2i(maxi(4, size.x >> 4), maxi(4, size.y >> 4))
+	var usage := RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT | RenderingDevice.TEXTURE_USAGE_STORAGE_BIT
+	var fmt := RenderingDevice.DATA_FORMAT_R16G16B16A16_SFLOAT
+	for n in ["b1", "b2"]:
+		buffers.create_texture(CONTEXT, n, fmt, usage, RenderingDevice.TEXTURE_SAMPLES_1, quarter, views, 1, true, false)
+	for n in ["b3", "b4"]:
+		buffers.create_texture(CONTEXT, n, fmt, usage, RenderingDevice.TEXTURE_SAMPLES_1, sixteenth, views, 1, true, false)
 	var proj := scene.get_cam_projection()
 	var cam := scene.get_cam_transform()
 	var v := cam.affine_inverse() * (cam.origin + sun_dir.normalized() * 1000.0)
@@ -165,25 +264,32 @@ func _render_callback(type: int, data: RenderData) -> void:
 	var sun := Vector4(clampf(sx, -0.3, 1.3), clampf(sy, -0.2, 1.3), on_screen, 1.0)
 	if not front:
 		sun = Vector4(1.4 if sx < 0.5 else -0.4, 1.2, 0.0, 0.25)
-	var pc := PackedFloat32Array([size.x, size.y, proj.get_z_near(), proj.get_z_far(),
-			sun.x, sun.y, sun.z, sun.w, outline, grade, exposure, vignette])
-	var bytes := pc.to_byte_array()
-	for view in buffers.get_view_count():
-		var u_color := RDUniform.new()
-		u_color.uniform_type = RenderingDevice.UNIFORM_TYPE_IMAGE
-		u_color.binding = 0
-		u_color.add_id(buffers.get_color_layer(view))
-		var u_depth := RDUniform.new()
-		u_depth.uniform_type = RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE
-		u_depth.binding = 1
-		u_depth.add_id(_sampler)
-		u_depth.add_id(buffers.get_depth_layer(view))
-		var u_normal := RDUniform.new()
-		u_normal.uniform_type = RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE
-		u_normal.binding = 2
-		u_normal.add_id(_sampler)
-		u_normal.add_id(buffers.get_texture_slice("forward_clustered", "normal_roughness", view, 0, 1, 1))
-		var set := UniformSetCacheRD.get_cache(_shader, 0, [u_color, u_depth, u_normal])
+	var bytes := PackedFloat32Array([size.x, size.y, proj.get_z_near(), proj.get_z_far(),
+			sun.x, sun.y, sun.z, sun.w, outline, grade, exposure, vignette, bloom, glow, 0.0, 0.0]).to_byte_array()
+	var qx := Vector2(1.0 / quarter.x, 0.0)
+	var qy := Vector2(0.0, 1.0 / quarter.y)
+	var sxd := Vector2(1.0 / sixteenth.x, 0.0)
+	var syd := Vector2(0.0, 1.0 / sixteenth.y)
+	for view in views:
+		var color := buffers.get_color_layer(view)
+		var b := {}
+		for n in ["b1", "b2", "b3", "b4"]:
+			b[n] = buffers.get_texture_slice(CONTEXT, n, view, 0, 1, 1)
+		_pass(color, b.b1, quarter, Vector2.ZERO, 0.0)
+		_pass(b.b1, b.b2, quarter, qx, 1.0)
+		_pass(b.b2, b.b1, quarter, qy, 1.0)
+		_pass(b.b1, b.b2, quarter, qx * 1.5, 1.0)
+		_pass(b.b2, b.b3, sixteenth, sxd, 1.0)
+		_pass(b.b3, b.b4, sixteenth, syd, 1.0)
+		_pass(b.b4, b.b3, sixteenth, sxd * 1.6, 1.0)
+		_pass(b.b3, b.b4, sixteenth, syd * 1.6, 1.0)
+		var set := UniformSetCacheRD.get_cache(_shader, 0, [
+				_uniform(RenderingDevice.UNIFORM_TYPE_IMAGE, 0, [color]),
+				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 1, [_nearest, buffers.get_depth_layer(view)]),
+				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 2,
+						[_nearest, buffers.get_texture_slice("forward_clustered", "normal_roughness", view, 0, 1, 1)]),
+				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 3, [_linear, b.b2]),
+				_uniform(RenderingDevice.UNIFORM_TYPE_SAMPLER_WITH_TEXTURE, 4, [_linear, b.b4])])
 		var list := _rd.compute_list_begin()
 		_rd.compute_list_bind_compute_pipeline(list, _pipeline)
 		_rd.compute_list_bind_uniform_set(list, set, 0)
