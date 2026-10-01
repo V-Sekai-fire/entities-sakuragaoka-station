@@ -11,6 +11,7 @@ const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
 const Quality = preload("res://addons/sakuragaoka_station/core/quality.gd")
 const SKY := preload("res://addons/sakuragaoka_station/core/sky.gdshader")
+const Composite := preload("res://addons/sakuragaoka_station/core/composite.gd")
 
 @export var world_seed := 1
 @export var modules := PackedStringArray(["environment", "station", "plaza", "sakura"])
@@ -79,6 +80,7 @@ func _environment() -> void:
 	var we := WorldEnvironment.new()
 	we.name = "SkyAndFog"
 	we.environment = env
+	we.compositor = Composite.compositor(sun_dir)
 	add_child(we)
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
