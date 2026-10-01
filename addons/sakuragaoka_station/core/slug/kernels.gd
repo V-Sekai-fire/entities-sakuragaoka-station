@@ -501,3 +501,15 @@ static func probe_scan(d: PackedByteArray, w: int, h: int, q: PackedVector2Array
 			out[2] = mini(out[2], d[i])
 			out[3] = maxi(out[3], d[i])
 	return out
+
+
+static func score_rgba(a: PackedByteArray, b: PackedByteArray, w: int, h: int) -> PackedFloat64Array:
+	if sandbox() == null:
+		return PackedFloat64Array()
+	return _sb.vmcall("score_rgba", a, b, w, h)
+
+
+static func diff_rgba(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
+	if sandbox() == null:
+		return PackedByteArray()
+	return _sb.vmcall("diff_rgba", a, b)
