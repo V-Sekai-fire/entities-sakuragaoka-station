@@ -28,12 +28,13 @@ func _check(ok: bool, what: String) -> void:
 		print("elf_check: FAIL ", what)
 
 
-func _timed(fn: String, key: String, args: Array):
+func _timed(fn: String, key: String, args: Array, label: String = ""):
 	var t0 := Time.get_ticks_usec()
 	var r = Guest.shared().call_fn(fn, args)
 	var ms := (Time.get_ticks_usec() - t0) / 1000.0
-	if not _slowest.has(fn) or ms > _slowest[fn][0]:
-		_slowest[fn] = [ms, key]
+	var tag := label if label != "" else fn
+	if not _slowest.has(tag) or ms > _slowest[tag][0]:
+		_slowest[tag] = [ms, key]
 	return r
 
 
@@ -96,7 +97,7 @@ func _initialize() -> void:
 		print("elf_check: stamps: %d layers, %d instances, %d prototypes, %d cell texels, %d mean bytes" % [
 				n_stamp_layers, a.stamp_instances.size() / 12, a.stamp_protos.size() / 2, a.stamp_cells.size() / 4, a.stamp_means.size()])
 
-	var modes := {"mesh": 0, "slug": 0, "mean": 0}
+	var modes := {"mesh": 0, "slug": 0, "stamp": 0, "mean": 0}
 	var mism := []
 	var quad_v := PackedFloat32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0])
 	var quad_uv := PackedFloat32Array([0, 0, 1, 0, 1, 1, 0, 1])
@@ -146,11 +147,41 @@ func _initialize() -> void:
 	var baked = Baked.shared()
 	_check(baked != null, "core/slug/baked.gd opens on the real guest")
 	if baked != null:
+		var unparsed := []
 		for key in keys:
 			var mode: String = baked.mode(key)
 			_check(mode in modes, "%s: baked.gd mode" % key)
 			var bm = baked.get_mesh(key)
-			_check(bm != null and bm.positions.size() > 0, "%s: baked.gd parses slug_mesh" % key)
+			# baked.gd hands out meshes for the pack's "mesh" keys only.
+			if mode == "mesh":
+				_check(bm != null and bm.positions.size() > 0, "%s: baked.gd parses slug_mesh" % key)
+			elif bm == null:
+				unparsed.append(key)
+		if not unparsed.is_empty():
+			print("elf_check: baked.gd gives no mesh for %d non-mesh-mode keys" % unparsed.size())
+
+	# slug-baked: every key on a full-canvas quad within a 4096-triangle budget (cards alpha-tested,
+	# the rest opaque; lift_cap's 6 floats select it), never capped; a planted over-budget surface
+	# coarsens; the plaza tree moss bakes with its alpha map folded in.
+	var lod_count := {}
+	for key in keys:
+		var card: bool = native.has("keys") and native.keys.has(key) and float(native.keys[key].opaque_area) < 0.95
+		var fd = _timed("slug_decal", key, [key, quad_v, PackedFloat32Array(), quad_uv, quad_f,
+				PackedFloat32Array([1, 1, 0, 0, 0]), PackedFloat32Array([0, 0, 4096, 0.5, 1.0, 2 if card else 0])], "slug_decal (slug-baked)")
+		var ok: bool = fd is Dictionary and not fd.has("error") and not fd.get("capped", true)
+		_check(ok, "%s: slug-baked decal" % key)
+		if ok:
+			_check(fd.paint.size() <= 4096, "%s: slug-baked within 4096 triangles (%d)" % [key, fd.paint.size()])
+			lod_count[int(fd.lod)] = int(lod_count.get(int(fd.lod), 0)) + 1
+	print("elf_check: slug-baked LOD levels (level: keys) ", lod_count)
+	var heavy = Guest.shared().call_fn("slug_decal", ["st-gravel", quad_v, PackedFloat32Array(), quad_uv, quad_f,
+			PackedFloat32Array([1, 1, 0, 0, 0]), PackedFloat32Array([0, 0, 500, 0.5, 1.0, 0])])
+	_check(heavy is Dictionary and not heavy.get("capped", true) and heavy.paint.size() <= 500 and int(heavy.lod) > 0,
+			"st-gravel at 500 triangles coarsens instead of failing")
+	if heavy is Dictionary and heavy.has("lod"):
+		print("elf_check: planted over-budget st-gravel cap 500 -> lod %d, %d triangles" % [int(heavy.lod), heavy.paint.size()])
+	var moss = _timed("slug_bake", "|plaza-moss", ["|plaza-moss", PackedFloat32Array([1, 0.5, 0.85, 0])])
+	_check(moss is Dictionary and moss.has("triangles") and moss.triangles.size() > 0, "|plaza-moss bakes (alpha map folded in)")
 
 	print("elf_check: modes ", modes)
 	if not mism.is_empty():

@@ -1,0 +1,896 @@
+{
+ "both_engines": true,
+ "h": 1080.0,
+ "hammersley": "8@-1,-11.4",
+ "modules": [
+  "environment",
+  "station",
+  "plaza",
+  "sakura"
+ ],
+ "note": "in-view chart placements (tools/chart_in_view.gd --pick): sunlit or shadowed in both engines' shadow maps",
+ "probe_margin": 1.3,
+ "quality": "high",
+ "sun_dir": [
+  -0.775802612304688,
+  0.516868531703949,
+  0.36190789937973
+ ],
+ "views": [
+  {
+   "agreement": {
+    "lit": {},
+    "shadow": {
+     "mixed": 38,
+     "shadow": 22
+    }
+   },
+   "cam": [
+    -1.0,
+    -11.4,
+    0.0,
+    -85.0
+   ],
+   "charts": [
+    {
+     "depth": 1.4,
+     "distance": 1.59658527374268,
+     "facing": "front-lit",
+     "lower_frame": true,
+     "n_dot_l": 0.261165678501129,
+     "name": "v0-shadow",
+     "normal": [
+      0.373618632555008,
+      0.894716084003448,
+      0.24472913146019
+     ],
+     "patch_px": 30.0905151367188,
+     "pitch": -63.4719849451486,
+     "pos": [
+      -1.66221439838409,
+      0.0915094614028931,
+      -11.1354780197144
+     ],
+     "probe": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 52703.0,
+      "state": "shadow"
+     },
+     "probe_original": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 52703.0,
+      "state": "shadow"
+     },
+     "px": 0.00044337766115072,
+     "screen": [
+      0.259999990463257,
+      0.75
+     ],
+     "state": "shadowed",
+     "turn_deg": -55.0,
+     "wider_search": true,
+     "yaw": 56.774243207177
+    }
+   ],
+   "eye": [
+    -1.0,
+    1.51999998092651,
+    -11.3999996185303
+   ],
+   "pair": false,
+   "probe_states": {
+    "hidden": 1435.0,
+    "mixed": 69.0,
+    "shadow": 125.0
+   },
+   "tried": 1629.0,
+   "view": 0,
+   "wider_search": true
+  },
+  {
+   "agreement": {
+    "lit": {
+     "lit": 12,
+     "mixed": 8
+    },
+    "shadow": {
+     "mixed": 39,
+     "shadow": 21
+    }
+   },
+   "cam": [
+    -1.0,
+    -11.4,
+    180.0,
+    -30.0
+   ],
+   "charts": [
+    {
+     "depth": 3.5,
+     "distance": 4.39831066131592,
+     "facing": "front-lit",
+     "lower_frame": false,
+     "n_dot_l": 0.293350636959076,
+     "name": "v1-lit",
+     "normal": [
+      -0.618043899536133,
+      0.17631933093071,
+      -0.766115725040436
+     ],
+     "patch_px": 29.9922161102295,
+     "pitch": -10.1554441578779,
+     "pos": [
+      1.41432356834412,
+      0.744492769241333,
+      -7.80628728866577
+     ],
+     "probe": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 57811.0,
+      "state": "lit"
+     },
+     "probe_original": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 57811.0,
+      "state": "lit"
+     },
+     "px": 0.00105376829210776,
+     "screen": [
+      0.150000005960464,
+      0.209999993443489
+     ],
+     "state": "sunlit",
+     "turn_deg": 5.0,
+     "wider_search": true,
+     "yaw": -141.106050279296
+    },
+    {
+     "depth": 3.0,
+     "distance": 3.13353514671326,
+     "facing": "front-lit",
+     "lower_frame": false,
+     "n_dot_l": 0.285816103219986,
+     "name": "v1-shadow",
+     "normal": [
+      -0.484863817691803,
+      0.377583086490631,
+      -0.788883984088898
+     ],
+     "patch_px": 29.9976768493652,
+     "pitch": -22.184053599781,
+     "pos": [
+      -0.17223185300827,
+      0.336830139160156,
+      -8.6190013885498
+     ],
+     "probe": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 58582.0,
+      "state": "shadow"
+     },
+     "probe_original": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 58582.0,
+      "state": "shadow"
+     },
+     "px": 0.00101152957588465,
+     "screen": [
+      0.360000014305115,
+      0.389999985694885
+     ],
+     "state": "shadowed",
+     "turn_deg": 15.0,
+     "wider_search": true,
+     "yaw": -148.424287379722
+    }
+   ],
+   "eye": [
+    -1.0,
+    1.51999998092651,
+    -11.3999996185303
+   ],
+   "pair": true,
+   "probe_states": {
+    "hidden": 811.0,
+    "lit": 20.0,
+    "mixed": 95.0,
+    "shadow": 511.0
+   },
+   "tried": 1437.0,
+   "view": 1,
+   "wider_search": true
+  },
+  {
+   "agreement": {
+    "lit": {
+     "lit": 18,
+     "mixed": 31
+    },
+    "shadow": {
+     "mixed": 3,
+     "shadow": 57
+    }
+   },
+   "cam": [
+    -1.0,
+    -11.4,
+    90.0,
+    0.0
+   ],
+   "charts": [
+    {
+     "depth": 4.5,
+     "distance": 4.76341819763184,
+     "facing": "back-lit",
+     "lower_frame": true,
+     "n_dot_l": -0.724385738372803,
+     "name": "v2-lit",
+     "normal": [
+      0.944699764251709,
+      0.198989108204842,
+      -0.260664165019989
+     ],
+     "patch_px": 29.9790687561035,
+     "pitch": -11.4778510633873,
+     "pos": [
+      -5.5,
+      0.572131633758545,
+      -10.1583471298218
+     ],
+     "probe": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 52597.0,
+      "state": "lit"
+     },
+     "probe_original": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 52597.0,
+      "state": "lit"
+     },
+     "px": 0.00141327138555427,
+     "screen": [
+      0.360000014305115,
+      0.689999997615814
+     ],
+     "state": "sunlit",
+     "turn_deg": 0.0,
+     "wider_search": true,
+     "yaw": 105.42539262377
+    },
+    {
+     "depth": 1.8,
+     "distance": 2.05275249481201,
+     "facing": "front-lit",
+     "lower_frame": true,
+     "n_dot_l": 0.274425446987152,
+     "name": "v2-shadow",
+     "normal": [
+      0.245910435914993,
+      0.243028864264488,
+      0.938331007957459
+     ],
+     "patch_px": 30.045316696167,
+     "pitch": -14.0653756042161,
+     "pos": [
+      -2.79999995231628,
+      1.02112185955048,
+      -12.2514181137085
+     ],
+     "probe": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 125200.0,
+      "state": "shadow"
+     },
+     "probe_original": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 125200.0,
+      "state": "shadow"
+     },
+     "px": 0.00097160842245741,
+     "screen": [
+      0.740000009536743,
+      0.75
+     ],
+     "state": "shadowed",
+     "turn_deg": -50.0,
+     "wider_search": true,
+     "yaw": 14.6853684112158
+    }
+   ],
+   "eye": [
+    -1.0,
+    1.51999998092651,
+    -11.3999996185303
+   ],
+   "pair": true,
+   "probe_states": {
+    "hidden": 295.0,
+    "lit": 49.0,
+    "mixed": 605.0,
+    "shadow": 448.0
+   },
+   "tried": 1397.0,
+   "view": 2,
+   "wider_search": true
+  },
+  {
+   "agreement": {
+    "lit": {
+     "lit": 12,
+     "mixed": 12
+    },
+    "shadow": {
+     "mixed": 50,
+     "shadow": 10
+    }
+   },
+   "cam": [
+    -1.0,
+    -11.4,
+    270.0,
+    9.59406822686046
+   ],
+   "charts": [
+    {
+     "depth": 3.4,
+     "distance": 4.27404022216797,
+     "facing": "front-lit",
+     "lower_frame": true,
+     "n_dot_l": 0.476594299077988,
+     "name": "v3-lit",
+     "normal": [
+      -0.821119904518127,
+      0.084809385240078,
+      -0.564419686794281
+     ],
+     "patch_px": 29.9848117828369,
+     "pitch": -4.86506386901258,
+     "pos": [
+      2.50949954986572,
+      1.15752124786377,
+      -8.98764705657959
+     ],
+     "probe": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 66173.0,
+      "state": "lit"
+     },
+     "probe_original": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 66173.0,
+      "state": "lit"
+     },
+     "px": 0.00109168031356077,
+     "screen": [
+      0.860000014305115,
+      0.75
+     ],
+     "state": "sunlit",
+     "turn_deg": 0.0,
+     "wider_search": false,
+     "yaw": -124.503772772969
+    },
+    {
+     "depth": 2.6,
+     "distance": 2.76719808578491,
+     "facing": "front-lit",
+     "lower_frame": true,
+     "n_dot_l": 0.884599208831787,
+     "name": "v3-shadow",
+     "normal": [
+      -0.969838261604309,
+      0.100169777870178,
+      0.222215369343758
+     ],
+     "patch_px": 30.0181198120117,
+     "pitch": -5.7489471221892,
+     "pos": [
+      1.68373465538025,
+      1.2428103685379,
+      -12.01491355896
+     ],
+     "probe": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 54018.0,
+      "state": "shadow"
+     },
+     "probe_original": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 54018.0,
+      "state": "shadow"
+     },
+     "px": 0.00082486862579442,
+     "screen": [
+      0.379999995231628,
+      0.75
+     ],
+     "state": "shadowed",
+     "turn_deg": 0.0,
+     "wider_search": false,
+     "yaw": -77.0947934506343
+    }
+   ],
+   "eye": [
+    -1.0,
+    1.51999998092651,
+    -11.3999996185303
+   ],
+   "pair": true,
+   "probe_states": {
+    "hidden": 5.0,
+    "lit": 24.0,
+    "mixed": 73.0,
+    "shadow": 213.0
+   },
+   "tried": 315.0,
+   "view": 3,
+   "wider_search": false
+  },
+  {
+   "agreement": {
+    "lit": {
+     "lit": 2,
+     "mixed": 13
+    },
+    "shadow": {
+     "mixed": 11,
+     "shadow": 49
+    }
+   },
+   "cam": [
+    -1.0,
+    -11.4,
+    45.0,
+    19.4712206344907
+   ],
+   "charts": [
+    {
+     "depth": 4.4,
+     "distance": 5.61627769470215,
+     "facing": "back-lit",
+     "lower_frame": true,
+     "n_dot_l": -0.690007984638214,
+     "name": "v4-lit",
+     "normal": [
+      0.980853080749512,
+      0.0008896104991436,
+      0.194747269153595
+     ],
+     "patch_px": 29.9652347564697,
+     "pitch": -0.0509709337345806,
+     "pos": [
+      -6.50874328613281,
+      1.51500368118286,
+      -12.4937543869019
+     ],
+     "probe": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 60117.0,
+      "state": "lit"
+     },
+     "probe_original": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 60117.0,
+      "state": "lit"
+     },
+     "px": 0.00133842734298754,
+     "screen": [
+      0.140000000596046,
+      0.819999992847443
+     ],
+     "state": "sunlit",
+     "turn_deg": 0.0,
+     "wider_search": false,
+     "yaw": 78.770035676628
+    },
+    {
+     "depth": 3.0,
+     "distance": 3.77121257781982,
+     "facing": "front-lit",
+     "lower_frame": true,
+     "n_dot_l": 0.2547647356987,
+     "name": "v4-shadow",
+     "normal": [
+      0.0969629809260368,
+      -0.0572994835674763,
+      0.993637263774872
+     ],
+     "patch_px": 30.0107841491699,
+     "pitch": 3.2848177207449,
+     "pos": [
+      -1.69086802005768,
+      1.736088514328,
+      -15.1010875701904
+     ],
+     "probe": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 64752.0,
+      "state": "shadow"
+     },
+     "probe_original": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 64752.0,
+      "state": "shadow"
+     },
+     "px": 0.00095367062763863,
+     "screen": [
+      0.860000014305115,
+      0.75
+     ],
+     "state": "shadowed",
+     "turn_deg": -5.0,
+     "wider_search": false,
+     "yaw": 5.57349783363451
+    }
+   ],
+   "eye": [
+    -1.0,
+    1.51999998092651,
+    -11.3999996185303
+   ],
+   "pair": true,
+   "probe_states": {
+    "hidden": 64.0,
+    "lit": 15.0,
+    "mixed": 68.0,
+    "shadow": 131.0
+   },
+   "tried": 278.0,
+   "view": 4,
+   "wider_search": false
+  },
+  {
+   "agreement": {
+    "lit": {
+     "lit": 33,
+     "mixed": 27
+    },
+    "shadow": {
+     "mixed": 17,
+     "shadow": 43
+    }
+   },
+   "cam": [
+    -1.0,
+    -11.4,
+    225.0,
+    30.0
+   ],
+   "charts": [
+    {
+     "depth": 3.4,
+     "distance": 3.87742137908936,
+     "facing": "front-lit",
+     "lower_frame": true,
+     "n_dot_l": 0.296134412288666,
+     "name": "v5-lit",
+     "normal": [
+      -0.79550039768219,
+      -0.227966547012329,
+      -0.56143593788147
+     ],
+     "patch_px": 29.9895935058594,
+     "pitch": 13.1773833710842,
+     "pos": [
+      0.278034448623657,
+      2.40392231941223,
+      -7.84757709503174
+     ],
+     "probe": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 59149.0,
+      "state": "lit"
+     },
+     "probe_original": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 59149.0,
+      "state": "lit"
+     },
+     "px": 0.00119736791446916,
+     "screen": [
+      0.740000009536743,
+      0.75
+     ],
+     "state": "sunlit",
+     "turn_deg": 35.0,
+     "wider_search": false,
+     "yaw": -125.213085746938
+    },
+    {
+     "depth": 3.0,
+     "distance": 3.4212543964386,
+     "facing": "front-lit",
+     "lower_frame": true,
+     "n_dot_l": 0.473659098148346,
+     "name": "v5-shadow",
+     "normal": [
+      -0.916181623935699,
+      -0.227966547012329,
+      -0.329609483480453
+     ],
+     "patch_px": 30.0144748687744,
+     "pitch": 13.1773833710842,
+     "pos": [
+      2.13449048995972,
+      2.29993152618408,
+      -10.2723217010498
+     ],
+     "probe": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 54974.0,
+      "state": "shadow"
+     },
+     "probe_original": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 54974.0,
+      "state": "shadow"
+     },
+     "px": 0.00092608364296704,
+     "screen": [
+      0.259999990463257,
+      0.75
+     ],
+     "state": "shadowed",
+     "turn_deg": 0.0,
+     "wider_search": false,
+     "yaw": -109.786922611608
+    }
+   ],
+   "eye": [
+    -1.0,
+    1.51999998092651,
+    -11.3999996185303
+   ],
+   "pair": true,
+   "probe_states": {
+    "lit": 67.0,
+    "mixed": 125.0,
+    "shadow": 123.0
+   },
+   "tried": 315.0,
+   "view": 5,
+   "wider_search": false
+  },
+  {
+   "agreement": {
+    "lit": {
+     "hidden": 9,
+     "lit": 39,
+     "mixed": 12
+    },
+    "shadow": {
+     "mixed": 1,
+     "shadow": 59
+    }
+   },
+   "cam": [
+    -1.0,
+    -11.4,
+    135.0,
+    41.8103148957786
+   ],
+   "charts": [
+    {
+     "depth": 4.4,
+     "distance": 5.53111171722412,
+     "facing": "back-lit",
+     "lower_frame": true,
+     "n_dot_l": -0.619235396385193,
+     "name": "v6-lit",
+     "normal": [
+      0.124093934893608,
+      -0.36599999666214,
+      -0.922304034233093
+     ],
+     "patch_px": 29.9484157562256,
+     "pitch": 21.4691371669546,
+     "pos": [
+      -1.6863774061203,
+      3.5443868637085,
+      -6.29863309860229
+     ],
+     "probe": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 55819.0,
+      "state": "lit"
+     },
+     "probe_original": {
+      "att_max": 1.0,
+      "att_min": 1.0,
+      "hidden": 0.0,
+      "pixels": 55819.0,
+      "state": "lit"
+     },
+     "px": 0.00130169596877686,
+     "screen": [
+      0.140000000596046,
+      0.75
+     ],
+     "state": "sunlit",
+     "turn_deg": 0.0,
+     "wider_search": true,
+     "yaw": 172.337001838236
+    },
+    {
+     "depth": 3.0,
+     "distance": 3.11309051513672,
+     "facing": "back-lit",
+     "lower_frame": true,
+     "n_dot_l": -0.950253486633301,
+     "name": "v6-shadow",
+     "normal": [
+      0.633805692195892,
+      -0.443374067544937,
+      -0.633805811405182
+     ],
+     "patch_px": 30.000732421875,
+     "pitch": 26.3193589178855,
+     "pos": [
+      -2.97309446334839,
+      2.90026354789734,
+      -9.42690467834473
+     ],
+     "probe": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 51050.0,
+      "state": "shadow"
+     },
+     "probe_original": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 51050.0,
+      "state": "shadow"
+     },
+     "px": 0.00094050377865806,
+     "screen": [
+      0.5,
+      0.75
+     ],
+     "state": "shadowed",
+     "turn_deg": 0.0,
+     "wider_search": true,
+     "yaw": 135.000005388235
+    }
+   ],
+   "eye": [
+    -1.0,
+    1.51999998092651,
+    -11.3999996185303
+   ],
+   "pair": true,
+   "probe_states": {
+    "hidden": 301.0,
+    "lit": 66.0,
+    "mixed": 254.0,
+    "shadow": 981.0
+   },
+   "tried": 1602.0,
+   "view": 6,
+   "wider_search": true
+  },
+  {
+   "agreement": {
+    "lit": {},
+    "shadow": {
+     "mixed": 25,
+     "shadow": 35
+    }
+   },
+   "cam": [
+    -1.0,
+    -11.4,
+    315.0,
+    56.4426902380793
+   ],
+   "charts": [
+    {
+     "depth": 3.0,
+     "distance": 3.11309027671814,
+     "facing": "front-lit",
+     "lower_frame": true,
+     "n_dot_l": 0.268827736377716,
+     "name": "v7-shadow",
+     "normal": [
+      -0.53405100107193,
+      -0.655423104763031,
+      0.534050703048706
+     ],
+     "patch_px": 30.000732421875,
+     "pitch": 40.9517397879502,
+     "pos": [
+      0.662549018859863,
+      3.56039118766785,
+      -13.0625476837158
+     ],
+     "probe": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 51050.0,
+      "state": "shadow"
+     },
+     "probe_original": {
+      "att_max": 0.0,
+      "att_min": 0.0,
+      "hidden": 0.0,
+      "pixels": 51050.0,
+      "state": "shadow"
+     },
+     "px": 0.00094050197706819,
+     "screen": [
+      0.5,
+      0.75
+     ],
+     "state": "shadowed",
+     "turn_deg": 0.0,
+     "wider_search": true,
+     "yaw": -45.0000159867481
+    }
+   ],
+   "eye": [
+    -1.0,
+    1.51999998092651,
+    -11.3999996185303
+   ],
+   "pair": false,
+   "probe_states": {
+    "hidden": 414.0,
+    "mixed": 33.0,
+    "shadow": 1171.0
+   },
+   "tried": 1618.0,
+   "view": 7,
+   "wider_search": true
+  }
+ ],
+ "w": 1920.0
+}

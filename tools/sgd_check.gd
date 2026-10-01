@@ -10,6 +10,8 @@
 #   realize                        the whole station realized twice (gd, then sgd): every mesh,
 #                                  MultiMesh and the palette image hashed and compared, which also
 #                                  covers blob_cols and split_coloured on the real geometry
+#   frame_diff                     two seeded 1920x1080 frames and a mask, with the mask, without it and frame against itself
+#   probe_scan                     200 seeded screen quads over a seeded frame of probe and scene pixels
 #   load_svgs (--load)             every key's SVG through slug_load_svg in two fresh slug.elf
 #                                  Sandboxes, then slug_atlas() compared
 # Needs the godot_sandbox addon and slug.elf (or a cached pack).
@@ -151,6 +153,43 @@ func _run() -> void:
 		Kernels.write_cache(tmp, {"format": 1, "atlas": at, "costs": pack.costs, "meshes": pack.meshes, "decals": pack.decals})
 		return FileAccess.get_sha256(tmp))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	var frames := []
+	for f in 3:
+		var d := PackedByteArray()
+		d.resize(1920 * 1080 * 3)
+		for i in range(0, d.size(), 997):
+			d[i] = rng.randi_range(0, 255)
+		frames.append(d)
+	var mask: PackedByteArray = frames[2].duplicate()
+	for i in range(0, mask.size(), 6):
+		mask[i] = 255
+		mask[i + 1] = 0
+		mask[i + 2] = 255
+	_both("frame_diff (3 frame pairs)", func():
+		return [Kernels.frame_diff(frames[0], frames[1], PackedByteArray(), 0), Kernels.frame_diff(frames[0], frames[1], mask, 0xff00ff),
+				Kernels.frame_diff(frames[0], frames[0], mask, 0xff00ff)], 3)
+
+	var probe := PackedByteArray()
+	probe.resize(1920 * 1080 * 3)
+	for i in range(0, probe.size(), 3):
+		var scene := rng.randi_range(0, 999) == 0
+		probe[i] = rng.randi_range(0, 255) if rng.randi_range(0, 3) == 0 else (255 if (i / 3) % 1920 < 960 else 0)
+		probe[i + 1] = 120 if scene else 255
+		probe[i + 2] = 0
+	var quads := []
+	for k in 200:
+		var c := Vector2(rng.randf_range(-100.0, 2020.0), rng.randf_range(-100.0, 1180.0))
+		var e := Vector2(rng.randf_range(20.0, 300.0), 0.0).rotated(rng.randf_range(0.0, TAU))
+		var f := Vector2(-e.y, e.x) * rng.randf_range(0.3, 1.0)
+		quads.append(PackedVector2Array([c - e - f, c + e - f, c + e + f, c - e + f]))
+	_both("probe_scan (200 quads)", func():
+		var out := []
+		for q in quads:
+			out.append(Kernels.probe_scan(probe, 1920, 1080, q, 2.0))
+		return out, 200)
 
 	if "--load" in args:
 		_load_svgs()

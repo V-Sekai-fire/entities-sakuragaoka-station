@@ -1,18 +1,14 @@
 # The lookdev-24 chart in the engine floor (tools/engine_floor.gd renders the tiles): each patch read
 # back from the central 60% of its square, by projecting the square with the tile's camera, and
 # scored in CIEDE2000 (sRGB 8-bit -> linear -> XYZ D65 -> Bradford to D50 -> L*a*b* D50).
-#   unlit chart, both engines:  8-bit code against srgb8 (unlit must be exact); dE00 against lab_d50
-#                               (absolute; the cyan's R' = 0 is clipped, flagged); dE00 against the
-#                               srgb8 colour's own L*a*b* (fidelity: what an engine can be held to)
+#   unlit chart, both engines:  the 8-bit code against srgb8 (unlit must be exact) and dE00 against
+#                               the srgb8 colour's own L*a*b* ("fid"); the cyan's R' = 0 is clipped
 #   lit toon chart:             three against godot, dE00 per patch in the sun and in the cast shadow
 #   texture path:               the chart as the original's canvas texture -> canvas_svg.mjs -> SVG
 #                               -> slug.elf -> the baked mesh (palette) and slug-runtime, on an unlit
 #                               quad in the port (three.js's own textured quad alongside)
-# Tests that can fail (unclipped patches): unlit fidelity dE00 <= 0.5 in both engines; texture path
-# fidelity dE00 <= 1.0 in both paths; the control (the port's unlit chart with patches 3 and 4
-# swapped) must FAIL the unlit test. The absolute test against lab_d50 (dE00 <= 0.5) is reported too:
-# the published srgb8 values themselves miss lab_d50 by up to 1.19 under this conversion, so that test
-# measures the reference, not an engine; the "srgb8" column shows by how much.
+# Gates on unclipped patches, against srgb8 (the chart's truth): unlit dE00 <= 0.5 and texture path <= 1.0 in both
+# engines; the port's chart with patches 3 and 4 swapped must fail the unlit gate. srgb8 against lab_d50 is printed only.
 extends RefCounted
 
 const Sheet = preload("res://tools/sheet.gd")
@@ -86,23 +82,26 @@ static func de2000(l1: Vector3, l2: Vector3) -> float:
 	return sqrt(pow(dlp / sl, 2) + pow(dcp / sc, 2) + pow(dhhp / sh, 2) + rt * (dcp / sc) * (dhhp / sh))
 
 
+static func chart_basis(c: Dictionary) -> Basis:
+	return Basis.from_euler(Vector3(deg_to_rad(float(c.get("pitch", 0.0))), deg_to_rad(float(c.yaw)), 0.0), EULER_ORDER_YXZ)
+
+
+static func chart_point(c: Dictionary, u: float, v: float) -> Vector3:
+	var px := float(c.px)
+	return Vector3(c.pos[0], c.pos[1], c.pos[2]) + chart_basis(c) * Vector3((u - 345.0) * px, (235.0 - v) * px, 0.0)
+
+
 ## The central 60% of each patch square on screen, by projecting it with cam (placed at the tile).
-## c: a chart placement (calib_scene.json "charts" / "textured": pos, yaw, px).
+## c: a chart placement (calib_scene.json "charts" / "textured": pos, yaw, optional pitch, px).
 static func patch_rects(cam: Camera3D, c: Dictionary, chart: Dictionary) -> Array:
 	var out := []
-	var yaw := deg_to_rad(float(c.yaw))
-	var px := float(c.px)
-	var pos := Vector3(c.pos[0], c.pos[1], c.pos[2])
 	for p in chart.patches:
 		var cx: float = 20.0 + p.col * 110.0 + 50.0
 		var cy: float = 20.0 + p.row * 110.0 + 50.0
 		var lo := Vector2(INF, INF)
 		var hi := -lo
 		for k in [Vector2(-30, -30), Vector2(30, -30), Vector2(30, 30), Vector2(-30, 30)]:
-			var x: float = (cx + k.x - 345.0) * px
-			var y: float = (235.0 - (cy + k.y)) * px
-			var w := pos + Vector3(x * cos(yaw), y, -x * sin(yaw))
-			var s := cam.unproject_position(w)
+			var s := cam.unproject_position(chart_point(c, cx + k.x, cy + k.y))
 			lo = lo.min(s)
 			hi = hi.max(s)
 		out.append(Rect2i(Vector2i(ceili(lo.x), ceili(lo.y)), Vector2i(floori(hi.x) - ceili(lo.x), floori(hi.y) - ceili(lo.y))))
@@ -154,7 +153,8 @@ static func report(tree: SceneTree, chart: Dictionary, reads: Dictionary, out: S
 		vals[k] = read(reads[k].img, reads[k].rects)
 	var rows := []
 	var res := {"patches": [], "tests": {}}
-	var fails := {"unlit": [], "texture": [], "control": [], "absolute": []}
+	var fails := {"unlit": [], "texture": [], "control": []}
+	var ref := {"max": 0.0, "patch": 0, "over_0.5": 0, "clipped": {}, "engine_minus_reference": {}}
 	var unlit := ["three-unlit", "godot-unlit"]
 	var tex := ["three-texture", "godot-baked", "godot-runtime"]
 	for i in chart.patches.size():
@@ -164,6 +164,14 @@ static func report(tree: SceneTree, chart: Dictionary, reads: Dictionary, out: S
 		var lab_s := lab(ref8)
 		var clipped: bool = p.srgb8_clipped.has(true)
 		var e := {"no": p.no, "name": p.name, "clipped": clipped, "ref_de_abs": de2000(lab_ref, lab_s)}
+		if clipped:
+			ref.clipped["patch %d" % p.no] = e.ref_de_abs
+		else:
+			if e.ref_de_abs > ref.max:
+				ref.max = e.ref_de_abs
+				ref.patch = p.no
+			if e.ref_de_abs > UNLIT_MAX:
+				ref["over_0.5"] += 1
 		var worst := 0.0
 		for k in unlit + tex + ["godot-unlit-swapped"]:
 			if not vals.has(k):
@@ -177,10 +185,10 @@ static func report(tree: SceneTree, chart: Dictionary, reads: Dictionary, out: S
 				worst = maxf(worst, fid)
 			if clipped:
 				continue
+			if k in unlit:
+				ref.engine_minus_reference[k] = maxf(ref.engine_minus_reference.get(k, 0.0), absf(ab - e.ref_de_abs))
 			if k in unlit and fid > UNLIT_MAX:
 				fails.unlit.append("%s patch %d %.2f" % [k, p.no, fid])
-			if k in unlit and ab > UNLIT_MAX:
-				fails.absolute.append("%s patch %d %.2f" % [k, p.no, ab])
 			if k in tex and k != "three-texture" and fid > TEXTURE_MAX:
 				fails.texture.append("%s patch %d %.2f" % [k, p.no, fid])
 			if k == "godot-unlit-swapped" and fid > UNLIT_MAX:
@@ -208,14 +216,28 @@ static func report(tree: SceneTree, chart: Dictionary, reads: Dictionary, out: S
 				"label": "patch %d %s%s" % [p.no, p.name, " (clipped: cyan R' = 0)" if clipped else ""], "cells": cells})
 	rows.sort_custom(func(x, y): return x.worst > y.worst)
 	res.tests = {
-		"unlit_fidelity_le_0.5": {"pass": fails.unlit.is_empty(), "fails": fails.unlit},
-		"unlit_absolute_vs_lab_d50_le_0.5": {"pass": fails.absolute.is_empty(), "fails": fails.absolute},
-		"texture_fidelity_le_1.0": {"pass": fails.texture.is_empty(), "fails": fails.texture},
+		"unlit_vs_srgb8_dE00_le_0.5": {"pass": fails.unlit.is_empty(), "fails": fails.unlit},
+		"texture_vs_srgb8_dE00_le_1.0": {"pass": fails.texture.is_empty(), "fails": fails.texture},
 		"control_swapped_must_fail": {"pass": not fails.control.is_empty(), "fails_seen": fails.control},
 	}
+	res["reference_consistency"] = ref
 	for t in res.tests:
 		print("chart_calib: test %-34s %s %s" % [t, "PASS" if res.tests[t].pass else "FAIL", str(res.tests[t].get("fails", res.tests[t].get("fails_seen", [])))])
-	print("chart_calib: patch | srgb8 vs lab_d50 | three unlit fid/abs/code | godot unlit fid/abs/code | baked fid/abs | runtime fid/abs | three tex fid | lit dE00 | shadow dE00")
+	var codes := []
+	for k in unlit + tex:
+		if vals.has(k):
+			var m := 0.0
+			for e in res.patches:
+				if not e.clipped:
+					m = maxf(m, e[k].code)
+			codes.append("%s %.1f" % [k, m])
+	print("chart_calib: largest 8-bit code difference from srgb8 (unclipped): ", ", ".join(PackedStringArray(codes)))
+	var em := []
+	for k in ref.engine_minus_reference:
+		em.append("%s %.2f" % [k, ref.engine_minus_reference[k]])
+	print("chart_calib: INFO reference consistency (not a gate): the published srgb8 and the Bradford-converted lab_d50 differ by up to dE00 %.2f (patch %d; %d unclipped patches over 0.5; clipped %s); each engine's dE00 against lab_d50 differs from that reference figure by at most: %s" % [
+			ref.max, ref.patch, ref["over_0.5"], str(ref.clipped), ", ".join(PackedStringArray(em))])
+	print("chart_calib: patch | srgb8 vs lab_d50 (info) | three unlit fid/abs/code | godot unlit fid/abs/code | baked fid/abs | runtime fid/abs | three tex fid | lit dE00 | shadow dE00")
 	for e in res.patches:
 		var f := func(k: String, what: String) -> String: return "%.2f" % e[k][what] if e.has(k) else "-"
 		print("chart_calib: %2d %-14s %5.2f%s | %s/%s/%s | %s/%s/%s | %s/%s | %s/%s | %s | %s | %s" % [e.no, e.name, e.ref_de_abs, "*" if e.clipped else " ",
@@ -230,7 +252,7 @@ static func report(tree: SceneTree, chart: Dictionary, reads: Dictionary, out: S
 	for side in ["lit", "shadow"]:
 		if reads.has("three-" + side):
 			heads.append_array(["three " + side, "godot " + side])
-	var img: Image = await Sheet.render(tree, "24-patch chart, worst first. fid: dE00 vs srgb8's Lab; abs: vs lab_d50; d: max code diff; red: over the limit",
+	var img: Image = await Sheet.render(tree, "24-patch chart, worst first. fid: dE00 vs srgb8 (the gate); d: max code diff; abs: vs lab_d50 (info); red: over the gate",
 			heads, rows, CELL)
 	for p in Sheet.publish(img, out.path_join("chart-calib-sheet.png"), "chart-calib"):
 		print("chart_calib: saved ", p)

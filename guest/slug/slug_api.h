@@ -116,6 +116,46 @@ bool cost(const std::string &key, Cost &out, std::string &err);
 // floats, row-major, row 0 = canvas top (UV v = 1). What the port's slug.gdshaderinc must match.
 bool render(const std::string &key, int width, int height, std::vector<float> &out, std::string &err);
 
+// ---- slug-baked: the final composite at an LOD within a budget (bake::bakeFinal) ----------------
+// A key spec is "colorKey|alphaKey": the material's map and alphaMap keys ("|alphaKey": an alpha
+// map over the material colour alone, the map taken as white; "colorKey": no alpha map). three.js:
+// rgb = map, alpha = map alpha x opacity x alphaMap.g.
+
+struct BakeParams {
+	int mode = 2;                    // 0 opaque, 1 transparent (base-colour alpha), 2 alpha test
+	double alpha_test = 0.5;
+	double opacity = 1.0;
+	int64_t cap = 0;                 // max triangles; 0 = no cap (level 0)
+	double feature_floor_px = 0.0;   // fold features narrower than this (texture px) at every level
+	double window[4] = {0, 0, 0, 0}; // canvas px x0, y0, x1, y1; all 0 = the whole canvas
+};
+
+constexpr int LOD_MEAN = 15;         // the level after the last (bake::LOD_LEVELS): the mean colour
+
+struct Lod {
+	int level = 0;
+	int64_t triangles = 0;           // the level's bake of the window
+	int64_t surface_triangles = -1;  // after clipping onto the surface (-1: not clipped / past cap)
+	double feature_px = 0.0;         // features narrower than this were folded into local means
+	double tolerance_px = 0.0;       // flattening / outline tolerance
+	double simplify_error_px = 0.0;  // meshoptimizer's error, when it was tried on this level
+	bool aborted = false;            // the bake passed 8 x cap and stopped
+};
+
+struct FinalBake {
+	Mesh mesh;                       // UV (v up), no overlay; paints carry the final alpha
+	int lod = 0;
+	std::vector<Lod> lods;           // every level tried, finest first
+	double transparent_area = 0.0;   // opaque mode: px^2 whose final alpha < 1 (shown straight)
+	double canvas_area = 0.0;        // px^2 of the window
+	int64_t folded_features = 0;
+	double feature_px = 0.0;
+};
+
+// The spec's final bake over the window at the finest level within cap (meshoptimizer first
+// when a level is within 8x of it), else the mean.
+bool bake(const std::string &key_spec, const BakeParams &p, FinalBake &out, std::string &err);
+
 struct Decal {
 	bool capped = false;
 	std::vector<float> vertices;    // 9T unindexed, CCW outward, lifted
@@ -123,6 +163,15 @@ struct Decal {
 	std::vector<int32_t> paint;     // T, paint id per triangle
 	std::vector<float> param;       // 6T, per vertex as Mesh::param
 	int32_t overlay_from = 0;       // first overlay triangle
+
+	// decal_final only.
+	std::vector<float> paints;      // this result's paints (Mesh::paints layout, with alpha)
+	int lod = -1;
+	std::vector<Lod> lods;
+	double transparent_area = 0.0;
+	double canvas_area = 0.0;       // px^2 of the surface's window
+	double world_per_uv = 0.0;      // the surface's texel density (world units per UV unit)
+	double feature_px = 0.0;        // folded below this at the chosen level (x world_per_uv / width = world)
 };
 
 // Clips the key's bake onto a surface (see slug_api.cpp). uv_xform = repeat.x, repeat.y,
@@ -131,5 +180,13 @@ struct Decal {
 bool decal(const std::string &key, const std::vector<float> &vertices, const std::vector<float> &normals,
 		const std::vector<float> &uvs, const std::vector<int32_t> &triangles, const std::vector<float> &uv_xform,
 		const std::vector<float> &lift, int64_t cap, double alpha_test, Decal &out, std::string &err);
+
+// slug-baked onto a surface: the window is the surface's UV footprint, the cap its budget, and
+// the finest LOD level whose clipped triangles fit is returned (never capped; past every level,
+// the surface's own faces in the mean colour). feature_floor_world > 0 folds features narrower
+// than that many world units at every level (via the surface's texel density).
+bool decal_final(const std::string &key_spec, const std::vector<float> &vertices, const std::vector<float> &normals,
+		const std::vector<float> &uvs, const std::vector<int32_t> &triangles, const std::vector<float> &uv_xform,
+		const std::vector<float> &lift, const BakeParams &params, double feature_floor_world, Decal &out, std::string &err);
 
 } // namespace slug

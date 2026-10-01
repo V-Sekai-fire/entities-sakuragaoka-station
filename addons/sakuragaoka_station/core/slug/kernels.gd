@@ -420,3 +420,84 @@ static func pack_stamps(r: Dictionary, stops: PackedInt32Array) -> Dictionary:
 		sol.append(si)
 	return {"error": "", "px": px, "rows": rows, "cells": cells, "cell_rows": cell_rows, "stamp_of_layer": sol,
 			"stamp_layer_count": stamp_layer_count, "instance_count": instance_count}
+
+
+## Two RGB8 frames: [sum |a - b| over the pixels where m equals key (all when m is empty), their channel
+## count, the same over the rest, pixels that differ, largest channel difference].
+static func frame_diff(a: PackedByteArray, b: PackedByteArray, m: PackedByteArray, key: int) -> PackedInt64Array:
+	if _sgd():
+		return _sb.vmcall("frame_diff", a, b, m, key)
+	var out := PackedInt64Array()
+	out.resize(6)
+	var count := mini(a.size(), b.size())
+	var masked := m.size() >= count
+	var i := 0
+	while i < count:
+		var d0 := absi(a[i] - b[i])
+		var d1 := absi(a[i + 1] - b[i + 1])
+		var d2 := absi(a[i + 2] - b[i + 2])
+		var dd := maxi(d0, maxi(d1, d2))
+		if dd > 0:
+			out[4] += 1
+			out[5] = maxi(out[5], dd)
+		var o := 0
+		if masked and ((m[i] << 16) | (m[i + 1] << 8) | m[i + 2]) != key:
+			o = 2
+		out[o] += d0 + d1 + d2
+		out[o + 1] += 3
+		i += 3
+	return out
+
+
+## An RGB8 frame w x h read inside screen quad q, inset px in from its edges: [pixels, pixels not probe-coloured
+## (green under 250 or blue over 5), lowest red, highest red] (chart_in_view.gd's shadow probes).
+static func probe_scan(d: PackedByteArray, w: int, h: int, q: PackedVector2Array, inset: float) -> PackedInt32Array:
+	if _sgd():
+		return _sb.vmcall("probe_scan", d, w, h, q, inset)
+	var centre := (q[0] + q[1] + q[2] + q[3]) / 4.0
+	var ea := PackedVector2Array()
+	var en := PackedVector2Array()
+	for k in 4:
+		var a := q[k]
+		var e := (q[(k + 1) % 4] - a).normalized()
+		var n := Vector2(-e.y, e.x)
+		if (centre - a).dot(n) < 0.0:
+			n = -n
+		ea.append(a)
+		en.append(n)
+	var lo_v := q[0]
+	var hi_v := q[0]
+	for p in q:
+		lo_v = lo_v.min(p)
+		hi_v = hi_v.max(p)
+	var box := Rect2(lo_v, hi_v - lo_v)
+	var out := PackedInt32Array()
+	out.resize(4)
+	out[2] = 255
+	for y in range(maxi(int(box.position.y), 0), mini(int(box.end.y) + 1, h)):
+		var yc := y + 0.5
+		var x0 := -INF
+		var x1 := INF
+		var row_ok := true
+		for k in 4:
+			var a := ea[k]
+			var n := en[k]
+			var rhs := inset + a.dot(n) - n.y * yc
+			if absf(n.x) < 1e-6:
+				if rhs > 0.0:
+					row_ok = false
+			elif n.x > 0.0:
+				x0 = maxf(x0, rhs / n.x)
+			else:
+				x1 = minf(x1, rhs / n.x)
+		if not row_ok:
+			continue
+		for x in range(maxi(ceili(x0 - 0.5), 0), mini(floori(x1 - 0.5), w - 1) + 1):
+			var i := (y * w + x) * 3
+			out[0] += 1
+			if d[i + 1] < 250 or d[i + 2] > 5:
+				out[1] += 1
+				continue
+			out[2] = mini(out[2], d[i])
+			out[3] = maxi(out[3], d[i])
+	return out

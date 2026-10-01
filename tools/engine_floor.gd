@@ -18,7 +18,7 @@
 #   node tools/oracle/calib.mjs --out <dir>/three            (the original's tiles)
 #   node tools/oracle/calib_svg.mjs --out <dir>/svg          (the chart's canvas texture as SVG)
 #   godot --path . --resolution 1920x1080 --script tools/engine_floor.gd -- --three=<dir>/three --out=<dir>
-#       --chart-svg=<dir>/svg/calib-chart24.svg [--q=high] [--sheet-only] [--ramp-control=step|nohemi|nopaint]
+#       --chart-svg=<dir>/svg/calib-chart24.svg [--q=high] [--sheet-only] [--ramp-control=<a RAMP_CONTROLS name>]
 #   godot --path . --resolution 1920x1080 --script tools/engine_floor.gd -- --station --floors=<dir>/engine_floor.json
 #       --original=<prefix> --views=<dir> [--hammersley=8@-1,-11.4]
 # <prefix>_<tile id>.png are calib.mjs' renders; <dir>/godot_<tile id>.png are written here, with
@@ -124,16 +124,13 @@ func _teardown() -> void:
 
 # ------------------------------------------------------------------------------------- tiles
 
-## The port composite's switches (core/composite.gd exports) and the original's post stage each
-## follows: outline the outline stage, bloom and glow the bloom stage, and grade (exposure, soft clip,
-## grading, light leak and vignette under one switch, vignette its amount) only when the original's
-## grading, leak and vignette are all on. The port has no dither.
+## Each port composite switch and the original stage it follows; the port's grade block holds grading, leak and
+## vignette together, so it runs only when all three are on. The port has no dither.
 const PORT_STAGES := {"outline": "outline", "bloom": "bloom", "glow": "bloom", "grade": "block", "vignette": "block"}
 
 
-## The port's composite set for a tile's post stages {outline, bloom, grade, leak, vignette, dither}.
-## A tile whose stages the port cannot run (dither, or grading, leak or vignette alone) is drawn with
-## those off, so its measure is the stage's whole contribution. Returns what the port ran, for the labels.
+## Sets the port's composite for a tile's post stages; stages it cannot run stay off, so the tile measures their
+## whole contribution. Returns what the port ran, for the labels.
 func _set_post(p: Dictionary) -> String:
 	if _fx == null:
 		return "port: no composite"
@@ -402,7 +399,7 @@ static func _chart(mats, chart: Dictionary, c: Dictionary):
 	var grp := T.Group.new()
 	grp.name = "calib-chart-" + str(c.get("name", ""))
 	grp.position = Vector3(c.pos[0], c.pos[1], c.pos[2])
-	grp.rotation = Vector3(0, deg_to_rad(c.yaw), 0)
+	grp.set_rotation(deg_to_rad(float(c.get("pitch", 0.0))), deg_to_rad(c.yaw), 0.0, "YXZ")
 	var px: float = c.px
 	var cols := []
 	for p in chart.patches:
