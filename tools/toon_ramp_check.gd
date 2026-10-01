@@ -1,7 +1,7 @@
 # The toon ramp (core/ramp/) against the original's toon material, by tests that can fail: formula (each
 # palette variant on quads either side of every gradient-map break and on back faces, against the ramp
 # written out here, within one 8-bit level, a pure red environment ambient not reaching it); chart
-# (engine_floor.gd's chart-toon tile, dE00 three.js vs the port per patch, mean <= 1.0 and every patch
+# (engine_floor.gd's chart-toon tile, dE00 three.js vs the port per patch, mean <= 0.2 sun, 0.3 shadow, every patch
 # <= 2.0 after; the unlit chart's codes exact; tiles b-toon, b-toon-paint, c-shadow MAD before -> after);
 # controls (engine_floor.gd --ramp-control: step must bring the shadow dE00 back, nohemi darken each
 # shadow patch by its computed hemisphere term, nopaint regress b-toon-paint and leave b-toon).
@@ -22,7 +22,7 @@ const SUN_I := 2.75
 const SKY := "#a9b3ee"
 const GROUND := "#d9c6c8"
 const HEMI_I := 1.62
-const MEAN_MAX := 1.0
+const MEAN_MAX := {"lit": 0.2, "shadow": 0.3}
 const PATCH_MAX := 2.0
 const CELL := Vector2i(150, 84)
 
@@ -312,10 +312,10 @@ func _chart() -> Dictionary:
 	for k in sums:
 		print("toon_ramp_check:   %-16s %6.2f / %6.2f" % [k, res.mean[k], res.max[k]])
 	if res.mean.has("after lit"):
-		_check(res.mean["after lit"] <= MEAN_MAX and res.max["after lit"] <= PATCH_MAX,
-				"chart in the sun after: mean dE00 %.2f <= %.1f, every patch <= %.1f (largest %.2f); before %.2f" % [res.mean["after lit"], MEAN_MAX, PATCH_MAX, res.max["after lit"], res.mean.get("before lit", -1.0)])
-		_check(res.mean["after shadow"] <= MEAN_MAX and res.max["after shadow"] <= PATCH_MAX,
-				"chart in shadow after: mean dE00 %.2f <= %.1f, every patch <= %.1f (largest %.2f); before %.2f" % [res.mean["after shadow"], MEAN_MAX, PATCH_MAX, res.max["after shadow"], res.mean.get("before shadow", -1.0)])
+		for sn in ["lit", "shadow"]:
+			_check(res.mean["after " + sn] <= MEAN_MAX[sn] and res.max["after " + sn] <= PATCH_MAX,
+					"chart %s after: mean dE00 %.2f <= %.1f, every patch <= %.1f (largest %.2f); before %.2f" % [sn, res.mean["after " + sn], MEAN_MAX[sn],
+					PATCH_MAX, res.max["after " + sn], res.mean.get("before " + sn, -1.0)])
 	# the unlit chart: every patch's 8-bit code, before and after
 	var tu = _img("%s_chart-unlit.png" % three)
 	for k in ["before", "after"]:
@@ -345,8 +345,8 @@ func _chart() -> Dictionary:
 			_check(res.tiles[t].after < res.tiles[t].before, "tile %s: MAD %.2f before -> %.2f after" % [t, res.tiles[t].before, res.tiles[t].after])
 	if res.mean.has("step shadow"):
 		res.controls["step"] = {"lit": res.mean["step lit"], "shadow": res.mean["step shadow"], "b-toon": res.tiles["b-toon"].get("step", -1.0)}
-		_check(res.mean["step shadow"] > MEAN_MAX, "CONTROL step (MToon's step for G): the chart's shadow dE00 comes back, mean %.2f > %.1f (lit %.2f: N.L there is 0.856, where both are 1); b-toon MAD %.2f against after's %.2f" % [
-				res.mean["step shadow"], MEAN_MAX, res.mean["step lit"], res.tiles["b-toon"].get("step", -1.0), res.tiles["b-toon"].get("after", -1.0)])
+		_check(res.mean["step shadow"] > MEAN_MAX.shadow, "CONTROL step (MToon's step for G): the chart's shadow dE00 comes back, mean %.2f > %.1f (lit %.2f: N.L there is 0.856, where both are 1); b-toon MAD %.2f against after's %.2f" % [
+				res.mean["step shadow"], MEAN_MAX.shadow, res.mean["step lit"], res.tiles["b-toon"].get("step", -1.0), res.tiles["b-toon"].get("after", -1.0)])
 	if vals.has("nohemi") and vals.has("after"):
 		res.controls["nohemi"] = _darkening(chart, vals, res)
 	if res.tiles["b-toon-paint"].has("nopaint") and res.tiles["b-toon-paint"].has("after"):
@@ -384,7 +384,7 @@ func _darkening(chart: Dictionary, vals: Dictionary, res: Dictionary) -> Diction
 		rows.append({"no": p.no, "predicted": [pred.x, pred.y, pred.z], "measured": [meas.x, meas.y, meas.z], "nohemi_rgb": [c.x, c.y, c.z]})
 	var m: float = res.mean.get("nohemi shadow", 0.0)
 	_check(ok, "CONTROL nohemi: every shadow patch darkens by its hemisphere term colour * mix(ground, sky, 0.5) * 1.62 / pi (largest error %.2f of the tolerance, one 8-bit level + 2 %%)" % worst)
-	_check(m > MEAN_MAX, "CONTROL nohemi: the chart's shadow dE00 fails the gate, mean %.2f > %.1f" % [m, MEAN_MAX])
+	_check(m > MEAN_MAX.shadow, "CONTROL nohemi: the chart's shadow dE00 fails the gate, mean %.2f > %.1f" % [m, MEAN_MAX.shadow])
 	return {"shadow_mean_de": m, "worst_over_tolerance": worst, "patches": rows}
 
 

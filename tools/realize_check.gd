@@ -89,7 +89,13 @@ func _on_built(s: Dictionary) -> void:
 			s.batches, draws, tris, s.build_ms, s.realize_ms])
 	print("realize: quality %s (MSAA %s)" % [_quality, ["off", "2x", "4x", "8x"][get_root().msaa_3d]])
 	if _control != "":
-		print("realize: CONTROL %s on %d toon-ramp materials" % [_control, EngineFloor.ramp_control(_st, _control)])
+		var n: int = EngineFloor.ramp_control(_st, _control)
+		print("realize: CONTROL %s on %d toon-ramp materials" % [_control, n])
+		if n <= 0:
+			print("realize: FAIL the control switched nothing")
+			_teardown()
+			quit(1)
+			return
 	if _out == "" or _cams.is_empty():
 		_teardown()
 		quit()

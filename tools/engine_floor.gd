@@ -279,7 +279,13 @@ func _tiles() -> void:
 	await process_frame
 	r.finish()
 	if _a.has("ramp-control"):
-		print("engine_floor: CONTROL %s on %d toon-ramp materials" % [_a["ramp-control"], ramp_control(holder, str(_a["ramp-control"]))])
+		var n := ramp_control(holder, str(_a["ramp-control"]))
+		print("engine_floor: CONTROL %s on %d toon-ramp materials" % [_a["ramp-control"], n])
+		if n <= 0:
+			print("engine_floor: FAIL the control switched nothing")
+			_teardown()
+			quit(1)
+			return
 	var sun: DirectionalLight3D = _st.get_node("Sun")
 	var renders := {}
 	var rects := _chart_rects(scene, chart)
@@ -326,11 +332,13 @@ func _tiles() -> void:
 
 const RAMP_CONTROLS := {"step": "RAMP_CONTROL_STEP", "nohemi": "RAMP_CONTROL_NO_HEMI", "nopaint": "RAMP_CONTROL_NO_PAINT",
 		"oct": "RAMP_CONTROL_SAKURA_NO_OCT", "wobble": "RAMP_CONTROL_SAKURA_NO_WOBBLE", "speck": "RAMP_CONTROL_SAKURA_NO_SPECK",
-		"rim": "RAMP_CONTROL_SAKURA_NO_RIM", "shade": "RAMP_CONTROL_SAKURA_NO_SHADE"}
+		"rim": "RAMP_CONTROL_SAKURA_NO_RIM", "shade": "RAMP_CONTROL_SAKURA_NO_SHADE", "dapple": "RAMP_CONTROL_SAKURA_NO_DAPPLE"}
 
 
 ## Toon-ramp materials under root redrawn with a control's define (mtoon_ramp.gdshaderinc); returns the count.
 static func ramp_control(root: Node, which: String) -> int:
+	if not RAMP_CONTROLS.has(which):
+		return -1
 	var define: String = RAMP_CONTROLS[which]
 	var mats := []
 	for n in root.find_children("*", "MeshInstance3D", true, false):
