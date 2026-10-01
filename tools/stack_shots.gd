@@ -1,5 +1,5 @@
 # Port renders under post-stack toggles, for tools/sky_seam.gd. Builds the station once
-# (--modules=none is the sky alone) and renders every camera set under each configuration, as
+# (--modules=none is the sky alone) and renders every camera set under each configuration (a+b sets both), as
 # <out>/<config>/<set>_<i>.png, so a toggle's effect is one directory apart. Sets: the sphere Hammersley views
 # (realize_check.gd's) and a turntable. The mask configuration is tools/sky_mask.gd's: magenta sky, post off.
 #   godot --path . --resolution 1920x1080 --script tools/stack_shots.gd -- --out=<dir> [--modules=none]
@@ -14,7 +14,8 @@ const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
 const EYE := 1.52
 const CONFIGS := ["base", "composite_off", "fog_off", "post_off", "bloom_off", "outline_off", "grade_off",
-		"msaa_off", "q_medium", "q_low", "sky_realtime", "sky_quality", "radiance_32", "radiance_2048", "debanding", "mask"]
+		"msaa_off", "q_medium", "q_low", "sky_realtime", "sky_quality", "radiance_32", "radiance_2048", "debanding", "mask",
+		"normals"]
 
 var _a := {}
 var _st: Node3D
@@ -56,12 +57,18 @@ func _apply(cfg: String, we: WorldEnvironment, fx: Array, defaults: Dictionary) 
 	env.sky.process_mode = defaults.process_mode
 	env.sky.radiance_size = defaults.radiance_size
 	vp.use_debanding = false
+	vp.debug_draw = Viewport.DEBUG_DRAW_DISABLED
 	env.background_mode = Environment.BG_SKY
 	for e in fx:
 		e.enabled = true
-	var comp = fx[1]
 	for k in ["outline", "grade", "bloom", "glow"]:
-		comp.set(k, defaults[k])
+		fx[1].set(k, defaults[k])
+	for part in cfg.split("+"):
+		_toggle(part, env, vp, fx)
+
+
+func _toggle(cfg: String, env: Environment, vp: Viewport, fx: Array) -> void:
+	var comp = fx[1]
 	match cfg:
 		"composite_off":
 			comp.enabled = false
@@ -96,6 +103,8 @@ func _apply(cfg: String, we: WorldEnvironment, fx: Array, defaults: Dictionary) 
 			env.background_color = Color(1, 0, 1)
 			for e in fx:
 				e.enabled = false
+		"normals":
+			vp.debug_draw = Viewport.DEBUG_DRAW_NORMAL_BUFFER
 
 
 func _run() -> void:
@@ -127,7 +136,7 @@ func _run() -> void:
 	var last := PackedByteArray()
 	var failed := 0
 	for cfg in configs:
-		if not cfg in CONFIGS:
+		if Array(cfg.split("+")).any(func(c): return not c in CONFIGS):
 			print("stack_shots: FAIL unknown config ", cfg)
 			failed += 1
 			continue
