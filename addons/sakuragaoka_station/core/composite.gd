@@ -14,8 +14,8 @@ layout(set = 0, binding = 3) uniform sampler2D bloom_tex;
 layout(set = 0, binding = 4) uniform sampler2D glow_tex;
 layout(push_constant, std430) uniform Params {
 	vec2 raster;
-	float near;
-	float far;
+	float depth_a;
+	float depth_b;
 	vec4 sun;
 	float outline;
 	float grade;
@@ -31,8 +31,7 @@ const vec3 LINE = vec3(0.0272, 0.0203, 0.0513);
 
 float lin_depth(ivec2 c) {
 	c = clamp(c, ivec2(0), ivec2(p.raster) - 1);
-	float d = texelFetch(depth_tex, c, 0).r;
-	return min(p.near * p.far / (d * (p.far - p.near) + p.near), p.far);
+	return p.depth_b / (texelFetch(depth_tex, c, 0).r + p.depth_a);
 }
 
 vec3 nrm(ivec2 c) {
@@ -264,7 +263,7 @@ func _render_callback(type: int, data: RenderData) -> void:
 	var sun := Vector4(clampf(sx, -0.3, 1.3), clampf(sy, -0.2, 1.3), on_screen, 1.0)
 	if not front:
 		sun = Vector4(1.4 if sx < 0.5 else -0.4, 1.2, 0.0, 0.25)
-	var bytes := PackedFloat32Array([size.x, size.y, proj.get_z_near(), proj.get_z_far(),
+	var bytes := PackedFloat32Array([size.x, size.y, proj.z.z, proj.w.z,
 			sun.x, sun.y, sun.z, sun.w, outline, grade, exposure, vignette, bloom, glow, 0.0, 0.0]).to_byte_array()
 	var qx := Vector2(1.0 / quarter.x, 0.0)
 	var qy := Vector2(0.0, 1.0 / quarter.y)
