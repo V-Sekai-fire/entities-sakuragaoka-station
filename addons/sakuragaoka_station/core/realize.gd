@@ -21,7 +21,7 @@ const Baked = preload("res://addons/sakuragaoka_station/core/slug/baked.gd")
 const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const SLUG := "res://addons/sakuragaoka_station/core/slug/"
 const RAMP := "res://addons/sakuragaoka_station/core/ramp/"
-const BAND_FORMAT := Mesh.ARRAY_CUSTOM_RGB_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
+const RampSakura = preload("res://addons/sakuragaoka_station/core/ramp/sakura.gd")
 
 const MTOON := "res://addons/Godot-MToon-Shader/"
 ## Each keyed canvas texture's mean linear colour, read from the original's canvases by its
@@ -208,7 +208,7 @@ func _mesh(o, alone: bool) -> void:
 		stats.held += 1
 		return
 	if alone or mats.size() > 1 or m == null or not (m.type == "toon" or m.type == "basic") \
-			or m.map != null or m.alpha_map != null or _band(m):
+			or m.map != null or m.alpha_map != null or RampSakura.band(m):
 		_single(o, alone)
 		return
 	var gd := _geo_data(g)
@@ -321,6 +321,7 @@ func _single(o, alone: bool = false) -> void:
 	var mats: Array = o.materials()
 	var groups: Array = g.groups if mats.size() > 1 and not g.groups.is_empty() else [{"start": 0, "count": gd.idx.size(), "material_index": 0}]
 	var am := ArrayMesh.new()
+	var back_cast := false
 	for gr in groups:
 		var start: int = gr.start
 		var count: int = mini(gr.count, gd.idx.size() - start)
@@ -357,10 +358,11 @@ func _single(o, alone: bool = false) -> void:
 		var colour: Color = _mean_colour(m)
 		var blob: bool = m.user_data.has("sakura") and m.user_data["sakura"].get("band", false)
 		stats.blob += 1 if blob else 0
-		if blob and _band_ok(m, g, gd):
-			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, _band_arrays(g, gd, gidx, colour), [], {}, BAND_FORMAT)
+		if blob and RampSakura.band_ok(m, g, gd):
+			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, RampSakura.arrays(g, gd, gidx, _uv_of(colour)), [], {}, RampSakura.FORMAT)
 			am.surface_set_material(am.get_surface_count() - 1, _mtoon(m))
-			_mtoon(m).set_shader_parameter("ramp_dapple", bool(o.user_data.get("customDepthMaterial", {}).get("dapple", false)))
+			_mtoon(m).set_shader_parameter("ramp_dapple", RampSakura.dapple(o))
+			back_cast = back_cast or RampSakura.dapple(o)
 			_tally("palette single surfaces", gidx.size() / 3)
 			continue
 		var cols = _blob_cols(g, gd) if blob else (gd.cols if m.vertex_colors else null)
@@ -374,6 +376,8 @@ func _single(o, alone: bool = false) -> void:
 	mi.name = o.name if o.name != "" else "mesh"
 	mi.mesh = am
 	mi.transform = o.matrix_world
+	if back_cast:
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
 	_root.add_child(mi)
 
 
@@ -484,52 +488,6 @@ static func _ramp_flip(m) -> bool:
 	return not bool(m.user_data.get("sakura", {}).get("noFlip", false))
 
 
-static func _band(m) -> bool:
-	return m.user_data.has("sakura") and m.user_data["sakura"].get("band", false) and _variant(m, "") == ""
-
-
-static func _sakura(m) -> bool:
-	var s: Dictionary = m.user_data.get("sakura", {})
-	return m.type == "toon" and not m.transparent and m.alpha_test == 0.0 and (s.get("band", false) or s.get("edgeFade", false)
-			or s.get("sway", false) or s.get("octNormal", false) or s.has("speck") or float(s.get("rim", 0.0)) > 0.0 or float(s.get("shade", 0.0)) > 0.0)
-
-
-func _band_ok(m, g, gd: Dictionary) -> bool:
-	var ca = g.get_attribute("color")
-	return m.type == "toon" and _band(m) and ca != null and ca.item_size == 3 and gd.uv.size() == ca.count()
-
-
-## A blossom mass as the original draws it: indexed, its colour attribute in CUSTOM0 and uv in UV2.
-func _band_arrays(g, gd: Dictionary, idx: PackedInt32Array, colour: Color) -> Array:
-	var a: Array = gd.arrays.duplicate()
-	var uv := PackedVector2Array()
-	uv.resize(gd.uv.size())
-	uv.fill(_uv_of(colour))
-	a[Mesh.ARRAY_TEX_UV] = uv
-	a[Mesh.ARRAY_TEX_UV2] = gd.uv
-	a[Mesh.ARRAY_CUSTOM0] = g.get_attribute("color").array
-	a[Mesh.ARRAY_INDEX] = idx
-	return a
-
-
-func _sakura_params(sm: ShaderMaterial, m) -> void:
-	var s: Dictionary = m.user_data["sakura"]
-	sm.set_shader_parameter("ramp_sun_dir", _sun_dir)
-	sm.set_shader_parameter("ramp_rim_k", float(s.get("rim", 0.0)))
-	sm.set_shader_parameter("ramp_sheen_k", float(s.get("sheen", 0.0)))
-	sm.set_shader_parameter("ramp_shade_k", float(s.get("shade", 0.0)))
-	sm.set_shader_parameter("ramp_env_rim", bool(s.get("envRim", false)))
-	sm.set_shader_parameter("ramp_oct", bool(s.get("octNormal", false)))
-	sm.set_shader_parameter("ramp_band", bool(s.get("band", false)))
-	sm.set_shader_parameter("ramp_sway", bool(s.get("sway", false)))
-	sm.set_shader_parameter("ramp_edge_fade", bool(s.get("edgeFade", false)))
-	sm.set_shader_parameter("ramp_edge_cutoff", m.alpha_test if m.alpha_test > 0.0 else 0.5)
-	var t = s.get("speck")
-	sm.set_shader_parameter("ramp_speck_k", float(s.get("speckK", 1.0)) if _in_atlas(t) else 0.0)
-	if _in_atlas(t):
-		_slug.bind(sm, _slug.key_info(_tex_key(t), t.width, t.height), Vector2.ONE, Vector2.ZERO, true, "speck_")
-
-
 static func _ramp_key(m) -> String:
 	if m.type != "toon":
 		return ""
@@ -584,14 +542,14 @@ func _mtoon(m) -> ShaderMaterial:
 			return custom
 	var sm := ShaderMaterial.new()
 	if m.type == "toon":
-		sm.shader = load(RAMP + _variant(m, "mtoon_ramp_sakura" if _sakura(m) else "mtoon_ramp") + ".gdshader")
+		sm.shader = load(RAMP + _variant(m, "mtoon_ramp_sakura" if RampSakura.wants(m) else "mtoon_ramp") + ".gdshader")
 	else:
 		sm.shader = load(MTOON + _variant(m, "mtoon") + ".gdshader")
 	sm.set_shader_parameter("_MainTex", _palette_tex)
 	sm.set_shader_parameter("_ShadeTexture", _palette_tex)
 	_toon_params(sm, m)
-	if _sakura(m):
-		_sakura_params(sm, m)
+	if RampSakura.wants(m):
+		RampSakura.params(sm, m, _sun_dir, _slug)
 	if m.type == "basic":
 		sm.set_shader_parameter("_EmissionMap", _palette_tex)
 	_materials[k] = sm
