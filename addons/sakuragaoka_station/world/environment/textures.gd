@@ -3,6 +3,15 @@
 extends RefCounted
 
 
+class Fields extends RefCounted:
+	var dry
+	var veg
+	var renge
+	var wheat
+	var nano
+	var grass
+
+
 class EnvTextures extends RefCounted:
 	var ground
 	var masonry
@@ -11,6 +20,7 @@ class EnvTextures extends RefCounted:
 	var flowers
 	var mats
 	var reeds
+	var fields := Fields.new()
 	var _rest
 
 	func _init(ctx) -> void:
@@ -23,12 +33,14 @@ class EnvTextures extends RefCounted:
 		flowers = T.draw(1024, 512, null, {"key": "env-flowers2"})
 		mats = T.draw(512, 512, null, {"key": "env-mats"})
 		reeds = T.draw(512, 512, null, {"key": "env-reeds2"})
+		for k in ["dry", "veg", "renge", "wheat", "nano", "grass"]:
+			fields.set(k, T.draw(256, 256, null, {"key": "env-field-" + k, "repeat": [1, 1]}))
 
 	func _get(p: StringName):
 		return _rest.get(p)
 
 	func sub(name: String):
-		return _rest.sub(name)
+		return fields if name == "fields" else _rest.sub(name)
 
 
 static func create_env_textures(ctx):
