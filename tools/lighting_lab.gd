@@ -2,8 +2,10 @@
 # rendered at sphere-Hammersley orbit views, then once per planted defect. Each defect's residual against
 # the truth is summed on the GPU; the truth rendered twice is the floor, and a defect counts as seen when
 # it moves more pixels than the floor does. --aov also writes each view's reference passes, the inputs
-# the toon model reads (aov_albedo_<i>.png, aov_light_<i>.png).
-#   godot --path . --resolution 512x512 --script tools/lighting_lab.gd -- --out=<dir> [--views=8] [--aov]
+# the toon model reads (aov_albedo_<i>.png, aov_light_<i>.png, aov_ndl_<i>.png). --fit=<lighting_fit>
+# then fixes every defect from the truth and its own state's passes (_fix), and counts it fixed when at
+# most 1 pixel in 10,000 is off by more than one code; the moved sun is the fix it must not claim.
+#   godot --path . --resolution 512x512 --script tools/lighting_lab.gd -- --out=<dir> [--views=8] [--aov] [--fit=<bin>]
 extends SceneTree
 
 const TRUTH := preload("res://tools/lighting_lab/truth.gdshader")
@@ -14,7 +16,7 @@ const MAD_GLSL := """
 layout(local_size_x = 64) in;
 layout(set = 0, binding = 0, std430) readonly buffer A { uint a[]; };
 layout(set = 0, binding = 1, std430) readonly buffer B { uint b[]; };
-layout(set = 0, binding = 2, std430) buffer S { uint sum[4]; };
+layout(set = 0, binding = 2, std430) buffer S { uint sum[5]; };
 layout(push_constant, std430) uniform P { uint n; uint pad0; uint pad1; uint pad2; } p;
 void main() {
 	uint i = gl_GlobalInvocationID.x;
@@ -22,19 +24,24 @@ void main() {
 		return;
 	}
 	uint moved = 0u;
+	uint beyond = 0u;
 	for (int c = 0; c < 3; c++) {
 		int va = int((a[i] >> (8 * c)) & 0xFFu);
 		int vb = int((b[i] >> (8 * c)) & 0xFFu);
 		atomicAdd(sum[c], uint(abs(va - vb)));
 		moved |= uint(va != vb);
+		beyond |= uint(abs(va - vb) > 1);
 	}
 	atomicAdd(sum[3], moved);
+	atomicAdd(sum[4], beyond);
 }
 """
 
 var _out := "user://lighting_lab"
 var _views := 8
 var _aov := false
+var _fitter := ""
+var _sets := {}
 var _mat := ShaderMaterial.new()
 var _env := Environment.new()
 var _sun := DirectionalLight3D.new()
@@ -52,6 +59,8 @@ func _initialize() -> void:
 			_views = int(a.substr(8))
 		elif a == "--aov":
 			_aov = true
+		elif a.begins_with("--fit="):
+			_fitter = a.substr(6)
 	_mat.shader = TRUTH
 	_scene()
 	_gpu()
@@ -68,7 +77,7 @@ func _scene() -> void:
 	_sun.light_energy = 2.75 / PI
 	_sun.shadow_enabled = true
 	root.add_child(_sun)
-	_sun.look_at_from_position(Vector3.ZERO, -SUN.normalized(), Vector3.UP)
+	_aim(SUN)
 	var csg := CSGCombiner3D.new()
 	root.add_child(csg)
 	_solid(csg, CSGBox3D.new(), Vector3(0, -0.1, 0), {"size": Vector3(14, 0.2, 14)})
@@ -123,19 +132,35 @@ func _render(views: Array) -> Array:
 	return shots
 
 
-## The reference passes through the same viewport as the renders, as 8-bit sRGB PNGs: albedo, then
-## 0.5 dotNL + 0.5 / shadow / 0.5 normal y + 0.5 in red, green and blue, black where there is sky.
-func _passes(views: Array) -> void:
+## The reference passes for the current sun and shadow through the same viewport as the renders, as 8-bit
+## sRGB PNGs and PPMs: albedo; 0.5 dotNL + 0.5 / shadow / 0.5 normal y + 0.5; dotNL to 16 bits as high and
+## low bytes. Black where there is sky.
+func _passes(views: Array, name: String) -> void:
 	_mat.shader = AOV
 	var bg: Color = _env.background_color
 	_env.background_color = Color(0, 0, 0)
-	for mode in 2:
+	for mode in 3:
 		_mat.set_shader_parameter("mode", mode)
 		var shots: Array = await _render(views)
 		for i in shots.size():
-			shots[i].save_png(_out.path_join("aov_%s_%d.png" % [["albedo", "light"][mode], i]))
+			var file := _out.path_join("%s_%s_%d" % [name, ["albedo", "light", "ndl"][mode], i])
+			shots[i].save_png(file + ".png")
+			_ppm(shots[i], file + ".ppm")
 	_env.background_color = bg
 	_mat.shader = TRUTH
+
+
+func _ppm(img: Image, path: String) -> void:
+	var x: Image = img.duplicate()
+	x.convert(Image.FORMAT_RGB8)
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_buffer(("P6\n%d %d\n255\n" % [x.get_width(), x.get_height()]).to_ascii_buffer())
+	f.store_buffer(x.get_data())
+	f.close()
+
+
+func _aim(sun: Vector3) -> void:
+	_sun.look_at_from_position(Vector3.ZERO, -sun.normalized(), Vector3.UP)
 
 
 func _orbit_transform(a: Vector2) -> Transform3D:
@@ -149,6 +174,7 @@ func _apply(defect: Dictionary) -> void:
 	for k in defect.get("set", {}):
 		_mat.set_shader_parameter(k, defect.set[k])
 	_sun.shadow_enabled = defect.get("shadow", true)
+	_aim(defect.get("sun", SUN))
 
 
 func _run() -> void:
@@ -165,6 +191,7 @@ func _run() -> void:
 		{"name": "hemisphere swapped", "set": {"sky": Color("#d9c6c8"), "ground": Color("#a9b3ee")}},
 		{"name": "hemisphere as its mean", "set": {"sky": mean, "ground": mean}},
 		{"name": "no shadow", "set": {}, "shadow": false},
+		{"name": "sun moved 8 degrees", "set": {}, "sun": SUN.rotated(Vector3.UP, deg_to_rad(8.0)), "control": true},
 	]
 	DirAccess.make_dir_recursive_absolute(_out)
 	var views := _orbit()
@@ -175,7 +202,7 @@ func _run() -> void:
 	for i in truth.size():
 		truth[i].save_png(_out.path_join("truth_%d.png" % i))
 	if _aov:
-		await _passes(views)
+		await _passes(views, "aov")
 	var summary := []
 	var failed := 0
 	var floor_moved := 0
@@ -186,7 +213,7 @@ func _run() -> void:
 		var mads := []
 		var moved := 0
 		for i in shots.size():
-			var r: Vector2 = _mad(truth[i], shots[i])
+			var r: Vector3 = _mad(truth[i], shots[i])
 			mads.append(r.x)
 			moved += int(r.y)
 			shots[i].save_png(_out.path_join("%s_%d.png" % [d.name.replace(" ", "_"), i]))
@@ -201,11 +228,96 @@ func _run() -> void:
 				", ".join(mads.map(func(x): return "%.2f" % x)), "ok" if ok else "FAIL"])
 		summary.append({"defect": d.name, "planted": var_to_str(d.get("set", {})), "shadow": d.get("shadow", true),
 				"mad": mads, "mean": mean_mad, "pixels_moved": moved, "ok": ok})
+	var fixes := []
+	if _fitter != "":
+		for i in truth.size():
+			_ppm(truth[i], _out.path_join("truth_%d.ppm" % i))
+		for d in defects:
+			var r: Dictionary = await _fix(d, truth_params, truth, views)
+			var want_fixed: bool = not d.get("control", false)
+			var ok: bool = not r.has("error") and r.fixed == want_fixed
+			failed += 0 if ok else 1
+			if r.has("error"):
+				print("fix: %-26s FAIL %s" % [d.name, r.error])
+			else:
+				print("fix: %-26s %-9s shadow %-5s changed %-24s MAD %.4f  moved %d  off by more than one code %d  %s" % [
+						d.name, "fixed" if r.fixed else "not fixed", r.shadow, ",".join(r.changed), r.mad, r.moved,
+						r.beyond, "ok" if ok else "FAIL"])
+			r["ok"] = ok
+			fixes.append(r)
 	var f := FileAccess.open(_out.path_join("summary.json"), FileAccess.WRITE)
-	f.store_string(JSON.stringify({"views": views.map(func(v): return [v.x, v.y]), "defects": summary}, "  "))
+	f.store_string(JSON.stringify({"views": views.map(func(v): return [v.x, v.y]), "defects": summary, "fixes": fixes}, "  "))
 	f.close()
 	print("lab: %d defects, %d failed, renders and summary.json in %s" % [defects.size(), failed, _out])
 	quit(1 if failed > 0 else 0)
+
+
+## The ladder's structure and parameter rungs for one defect. Each shadow state, the one structural switch,
+## gets its reference passes and a fit of the toon parameters to the truth from the defect's own values;
+## the better fit is applied unless it beats the defect's own state by under 1%, then rendered and measured.
+func _fix(d: Dictionary, base: Dictionary, truth: Array, views: Array) -> Dictionary:
+	var start: Dictionary = base.duplicate()
+	start.merge(d.get("set", {}), true)
+	var sun: Vector3 = d.get("sun", SUN)
+	var own: bool = d.get("shadow", true)
+	var fits := {}
+	for shadow in [own, not own]:
+		var key := "port_%s_%d" % ["shadow" if shadow else "flat", absi(hash(sun))]
+		if not _sets.has(key):
+			_apply({"set": start, "shadow": shadow, "sun": sun})
+			await _passes(views, key)
+			_sets[key] = true
+		var out := []
+		var args := PackedStringArray([ProjectSettings.globalize_path(_out), "truth", key, str(views.size())])
+		args.append_array(_start_args(start))
+		var code := OS.execute(_fitter, args, out)
+		var parsed = JSON.parse_string(str(out[0]) if out.size() > 0 else "")
+		if code != 0 or not parsed is Dictionary:
+			return {"defect": d.name, "error": "lighting_fit exited %d: %s" % [code, out]}
+		fits[shadow] = parsed
+	var pick: bool = own
+	if float(fits[not own].f_applied) < 0.99 * float(fits[own].f_applied):
+		pick = not own
+	var r: Dictionary = fits[pick]
+	var fixed: Dictionary = start.duplicate()
+	if "thresholds" in r.changed:
+		fixed.thresholds = Vector3(r.thresholds[0], r.thresholds[1], r.thresholds[2])
+	if "levels" in r.changed:
+		fixed.levels = Vector4(r.levels[0], r.levels[1], r.levels[2], r.levels[3])
+	if "sun_gain" in r.changed:
+		fixed.sun_gain = r.sun_gain
+	if "sky" in r.changed:
+		fixed.sky = Color(r.sky[0], r.sky[1], r.sky[2]).linear_to_srgb()
+	if "ground" in r.changed:
+		fixed.ground = Color(r.ground[0], r.ground[1], r.ground[2]).linear_to_srgb()
+	_apply({"set": fixed, "shadow": pick, "sun": sun})
+	var shots: Array = await _render(views)
+	var mad := 0.0
+	var moved := 0
+	var beyond := 0
+	for i in shots.size():
+		var m: Vector3 = _mad(truth[i], shots[i])
+		mad += m.x / shots.size()
+		moved += int(m.y)
+		beyond += int(m.z)
+		shots[i].save_png(_out.path_join("fixed_%s_%d.png" % [d.name.replace(" ", "_"), i]))
+	var changed: Array = r.changed.duplicate()
+	if pick != own:
+		changed.append("shadow")
+	var px: int = shots.size() * shots[0].get_width() * shots[0].get_height()
+	return {"defect": d.name, "shadow": pick, "changed": changed, "fixed": beyond * 10000 <= px, "mad": mad,
+			"moved": moved, "beyond": beyond, "applied": var_to_str(fixed), "fit": r}
+
+
+func _start_args(p: Dictionary) -> PackedStringArray:
+	var t: Vector3 = p.thresholds
+	var l: Vector4 = p.levels
+	var s: Color = (p.sky as Color).srgb_to_linear()
+	var g: Color = (p.ground as Color).srgb_to_linear()
+	var out := PackedStringArray()
+	for v in [t.x, t.y, t.z, l.x, l.y, l.z, l.w, p.sun_gain, s.r, s.g, s.b, g.r, g.g, g.b]:
+		out.append("%.9f" % v)
+	return out
 
 
 func _gpu() -> void:
@@ -216,8 +328,9 @@ func _gpu() -> void:
 	_pipeline = _rd.compute_pipeline_create(_shader)
 
 
-## Mean absolute difference over RGB in [0, 255], every pixel, and how many pixels differ at all.
-func _mad(a: Image, b: Image) -> Vector2:
+## Mean absolute difference over RGB in [0, 255], every pixel; how many pixels differ at all; and how many
+## differ by more than one code in some channel.
+func _mad(a: Image, b: Image) -> Vector3:
 	var x: Image = a.duplicate()
 	var y: Image = b.duplicate()
 	x.convert(Image.FORMAT_RGBA8)
@@ -226,8 +339,8 @@ func _mad(a: Image, b: Image) -> Vector2:
 	var ba := _rd.storage_buffer_create(n * 4, x.get_data())
 	var bb := _rd.storage_buffer_create(n * 4, y.get_data())
 	var zero := PackedByteArray()
-	zero.resize(16)
-	var bs := _rd.storage_buffer_create(16, zero)
+	zero.resize(20)
+	var bs := _rd.storage_buffer_create(20, zero)
 	var uniforms := []
 	for i in 3:
 		var u := RDUniform.new()
@@ -249,4 +362,4 @@ func _mad(a: Image, b: Image) -> Vector2:
 	var total := sums.decode_u32(0) + sums.decode_u32(4) + sums.decode_u32(8)
 	for r in [set, ba, bb, bs]:
 		_rd.free_rid(r)
-	return Vector2(float(total) / (3.0 * n), float(sums.decode_u32(12)))
+	return Vector3(float(total) / (3.0 * n), float(sums.decode_u32(12)), float(sums.decode_u32(16)))
