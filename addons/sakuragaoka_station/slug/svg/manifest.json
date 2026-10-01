@@ -4,6 +4,7 @@
  "thresholds": {
   "mae": 0.02,
   "cov_1px": 0.99,
+  "applies_to": "residual = d(A,C) (the shipped SVG against the real canvas), plus the determinism precondition",
   "why": [
    "mae = alpha-weighted mean |linear RGB| difference between the real canvas and this SVG, rasterized by the same browser on a CPU-backed canvas. On the 120 port keys correct output scores median 0.0032, p90 0.0083, worst 0.0172 (plaza-bag-logo: small text; Skia draws canvas glyph masks with a contrast/gamma boost, 3-12% heavier in alpha than the true outline). Dropping the text (--ablate text) scores median 0.0665 and fails 52 of the 53 text keys, so 0.02 sits above antialiasing, text gamma and gradient dithering and below missing content.",
    "Scoring raster: the CPU raster dithers gradients and the GPU-drawn originals do not, which adds up to ~0.006 on gradient-heavy keys, equally for stamped and unstamped SVGs. The GPU raster is not used because its rounding of translucent fills depends on the SVG structure (+-3/255 at alpha 0.3 between <use> and plain paths), which would bias the stamping comparison.",
@@ -11,13 +12,16 @@
    "cov_1px = share of alpha>=0.5 pixels in either image that have a covered pixel within 1px in the other image. Strict IoU is reported but not gated, because transparent text-only keys score 0.85-0.95 on it purely from the glyph-mask boost. 0.99 fails missing or shifted shapes: with the text dropped, the three transparent text keys score 0, 0.70 and 0.76."
   ]
  },
- "floors": {
-  "canvas": "the real canvas against itself: an independent second page load (same URL, seed, t=0, font gate); 0 when byte-identical",
-  "svg": "the SVG raster against itself: the same SVG rasterized in the second page (CPU-backed canvas); 0 when byte-identical",
-  "raster": "canvas API vs SVG on content both draw identically, taken from the key itself: its pixel-aligned solid rects, full circles/ellipses (native arc) and text runs (fillText), recorded and emitted by this tool; generic scene (4 pixel-aligned rects, 1 circle, 1 text run) for a key with none",
-  "metric": "the residual metric (alpha-weighted mean |linear RGB|, coverage within 1 px); no blur, masks or threshold changes",
-  "units": "mae is normalised by the weight of the floor scene itself; mae_in_key = the weighted error of the floor divided by the residual weight of the key, the unit the residual is in",
-  "excess": "residual mae minus the largest floor mae_in_key"
+ "verification": {
+  "A": "the real canvas (oracle)",
+  "B": "direct SVG: every recorded call 1:1 in its plainest SVG form at full precision (0.0001 px): fillRect/strokeRect as <rect> in user space + transform, fills as device-space paths, arcs as exact SVG elliptical arcs, strokes in their own user space with exact width/cap/join/miter/dash, linear/radial gradients (userSpaceOnUse + gradientTransform, every stop), globalAlpha as opacity, clips, text as glyph outlines; no stamps, merging, clip lifting, run detection or 0.01 px rounding",
+  "C": "optimized SVG (the shipped file): stamps, rect merging, clip lifting, 0.01 px coordinates, arcs as cubic Beziers",
+  "floor": "d(A,B): the rasterizer’s irreducible canvas-vs-vector difference on the full content of the key",
+  "emitter_error": "d(B,C): what the optimizations add (what later rungs fix)",
+  "residual": "d(A,C): what pass/fail thresholds apply to",
+  "sanity": "residual ~ floor + emitter_error; gap = residual - floor - emitter_error (per pixel |A-C| <= |A-B| + |B-C|, so the gap is <= 0 up to the alpha weighting, and well below 0 when the two differences cancel)",
+  "deterministic": "precondition, not a floor: a second, independent page load reproduces A, the raster of B and the raster of C byte for byte",
+  "metric": "alpha-weighted mean |linear RGB| (mae) and coverage within 1 px; B and C rasterized on a CPU-backed canvas; no blur, masks or threshold changes"
  },
  "run_source": {
   "method": "rng hook: the served source of mulberry32 (ctx.rng), hash2 and hash3 counts calls; every draw records the count",
@@ -139,27 +143,29 @@
     "mae": 0.00953,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00034,
-     "mae_in_key": 0.00034,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 260 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00952,
+    "cov_1px": 1
    },
-   "excess": 0.00919
+   "emitter_error": {
+    "mae": 0.00077,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00953,
+    "floor_plus_emitter": 0.01029,
+    "gap": -0.00076
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 456818,
+    "no_vector_form": {}
+   }
   },
   "env-levee": {
    "file": "env-levee.svg",
@@ -39031,27 +39037,29 @@
     "mae": 0.00562,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00562,
+    "cov_1px": 1
    },
-   "excess": 0.00562
+   "emitter_error": {
+    "mae": 0.00003,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00562,
+    "floor_plus_emitter": 0.00565,
+    "gap": -0.00002
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 578178,
+    "no_vector_form": {}
+   }
   },
   "env-masonry2": {
    "file": "env-masonry2.svg",
@@ -39139,27 +39147,29 @@
     "mae": 0.00263,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00284,
+    "cov_1px": 1
    },
-   "excess": 0.00263
+   "emitter_error": {
+    "mae": 0.00042,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00263,
+    "floor_plus_emitter": 0.00326,
+    "gap": -0.00063
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 146383,
+    "no_vector_form": {}
+   }
   },
   "env-path": {
    "file": "env-path.svg",
@@ -39324,27 +39334,29 @@
     "mae": 0.00574,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00564,
+    "cov_1px": 1
    },
-   "excess": 0.00574
+   "emitter_error": {
+    "mae": 0.00035,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00574,
+    "floor_plus_emitter": 0.00599,
+    "gap": -0.00025
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 743905,
+    "no_vector_form": {}
+   }
   },
   "env-tufts2": {
    "file": "env-tufts2.svg",
@@ -39651,27 +39663,29 @@
     "mae": 0.00193,
     "cov_1px": 0.9999
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00235,
-     "mae_in_key": 0.00004,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 5 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00192,
+    "cov_1px": 0.9999
    },
-   "excess": 0.00189
+   "emitter_error": {
+    "mae": 0.00011,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00193,
+    "floor_plus_emitter": 0.00204,
+    "gap": -0.00011
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 37909,
+    "no_vector_form": {}
+   }
   },
   "env-flowers2": {
    "file": "env-flowers2.svg",
@@ -41292,27 +41306,29 @@
     "mae": 0.00206,
     "cov_1px": 0.99995
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00206,
-     "mae_in_key": 0.00137,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 639 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00217,
+    "cov_1px": 0.99995
    },
-   "excess": 0.00069
+   "emitter_error": {
+    "mae": 0.00096,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00206,
+    "floor_plus_emitter": 0.00313,
+    "gap": -0.00107
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 129896,
+    "no_vector_form": {}
+   }
   },
   "env-mats": {
    "file": "env-mats.svg",
@@ -41440,27 +41456,29 @@
     "mae": 0.00212,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00261,
-     "mae_in_key": 0.00227,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 894 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00218,
+    "cov_1px": 1
    },
-   "excess": -0.00015
+   "emitter_error": {
+    "mae": 0.00146,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00212,
+    "floor_plus_emitter": 0.00364,
+    "gap": -0.00152
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 144782,
+    "no_vector_form": {}
+   }
   },
   "env-reeds2": {
    "file": "env-reeds2.svg",
@@ -41509,27 +41527,29 @@
     "mae": 0.00213,
     "cov_1px": 0.99986
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00137,
-     "mae_in_key": 0.00534,
-     "cov_1px": 1,
-     "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
-    }
+   "floor": {
+    "mae": 0.00211,
+    "cov_1px": 0.99987
    },
-   "excess": -0.00321
+   "emitter_error": {
+    "mae": 0.00029,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00213,
+    "floor_plus_emitter": 0.0024,
+    "gap": -0.00027
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 36625,
+    "no_vector_form": {}
+   }
   },
   "env-field-dry": {
    "file": "env-field-dry.svg",
@@ -41619,27 +41639,29 @@
     "mae": 0.00351,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00349,
+    "cov_1px": 1
    },
-   "excess": 0.00351
+   "emitter_error": {
+    "mae": 0.00012,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00351,
+    "floor_plus_emitter": 0.00362,
+    "gap": -0.00011
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 34548,
+    "no_vector_form": {}
+   }
   },
   "env-field-veg": {
    "file": "env-field-veg.svg",
@@ -41720,27 +41742,29 @@
     "mae": 0.00083,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00163,
-     "mae_in_key": 0.00163,
-     "cov_1px": 1,
-     "scene": "own: 9 rects, 152 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00083,
+    "cov_1px": 1
    },
-   "excess": -0.0008
+   "emitter_error": {
+    "mae": 0.00095,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00083,
+    "floor_plus_emitter": 0.00178,
+    "gap": -0.00096
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 22484,
+    "no_vector_form": {}
+   }
   },
   "env-field-renge": {
    "file": "env-field-renge.svg",
@@ -41821,27 +41845,29 @@
     "mae": 0.00389,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.003,
-     "mae_in_key": 0.003,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 700 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00397,
+    "cov_1px": 1
    },
-   "excess": 0.00089
+   "emitter_error": {
+    "mae": 0.00264,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00389,
+    "floor_plus_emitter": 0.00661,
+    "gap": -0.00272
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 124840,
+    "no_vector_form": {}
+   }
   },
   "env-field-wheat": {
    "file": "env-field-wheat.svg",
@@ -41917,27 +41943,29 @@
     "mae": 0.00063,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 23 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00056,
+    "cov_1px": 1
    },
-   "excess": 0.00063
+   "emitter_error": {
+    "mae": 0.00016,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00063,
+    "floor_plus_emitter": 0.00072,
+    "gap": -0.00009
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 48369,
+    "no_vector_form": {}
+   }
   },
   "env-field-nano": {
    "file": "env-field-nano.svg",
@@ -42018,27 +42046,29 @@
     "mae": 0.0038,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00289,
-     "mae_in_key": 0.00289,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 900 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00424,
+    "cov_1px": 1
    },
-   "excess": 0.00091
+   "emitter_error": {
+    "mae": 0.00306,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0038,
+    "floor_plus_emitter": 0.00731,
+    "gap": -0.00351
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 160406,
+    "no_vector_form": {}
+   }
   },
   "env-field-grass": {
    "file": "env-field-grass.svg",
@@ -42120,27 +42150,29 @@
     "mae": 0.00075,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0002,
-     "mae_in_key": 0.0002,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 40 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00075,
+    "cov_1px": 1
    },
-   "excess": 0.00055
+   "emitter_error": {
+    "mae": 0.00031,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00075,
+    "floor_plus_emitter": 0.00106,
+    "gap": -0.00031
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 60308,
+    "no_vector_form": {}
+   }
   },
   "env-railing": {
    "file": "env-railing.svg",
@@ -42217,27 +42249,29 @@
     "mae": 0,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 15 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0,
+    "floor_plus_emitter": 0,
+    "gap": 0
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1080,
+    "no_vector_form": {}
+   }
   },
   "env-shrub2": {
    "file": "env-shrub2.svg",
@@ -42319,27 +42353,29 @@
     "mae": 0.00241,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00213,
-     "mae_in_key": 0.00213,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 3396 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00271,
+    "cov_1px": 1
    },
-   "excess": 0.00028
+   "emitter_error": {
+    "mae": 0.00188,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00241,
+    "floor_plus_emitter": 0.00459,
+    "gap": -0.00218
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 557046,
+    "no_vector_form": {}
+   }
   },
   "env-facade": {
    "file": "env-facade.svg",
@@ -42416,27 +42452,29 @@
     "mae": 0.0005,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 19 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.0005,
+    "cov_1px": 1
    },
-   "excess": 0.0005
+   "emitter_error": {
+    "mae": 0,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0005,
+    "floor_plus_emitter": 0.0005,
+    "gap": 0
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1620,
+    "no_vector_form": {}
+   }
   },
   "env-school": {
    "file": "env-school.svg",
@@ -42512,27 +42550,29 @@
     "mae": 0,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 52 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00002,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00002,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0,
+    "floor_plus_emitter": 0.00003,
+    "gap": -0.00003
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 6208,
+    "no_vector_form": {}
+   }
   },
   "env-r5-mark": {
    "file": "env-r5-mark.svg",
@@ -42571,27 +42611,29 @@
     "mae": 0.00595,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00595,
-     "mae_in_key": 0.00595,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 1 text runs"
-    }
+   "floor": {
+    "mae": 0.00598,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00007,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00595,
+    "floor_plus_emitter": 0.00605,
+    "gap": -0.0001
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 9142,
+    "no_vector_form": {}
+   }
   },
   "env-levee-sign": {
    "file": "env-levee-sign.svg",
@@ -44049,27 +44091,29 @@
     "mae": 0.00512,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00427,
-     "mae_in_key": 0.00427,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 14 circles/ellipses, 4 text runs (4 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00506,
+    "cov_1px": 1
    },
-   "excess": 0.00085
+   "emitter_error": {
+    "mae": 0.00019,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00512,
+    "floor_plus_emitter": 0.00525,
+    "gap": -0.00013
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 163138,
+    "no_vector_form": {}
+   }
   },
   "env-km-3.4": {
    "file": "env-km-3.4.svg",
@@ -44108,27 +44152,29 @@
     "mae": 0.00683,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00683,
-     "mae_in_key": 0.00683,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00683,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00004,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00683,
+    "floor_plus_emitter": 0.00687,
+    "gap": -0.00004
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 7044,
+    "no_vector_form": {}
+   }
   },
   "env-km-3.2": {
    "file": "env-km-3.2.svg",
@@ -44167,27 +44213,29 @@
     "mae": 0.0066,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0066,
-     "mae_in_key": 0.0066,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.0066,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00004,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0066,
+    "floor_plus_emitter": 0.00664,
+    "gap": -0.00004
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 7439,
+    "no_vector_form": {}
+   }
   },
   "env-notice": {
    "file": "env-notice.svg",
@@ -44228,27 +44276,29 @@
     "mae": 0.00589,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00589,
-     "mae_in_key": 0.00589,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00587,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00013,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00589,
+    "floor_plus_emitter": 0.00601,
+    "gap": -0.00012
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 62158,
+    "no_vector_form": {}
+   }
   },
   "env-bridge-plate": {
    "file": "env-bridge-plate.svg",
@@ -44287,27 +44337,29 @@
     "mae": 0.00996,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00996,
-     "mae_in_key": 0.00996,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00995,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00008,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00996,
+    "floor_plus_emitter": 0.01003,
+    "gap": -0.00007
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 29595,
+    "no_vector_form": {}
+   }
   },
   "env-park-sign": {
    "file": "env-park-sign.svg",
@@ -44876,27 +44928,29 @@
     "mae": 0.0083,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00693,
-     "mae_in_key": 0.00693,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs (3 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00831,
+    "cov_1px": 1
    },
-   "excess": 0.00138
+   "emitter_error": {
+    "mae": 0.00005,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0083,
+    "floor_plus_emitter": 0.00836,
+    "gap": -0.00005
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 77698,
+    "no_vector_form": {}
+   }
   },
   "env-allot-sign": {
    "file": "env-allot-sign.svg",
@@ -44942,27 +44996,29 @@
     "mae": 0.00545,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00727,
-     "mae_in_key": 0.00541,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00546,
+    "cov_1px": 1
    },
-   "excess": 0.00004
+   "emitter_error": {
+    "mae": 0.00017,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00545,
+    "floor_plus_emitter": 0.00563,
+    "gap": -0.00019
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 51305,
+    "no_vector_form": {}
+   }
   },
   "env-parking-sign": {
    "file": "env-parking-sign.svg",
@@ -45008,27 +45064,29 @@
     "mae": 0.00365,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00587,
-     "mae_in_key": 0.00361,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00364,
+    "cov_1px": 1
    },
-   "excess": 0.00004
+   "emitter_error": {
+    "mae": 0.00007,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00365,
+    "floor_plus_emitter": 0.00371,
+    "gap": -0.00006
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 52420,
+    "no_vector_form": {}
+   }
   },
   "env-sale-sign": {
    "file": "env-sale-sign.svg",
@@ -45074,27 +45132,29 @@
     "mae": 0.0029,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00582,
-     "mae_in_key": 0.00289,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.0029,
+    "cov_1px": 1
    },
-   "excess": 0.00001
+   "emitter_error": {
+    "mae": 0.00006,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0029,
+    "floor_plus_emitter": 0.00297,
+    "gap": -0.00007
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 36996,
+    "no_vector_form": {}
+   }
   },
   "st-concrete": {
    "file": "st-concrete.svg",
@@ -45395,27 +45455,29 @@
     "mae": 0.00759,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00788,
-     "mae_in_key": 0.00788,
-     "cov_1px": 1,
-     "scene": "own: 6 rects, 1364 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00758,
+    "cov_1px": 1
    },
-   "excess": -0.00029
+   "emitter_error": {
+    "mae": 0.00022,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00759,
+    "floor_plus_emitter": 0.00781,
+    "gap": -0.00022
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 407421,
+    "no_vector_form": {}
+   }
   },
   "st-tactile-dot": {
    "file": "st-tactile-dot.svg",
@@ -45496,27 +45558,29 @@
     "mae": 0.00181,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00181,
-     "mae_in_key": 0.00181,
-     "cov_1px": 1,
-     "scene": "own: 3 rects, 75 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00207,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00118,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00181,
+    "floor_plus_emitter": 0.00325,
+    "gap": -0.00143
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 9098,
+    "no_vector_form": {}
+   }
   },
   "st-tactile-line": {
    "file": "st-tactile-line.svg",
@@ -45599,27 +45663,29 @@
     "mae": 0.0005,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00001,
-     "mae_in_key": 0.00001,
-     "cov_1px": 1,
-     "scene": "own: 7 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00048,
+    "cov_1px": 1
    },
-   "excess": 0.00049
+   "emitter_error": {
+    "mae": 0.00021,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0005,
+    "floor_plus_emitter": 0.00069,
+    "gap": -0.00019
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1794,
+    "no_vector_form": {}
+   }
   },
   "st-floor": {
    "file": "st-floor.svg",
@@ -45700,27 +45766,29 @@
     "mae": 0.00131,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00122,
-     "mae_in_key": 0.00122,
-     "cov_1px": 1,
-     "scene": "own: 82 rects, 26 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.0013,
+    "cov_1px": 1
    },
-   "excess": 0.00009
+   "emitter_error": {
+    "mae": 0.00008,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00131,
+    "floor_plus_emitter": 0.00138,
+    "gap": -0.00007
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 53647,
+    "no_vector_form": {}
+   }
   },
   "st-plaster": {
    "file": "st-plaster.svg",
@@ -45888,27 +45956,29 @@
     "mae": 0.00599,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00587,
-     "mae_in_key": 0.00587,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 540 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00596,
+    "cov_1px": 1
    },
-   "excess": 0.00012
+   "emitter_error": {
+    "mae": 0.00024,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00599,
+    "floor_plus_emitter": 0.0062,
+    "gap": -0.00021
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 179085,
+    "no_vector_form": {}
+   }
   },
   "st-stone": {
    "file": "st-stone.svg",
@@ -45984,27 +46054,29 @@
     "mae": 0.00015,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00008,
-     "mae_in_key": 0.00008,
-     "cov_1px": 1,
-     "scene": "own: 97 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00015,
+    "cov_1px": 1
    },
-   "excess": 0.00007
+   "emitter_error": {
+    "mae": 0.00001,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00015,
+    "floor_plus_emitter": 0.00016,
+    "gap": -0.00001
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 49808,
+    "no_vector_form": {}
+   }
   },
   "st-paving": {
    "file": "st-paving.svg",
@@ -46085,27 +46157,29 @@
     "mae": 0.00188,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00054,
-     "mae_in_key": 0.00054,
-     "cov_1px": 1,
-     "scene": "own: 16 rects, 30 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00187,
+    "cov_1px": 1
    },
-   "excess": 0.00134
+   "emitter_error": {
+    "mae": 0.00008,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00188,
+    "floor_plus_emitter": 0.00194,
+    "gap": -0.00007
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 12337,
+    "no_vector_form": {}
+   }
   },
   "st-rubber": {
    "file": "st-rubber.svg",
@@ -46181,27 +46255,29 @@
     "mae": 0.00006,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 20 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00006,
+    "cov_1px": 1
    },
-   "excess": 0.00006
+   "emitter_error": {
+    "mae": 0,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00006,
+    "floor_plus_emitter": 0.00006,
+    "gap": 0
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 16282,
+    "no_vector_form": {}
+   }
   },
   "st-gravel": {
    "file": "st-gravel.svg",
@@ -46283,27 +46359,29 @@
     "mae": 0.00332,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00428,
-     "mae_in_key": 0.00428,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 12600 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00345,
+    "cov_1px": 1
    },
-   "excess": -0.00096
+   "emitter_error": {
+    "mae": 0.00185,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00332,
+    "floor_plus_emitter": 0.0053,
+    "gap": -0.00198
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 2627956,
+    "no_vector_form": {}
+   }
   },
   "st-grass": {
    "file": "st-grass.svg",
@@ -46407,27 +46485,29 @@
     "mae": 0.00297,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00208,
-     "mae_in_key": 0.00208,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 630 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00292,
+    "cov_1px": 1
    },
-   "excess": 0.0009
+   "emitter_error": {
+    "mae": 0.00078,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00297,
+    "floor_plus_emitter": 0.00371,
+    "gap": -0.00074
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 266838,
+    "no_vector_form": {}
+   }
   },
   "st-soil": {
    "file": "st-soil.svg",
@@ -46504,27 +46584,29 @@
     "mae": 0.00033,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00033,
+    "cov_1px": 1
    },
-   "excess": 0.00033
+   "emitter_error": {
+    "mae": 0.00008,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00033,
+    "floor_plus_emitter": 0.00041,
+    "gap": -0.00008
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 76939,
+    "no_vector_form": {}
+   }
   },
   "st-streaks": {
    "file": "st-streaks.svg",
@@ -46602,27 +46684,29 @@
     "mae": 0.00346,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00211,
-     "mae_in_key": 0.01206,
-     "cov_1px": 1,
-     "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
-    }
+   "floor": {
+    "mae": 0.00348,
+    "cov_1px": 1
    },
-   "excess": -0.0086
+   "emitter_error": {
+    "mae": 0.00027,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00346,
+    "floor_plus_emitter": 0.00374,
+    "gap": -0.00029
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 12527,
+    "no_vector_form": {}
+   }
   },
   "st-wiremesh": {
    "file": "st-wiremesh.svg",
@@ -46719,27 +46803,29 @@
     "mae": 0,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00288,
-     "mae_in_key": 0.01338,
-     "cov_1px": 1,
-     "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
-    }
+   "floor": {
+    "mae": 0,
+    "cov_1px": 1
    },
-   "excess": -0.01338
+   "emitter_error": {
+    "mae": 0,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0,
+    "floor_plus_emitter": 0,
+    "gap": 0
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1130,
+    "no_vector_form": {}
+   }
   },
   "st-grime": {
    "file": "st-grime.svg",
@@ -46822,27 +46908,29 @@
     "mae": 0.00358,
     "cov_1px": 0.99944
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00454,
-     "mae_in_key": 0.00079,
-     "cov_1px": 0.98291,
-     "scene": "own: 0 rects, 60 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00359,
+    "cov_1px": 0.99944
    },
-   "excess": 0.00279
+   "emitter_error": {
+    "mae": 0.00043,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00358,
+    "floor_plus_emitter": 0.00403,
+    "gap": -0.00044
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 12438,
+    "no_vector_form": {}
+   }
   },
   "st-atlas-signs": {
    "file": "st-atlas-signs.svg",
@@ -46895,27 +46983,29 @@
     "mae": 0.0035,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00749,
-     "mae_in_key": 0.00339,
-     "cov_1px": 1,
-     "scene": "own: 11 rects, 2 circles/ellipses, 68 text runs (64 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00351,
+    "cov_1px": 1
    },
-   "excess": 0.0001
+   "emitter_error": {
+    "mae": 0.00008,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0035,
+    "floor_plus_emitter": 0.00359,
+    "gap": -0.00009
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 326796,
+    "no_vector_form": {}
+   }
   },
   "st-atlas-facade": {
    "file": "st-atlas-facade.svg",
@@ -47398,27 +47488,29 @@
     "mae": 0.00586,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00595,
-     "mae_in_key": 0.00556,
-     "cov_1px": 1,
-     "scene": "own: 51 rects, 17 circles/ellipses, 74 text runs (72 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00586,
+    "cov_1px": 1
    },
-   "excess": 0.00031
+   "emitter_error": {
+    "mae": 0.00013,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00586,
+    "floor_plus_emitter": 0.00599,
+    "gap": -0.00013
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 382909,
+    "no_vector_form": {}
+   }
   },
   "st-atlas-misc": {
    "file": "st-atlas-misc.svg",
@@ -47604,27 +47696,32 @@
     "mae": 0.00509,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00584,
-     "mae_in_key": 0.00481,
-     "cov_1px": 1,
-     "scene": "own: 35 rects, 20 circles/ellipses, 45 text runs (41 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00507,
+    "cov_1px": 1
    },
-   "excess": 0.00028
+   "emitter_error": {
+    "mae": 0.00016,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00509,
+    "floor_plus_emitter": 0.00524,
+    "gap": -0.00015
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 445933,
+    "no_vector_form": {},
+    "notes": {
+     "approximated: synthetic bold as an outline stroke": 2
+    }
+   }
   },
   "st-atlas-posters": {
    "file": "st-atlas-posters.svg",
@@ -48145,27 +48242,29 @@
     "mae": 0.00445,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00399,
-     "mae_in_key": 0.00335,
-     "cov_1px": 1,
-     "scene": "own: 45 rects, 353 circles/ellipses, 58 text runs (50 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00453,
+    "cov_1px": 1
    },
-   "excess": 0.0011
+   "emitter_error": {
+    "mae": 0.00063,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00445,
+    "floor_plus_emitter": 0.00515,
+    "gap": -0.00071
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 717015,
+    "no_vector_form": {}
+   }
   },
   "st-atlas-boards": {
    "file": "st-atlas-boards.svg",
@@ -49036,27 +49135,32 @@
     "mae": 0.00546,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00401,
-     "mae_in_key": 0.00381,
-     "cov_1px": 1,
-     "scene": "own: 23 rects, 76 circles/ellipses, 93 text runs (91 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00547,
+    "cov_1px": 1
    },
-   "excess": 0.00164
+   "emitter_error": {
+    "mae": 0.00047,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00546,
+    "floor_plus_emitter": 0.00594,
+    "gap": -0.00049
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 845220,
+    "no_vector_form": {},
+    "notes": {
+     "approximated: synthetic bold as an outline stroke": 8
+    }
+   }
   },
   "st-atlas-info": {
    "file": "st-atlas-info.svg",
@@ -49233,27 +49337,29 @@
     "mae": 0.00577,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00528,
-     "mae_in_key": 0.00528,
-     "cov_1px": 1,
-     "scene": "own: 22 rects, 171 circles/ellipses, 290 text runs (285 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00576,
+    "cov_1px": 1
    },
-   "excess": 0.00049
+   "emitter_error": {
+    "mae": 0.00042,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00577,
+    "floor_plus_emitter": 0.00619,
+    "gap": -0.00041
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 973320,
+    "no_vector_form": {}
+   }
   },
   "st-atlas-tvm": {
    "file": "st-atlas-tvm.svg",
@@ -49420,27 +49526,29 @@
     "mae": 0.00543,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00437,
-     "mae_in_key": 0.00437,
-     "cov_1px": 1,
-     "scene": "own: 11 rects, 13 circles/ellipses, 33 text runs (33 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00546,
+    "cov_1px": 1
    },
-   "excess": 0.00106
+   "emitter_error": {
+    "mae": 0.00028,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00543,
+    "floor_plus_emitter": 0.00574,
+    "gap": -0.00031
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 195631,
+    "no_vector_form": {}
+   }
   },
   "st-atlas-foliage": {
    "file": "st-atlas-foliage.svg",
@@ -50774,27 +50882,29 @@
     "mae": 0.00168,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00182,
-     "mae_in_key": 0.0008,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 415 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00172,
+    "cov_1px": 1
    },
-   "excess": 0.00088
+   "emitter_error": {
+    "mae": 0.00073,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00168,
+    "floor_plus_emitter": 0.00245,
+    "gap": -0.00077
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 102349,
+    "no_vector_form": {}
+   }
   },
   "st-atlas-int": {
    "file": "st-atlas-int.svg",
@@ -51864,27 +51974,32 @@
     "mae": 0.00764,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00739,
-     "mae_in_key": 0.00682,
-     "cov_1px": 1,
-     "scene": "own: 159 rects, 99 circles/ellipses, 197 text runs (185 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00751,
+    "cov_1px": 1
    },
-   "excess": 0.00082
+   "emitter_error": {
+    "mae": 0.00048,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00764,
+    "floor_plus_emitter": 0.00799,
+    "gap": -0.00034
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1425695,
+    "no_vector_form": {},
+    "notes": {
+     "approximated: synthetic bold as an outline stroke": 8
+    }
+   }
   },
   "st-pool": {
    "file": "st-pool.svg",
@@ -51921,27 +52036,29 @@
     "mae": 0.00342,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00288,
-     "mae_in_key": 0.01162,
-     "cov_1px": 1,
-     "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
-    }
+   "floor": {
+    "mae": 0.00342,
+    "cov_1px": 1
    },
-   "excess": -0.0082
+   "emitter_error": {
+    "mae": 0,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00342,
+    "floor_plus_emitter": 0.00342,
+    "gap": 0
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 576,
+    "no_vector_form": {}
+   }
   },
   "st-cork": {
    "file": "st-cork.svg",
@@ -52018,27 +52135,29 @@
     "mae": 0.00093,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00091,
+    "cov_1px": 1
    },
-   "excess": 0.00093
+   "emitter_error": {
+    "mae": 0.00022,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00093,
+    "floor_plus_emitter": 0.00113,
+    "gap": -0.0002
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 155904,
+    "no_vector_form": {}
+   }
   },
   "st-grain": {
    "file": "st-grain.svg",
@@ -52632,27 +52751,29 @@
     "mae": 0.0026,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00261,
+    "cov_1px": 1
    },
-   "excess": 0.0026
+   "emitter_error": {
+    "mae": 0.00001,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0026,
+    "floor_plus_emitter": 0.00261,
+    "gap": -0.00001
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 24194,
+    "no_vector_form": {}
+   }
   },
   "plaza-tiles": {
    "file": "plaza-tiles.svg",
@@ -52796,27 +52917,29 @@
     "mae": 0.00249,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 4 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00233,
+    "cov_1px": 1
    },
-   "excess": 0.00249
+   "emitter_error": {
+    "mae": 0.0006,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00249,
+    "floor_plus_emitter": 0.00293,
+    "gap": -0.00044
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 371112,
+    "no_vector_form": {}
+   }
   },
   "plaza-granite": {
    "file": "plaza-granite.svg",
@@ -52916,27 +53039,29 @@
     "mae": 0.002,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00191,
+    "cov_1px": 1
    },
-   "excess": 0.002
+   "emitter_error": {
+    "mae": 0.00047,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.002,
+    "floor_plus_emitter": 0.00238,
+    "gap": -0.00037
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 576972,
+    "no_vector_form": {}
+   }
   },
   "plaza-curb": {
    "file": "plaza-curb.svg",
@@ -53019,27 +53144,29 @@
     "mae": 0.00178,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00172,
+    "cov_1px": 1
    },
-   "excess": 0.00178
+   "emitter_error": {
+    "mae": 0.00031,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00178,
+    "floor_plus_emitter": 0.00203,
+    "gap": -0.00025
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 78066,
+    "no_vector_form": {}
+   }
   },
   "plaza-circle": {
    "file": "plaza-circle.svg",
@@ -53241,27 +53368,29 @@
     "mae": 0.00063,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 11 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00063,
+    "cov_1px": 1
    },
-   "excess": 0.00063
+   "emitter_error": {
+    "mae": 0.00003,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00063,
+    "floor_plus_emitter": 0.00066,
+    "gap": -0.00003
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 115833,
+    "no_vector_form": {}
+   }
   },
   "plaza-brick": {
    "file": "plaza-brick.svg",
@@ -53352,27 +53481,29 @@
     "mae": 0.00162,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00109,
+    "cov_1px": 1
    },
-   "excess": 0.00162
+   "emitter_error": {
+    "mae": 0.00076,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00162,
+    "floor_plus_emitter": 0.00185,
+    "gap": -0.00023
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 9896,
+    "no_vector_form": {}
+   }
   },
   "plaza-concrete": {
    "file": "plaza-concrete.svg",
@@ -53456,27 +53587,29 @@
     "mae": 0.00189,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00187,
+    "cov_1px": 1
    },
-   "excess": 0.00189
+   "emitter_error": {
+    "mae": 0.00013,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00189,
+    "floor_plus_emitter": 0.00201,
+    "gap": -0.00011
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 89729,
+    "no_vector_form": {}
+   }
   },
   "plaza-wood": {
    "file": "plaza-wood.svg",
@@ -53701,27 +53834,29 @@
     "mae": 0.00191,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00003,
-     "mae_in_key": 0.00003,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 2 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00191,
+    "cov_1px": 1
    },
-   "excess": 0.00188
+   "emitter_error": {
+    "mae": 0.00004,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00191,
+    "floor_plus_emitter": 0.00195,
+    "gap": -0.00004
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 2898,
+    "no_vector_form": {}
+   }
   },
   "plaza-soil": {
    "file": "plaza-soil.svg",
@@ -53804,27 +53939,29 @@
     "mae": 0.00098,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00097,
+    "cov_1px": 1
    },
-   "excess": 0.00098
+   "emitter_error": {
+    "mae": 0.00016,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00098,
+    "floor_plus_emitter": 0.00113,
+    "gap": -0.00016
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 156413,
+    "no_vector_form": {}
+   }
   },
   "plaza-leafy": {
    "file": "plaza-leafy.svg",
@@ -53905,27 +54042,29 @@
     "mae": 0.00104,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00116,
-     "mae_in_key": 0.00116,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 360 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00106,
+    "cov_1px": 1
    },
-   "excess": -0.00011
+   "emitter_error": {
+    "mae": 0.00041,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00104,
+    "floor_plus_emitter": 0.00148,
+    "gap": -0.00043
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 80997,
+    "no_vector_form": {}
+   }
   },
   "plaza-azalea": {
    "file": "plaza-azalea.svg",
@@ -54007,27 +54146,29 @@
     "mae": 0.0018,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00156,
-     "mae_in_key": 0.00156,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 464 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00194,
+    "cov_1px": 1
    },
-   "excess": 0.00024
+   "emitter_error": {
+    "mae": 0.0013,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0018,
+    "floor_plus_emitter": 0.00324,
+    "gap": -0.00144
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 94297,
+    "no_vector_form": {}
+   }
   },
   "plaza-tactile-dots": {
    "file": "plaza-tactile-dots.svg",
@@ -54129,27 +54270,29 @@
     "mae": 0.00183,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.001,
-     "mae_in_key": 0.001,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 50 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00217,
+    "cov_1px": 1
    },
-   "excess": 0.00083
+   "emitter_error": {
+    "mae": 0.00086,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00183,
+    "floor_plus_emitter": 0.00303,
+    "gap": -0.0012
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 6846,
+    "no_vector_form": {}
+   }
   },
   "plaza-tactile-barsV": {
    "file": "plaza-tactile-barsV.svg",
@@ -54256,27 +54399,29 @@
     "mae": 0.00119,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00131,
+    "cov_1px": 1
    },
-   "excess": 0.00119
+   "emitter_error": {
+    "mae": 0.00014,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00119,
+    "floor_plus_emitter": 0.00145,
+    "gap": -0.00026
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1770,
+    "no_vector_form": {}
+   }
   },
   "plaza-tactile-barsU": {
    "file": "plaza-tactile-barsU.svg",
@@ -54383,27 +54528,29 @@
     "mae": 0.00118,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.0013,
+    "cov_1px": 1
    },
-   "excess": 0.00118
+   "emitter_error": {
+    "mae": 0.00014,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00118,
+    "floor_plus_emitter": 0.00144,
+    "gap": -0.00025
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1774,
+    "no_vector_form": {}
+   }
   },
   "plaza-inlay": {
    "file": "plaza-inlay.svg",
@@ -54581,27 +54728,29 @@
     "mae": 0.00123,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0004,
-     "mae_in_key": 0.00003,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 8 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00122,
+    "cov_1px": 1
    },
-   "excess": 0.0012
+   "emitter_error": {
+    "mae": 0.0001,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00123,
+    "floor_plus_emitter": 0.00132,
+    "gap": -0.00009
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 85598,
+    "no_vector_form": {}
+   }
   },
   "plaza-dust": {
    "file": "plaza-dust.svg",
@@ -54683,27 +54832,29 @@
     "mae": 0.00096,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00073,
+    "cov_1px": 1
    },
-   "excess": 0.00096
+   "emitter_error": {
+    "mae": 0.00073,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00096,
+    "floor_plus_emitter": 0.00146,
+    "gap": -0.0005
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 6063,
+    "no_vector_form": {}
+   }
   },
   "plaza-moss": {
    "file": "plaza-moss.svg",
@@ -54784,27 +54935,29 @@
     "mae": 0.00174,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00159,
-     "mae_in_key": 0.00159,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 40 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00187,
+    "cov_1px": 1
    },
-   "excess": 0.00015
+   "emitter_error": {
+    "mae": 0.00203,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00174,
+    "floor_plus_emitter": 0.0039,
+    "gap": -0.00217
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 7199,
+    "no_vector_form": {}
+   }
   },
   "plaza-grass": {
    "file": "plaza-grass.svg",
@@ -54844,27 +54997,29 @@
     "mae": 0.00125,
     "cov_1px": 0.99976
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00211,
-     "mae_in_key": 0.00818,
-     "cov_1px": 1,
-     "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
-    }
+   "floor": {
+    "mae": 0.00126,
+    "cov_1px": 0.99976
    },
-   "excess": -0.00693
+   "emitter_error": {
+    "mae": 0.00043,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00125,
+    "floor_plus_emitter": 0.00169,
+    "gap": -0.00044
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 2392,
+    "no_vector_form": {}
+   }
   },
   "plaza-daisy": {
    "file": "plaza-daisy.svg",
@@ -54945,27 +55100,29 @@
     "mae": 0.00146,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.003,
-     "mae_in_key": 0.00301,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 16 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00136,
+    "cov_1px": 1
    },
-   "excess": -0.00154
+   "emitter_error": {
+    "mae": 0.0016,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00146,
+    "floor_plus_emitter": 0.00296,
+    "gap": -0.0015
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 2487,
+    "no_vector_form": {}
+   }
   },
   "plaza-pansy": {
    "file": "plaza-pansy.svg",
@@ -55047,27 +55204,29 @@
     "mae": 0.00122,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0014,
-     "mae_in_key": 0.0014,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 7 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00145,
+    "cov_1px": 1
    },
-   "excess": -0.00019
+   "emitter_error": {
+    "mae": 0.00129,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00122,
+    "floor_plus_emitter": 0.00274,
+    "gap": -0.00152
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1187,
+    "no_vector_form": {}
+   }
   },
   "plaza-tiny": {
    "file": "plaza-tiny.svg",
@@ -55150,27 +55309,29 @@
     "mae": 0.00175,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00521,
-     "mae_in_key": 0.00526,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 49 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00224,
+    "cov_1px": 1
    },
-   "excess": -0.00351
+   "emitter_error": {
+    "mae": 0.00172,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00175,
+    "floor_plus_emitter": 0.00396,
+    "gap": -0.00221
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 9277,
+    "no_vector_form": {}
+   }
   },
   "plaza-dandelion": {
    "file": "plaza-dandelion.svg",
@@ -55251,27 +55412,29 @@
     "mae": 0.00122,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00286,
-     "mae_in_key": 0.00287,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 47 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00116,
+    "cov_1px": 1
    },
-   "excess": -0.00166
+   "emitter_error": {
+    "mae": 0.001,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00122,
+    "floor_plus_emitter": 0.00215,
+    "gap": -0.00094
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 6793,
+    "no_vector_form": {}
+   }
   },
   "plaza-leafclump": {
    "file": "plaza-leafclump.svg",
@@ -55375,27 +55538,29 @@
     "mae": 0.00113,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00074,
-     "mae_in_key": 0.00074,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 16 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00118,
+    "cov_1px": 1
    },
-   "excess": 0.00039
+   "emitter_error": {
+    "mae": 0.00052,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00113,
+    "floor_plus_emitter": 0.0017,
+    "gap": -0.00057
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 6936,
+    "no_vector_form": {}
+   }
   },
   "plaza-rosette": {
    "file": "plaza-rosette.svg",
@@ -55477,27 +55642,29 @@
     "mae": 0.00097,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00288,
-     "mae_in_key": 0.01147,
-     "cov_1px": 1,
-     "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
-    }
+   "floor": {
+    "mae": 0.00097,
+    "cov_1px": 1
    },
-   "excess": -0.0105
+   "emitter_error": {
+    "mae": 0.00001,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00097,
+    "floor_plus_emitter": 0.00098,
+    "gap": -0.00001
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1503,
+    "no_vector_form": {}
+   }
   },
   "plaza-map": {
    "file": "plaza-map.svg",
@@ -55932,27 +56099,29 @@
     "mae": 0.00356,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00247,
-     "mae_in_key": 0.00247,
-     "cov_1px": 1,
-     "scene": "own: 5 rects, 335 circles/ellipses, 54 text runs (54 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00325,
+    "cov_1px": 1
    },
-   "excess": 0.00108
+   "emitter_error": {
+    "mae": 0.00056,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00356,
+    "floor_plus_emitter": 0.00381,
+    "gap": -0.00025
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 404867,
+    "no_vector_form": {}
+   }
   },
   "plaza-guide": {
    "file": "plaza-guide.svg",
@@ -55993,27 +56162,29 @@
     "mae": 0.00573,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00573,
-     "mae_in_key": 0.00573,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 8 circles/ellipses, 10 text runs (10 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00573,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00014,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00573,
+    "floor_plus_emitter": 0.00587,
+    "gap": -0.00014
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 151563,
+    "no_vector_form": {}
+   }
   },
   "plaza-tourist": {
    "file": "plaza-tourist.svg",
@@ -56196,27 +56367,29 @@
     "mae": 0.00425,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00468,
-     "mae_in_key": 0.00468,
-     "cov_1px": 1,
-     "scene": "own: 7 rects, 187 circles/ellipses, 29 text runs (29 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00429,
+    "cov_1px": 1
    },
-   "excess": -0.00043
+   "emitter_error": {
+    "mae": 0.0002,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00425,
+    "floor_plus_emitter": 0.0045,
+    "gap": -0.00024
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 430031,
+    "no_vector_form": {}
+   }
   },
   "plaza-notice": {
    "file": "plaza-notice.svg",
@@ -56496,27 +56669,29 @@
     "mae": 0.00561,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00368,
-     "mae_in_key": 0.00368,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 105 circles/ellipses, 46 text runs (46 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00561,
+    "cov_1px": 1
    },
-   "excess": 0.00194
+   "emitter_error": {
+    "mae": 0.00022,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00561,
+    "floor_plus_emitter": 0.00583,
+    "gap": -0.00022
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 812002,
+    "no_vector_form": {}
+   }
   },
   "plaza-notice-hdr": {
    "file": "plaza-notice-hdr.svg",
@@ -56559,27 +56734,29 @@
     "mae": 0.01187,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.01134,
-     "mae_in_key": 0.01134,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 1 text runs (1 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.01186,
+    "cov_1px": 1
    },
-   "excess": 0.00053
+   "emitter_error": {
+    "mae": 0.0001,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.01187,
+    "floor_plus_emitter": 0.01196,
+    "gap": -0.0001
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 20603,
+    "no_vector_form": {}
+   }
   },
   "plaza-busround": {
    "file": "plaza-busround.svg",
@@ -56621,27 +56798,29 @@
     "mae": 0.00387,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00387,
-     "mae_in_key": 0.00387,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 1 circles/ellipses, 4 text runs (4 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00396,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00031,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00387,
+    "floor_plus_emitter": 0.00427,
+    "gap": -0.0004
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 52355,
+    "no_vector_form": {}
+   }
   },
   "plaza-bustable": {
    "file": "plaza-bustable.svg",
@@ -56684,27 +56863,29 @@
     "mae": 0.00931,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00929,
-     "mae_in_key": 0.00929,
-     "cov_1px": 1,
-     "scene": "own: 19 rects, 0 circles/ellipses, 54 text runs (54 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00931,
+    "cov_1px": 1
    },
-   "excess": 0.00003
+   "emitter_error": {
+    "mae": 0.00013,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00931,
+    "floor_plus_emitter": 0.00944,
+    "gap": -0.00013
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 197147,
+    "no_vector_form": {}
+   }
   },
   "plaza-shelter-fascia": {
    "file": "plaza-shelter-fascia.svg",
@@ -56748,27 +56929,29 @@
     "mae": 0.00407,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0035,
-     "mae_in_key": 0.0035,
-     "cov_1px": 1,
-     "scene": "own: 3 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00412,
+    "cov_1px": 1
    },
-   "excess": 0.00057
+   "emitter_error": {
+    "mae": 0.00014,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00407,
+    "floor_plus_emitter": 0.00426,
+    "gap": -0.00019
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 38505,
+    "no_vector_form": {}
+   }
   },
   "plaza-shelter-ad": {
    "file": "plaza-shelter-ad.svg",
@@ -56877,27 +57060,29 @@
     "mae": 0.00318,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00057,
-     "mae_in_key": 0.00016,
-     "cov_1px": 0.99999,
-     "scene": "own: 12 rects, 36 circles/ellipses, 5 text runs"
-    }
+   "floor": {
+    "mae": 0.00319,
+    "cov_1px": 1
    },
-   "excess": 0.00302
+   "emitter_error": {
+    "mae": 0.00029,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00318,
+    "floor_plus_emitter": 0.00348,
+    "gap": -0.00029
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 70264,
+    "no_vector_form": {}
+   }
   },
   "plaza-routemap": {
    "file": "plaza-routemap.svg",
@@ -56943,27 +57128,29 @@
     "mae": 0.00564,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00497,
-     "mae_in_key": 0.00497,
-     "cov_1px": 1,
-     "scene": "own: 4 rects, 8 circles/ellipses, 12 text runs (12 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00564,
+    "cov_1px": 1
    },
-   "excess": 0.00068
+   "emitter_error": {
+    "mae": 0.00035,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00564,
+    "floor_plus_emitter": 0.00599,
+    "gap": -0.00035
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 83795,
+    "no_vector_form": {}
+   }
   },
   "plaza-taxi": {
    "file": "plaza-taxi.svg",
@@ -57009,27 +57196,29 @@
     "mae": 0.00469,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00434,
-     "mae_in_key": 0.00434,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs (3 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00464,
+    "cov_1px": 1
    },
-   "excess": 0.00035
+   "emitter_error": {
+    "mae": 0.00012,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00469,
+    "floor_plus_emitter": 0.00476,
+    "gap": -0.00007
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 12147,
+    "no_vector_form": {}
+   }
   },
   "plaza-bikesign": {
    "file": "plaza-bikesign.svg",
@@ -57079,27 +57268,29 @@
     "mae": 0.00424,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0038,
-     "mae_in_key": 0.0038,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00438,
+    "cov_1px": 1
    },
-   "excess": 0.00044
+   "emitter_error": {
+    "mae": 0.00044,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00424,
+    "floor_plus_emitter": 0.00482,
+    "gap": -0.00058
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 28224,
+    "no_vector_form": {}
+   }
   },
   "plaza-bikenotice": {
    "file": "plaza-bikenotice.svg",
@@ -57149,27 +57340,29 @@
     "mae": 0.00733,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00671,
-     "mae_in_key": 0.00671,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 6 text runs (6 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00744,
+    "cov_1px": 1
    },
-   "excess": 0.00061
+   "emitter_error": {
+    "mae": 0.00053,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00733,
+    "floor_plus_emitter": 0.00797,
+    "gap": -0.00064
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 57338,
+    "no_vector_form": {}
+   }
   },
   "plaza-slotnums": {
    "file": "plaza-slotnums.svg",
@@ -57209,27 +57402,29 @@
     "mae": 0.00647,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00617,
-     "mae_in_key": 0.00617,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 12 text runs (12 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00635,
+    "cov_1px": 1
    },
-   "excess": 0.0003
+   "emitter_error": {
+    "mae": 0.00019,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00647,
+    "floor_plus_emitter": 0.00654,
+    "gap": -0.00007
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 12390,
+    "no_vector_form": {}
+   }
   },
   "plaza-monument": {
    "file": "plaza-monument.svg",
@@ -57271,27 +57466,29 @@
     "mae": 0.00472,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00432,
-     "mae_in_key": 0.00432,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00471,
+    "cov_1px": 1
    },
-   "excess": 0.00039
+   "emitter_error": {
+    "mae": 0.00006,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00472,
+    "floor_plus_emitter": 0.00478,
+    "gap": -0.00006
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 90121,
+    "no_vector_form": {}
+   }
   },
   "plaza-monument-plate": {
    "file": "plaza-monument-plate.svg",
@@ -57331,27 +57528,29 @@
     "mae": 0.00344,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00344,
-     "mae_in_key": 0.00344,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs (3 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00344,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00005,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00344,
+    "floor_plus_emitter": 0.00349,
+    "gap": -0.00005
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 43845,
+    "no_vector_form": {}
+   }
   },
   "plaza-postfront": {
    "file": "plaza-postfront.svg",
@@ -57389,27 +57588,29 @@
     "mae": 0.00754,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00754,
-     "mae_in_key": 0.00754,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs (3 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00754,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00008,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00754,
+    "floor_plus_emitter": 0.00762,
+    "gap": -0.00008
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 8417,
+    "no_vector_form": {}
+   }
   },
   "plaza-posttimes": {
    "file": "plaza-posttimes.svg",
@@ -57447,27 +57648,29 @@
     "mae": 0.01363,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.01363,
-     "mae_in_key": 0.01363,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.01365,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00018,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.01363,
+    "floor_plus_emitter": 0.01384,
+    "gap": -0.0002
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 21141,
+    "no_vector_form": {}
+   }
   },
   "plaza-phonesign": {
    "file": "plaza-phonesign.svg",
@@ -57505,27 +57708,29 @@
     "mae": 0.0148,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0148,
-     "mae_in_key": 0.0148,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.01483,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00007,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0148,
+    "floor_plus_emitter": 0.0149,
+    "gap": -0.0001
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 8198,
+    "no_vector_form": {}
+   }
   },
   "plaza-phonebook": {
    "file": "plaza-phonebook.svg",
@@ -57563,27 +57768,29 @@
     "mae": 0.00418,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00418,
-     "mae_in_key": 0.00418,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00418,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00006,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00418,
+    "floor_plus_emitter": 0.00424,
+    "gap": -0.00006
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 11813,
+    "no_vector_form": {}
+   }
   },
   "plaza-phonenotice": {
    "file": "plaza-phonenotice.svg",
@@ -57621,27 +57828,29 @@
     "mae": 0.0105,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0105,
-     "mae_in_key": 0.0105,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.01052,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00024,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0105,
+    "floor_plus_emitter": 0.01075,
+    "gap": -0.00025
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 42684,
+    "no_vector_form": {}
+   }
   },
   "plaza-bin-burn": {
    "file": "plaza-bin-burn.svg",
@@ -57680,27 +57889,29 @@
     "mae": 0.00783,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00783,
-     "mae_in_key": 0.00783,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00781,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00014,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00783,
+    "floor_plus_emitter": 0.00794,
+    "gap": -0.00012
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 21800,
+    "no_vector_form": {}
+   }
   },
   "plaza-bin-can": {
    "file": "plaza-bin-can.svg",
@@ -57739,27 +57950,29 @@
     "mae": 0.00871,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00871,
-     "mae_in_key": 0.00871,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00869,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00012,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00871,
+    "floor_plus_emitter": 0.00881,
+    "gap": -0.0001
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 16972,
+    "no_vector_form": {}
+   }
   },
   "plaza-bin-pet": {
    "file": "plaza-bin-pet.svg",
@@ -57798,27 +58011,29 @@
     "mae": 0.00853,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00853,
-     "mae_in_key": 0.00853,
-     "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.0085,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00008,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00853,
+    "floor_plus_emitter": 0.00858,
+    "gap": -0.00005
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 15832,
+    "no_vector_form": {}
+   }
   },
   "plaza-clock": {
    "file": "plaza-clock.svg",
@@ -57941,27 +58156,29 @@
     "mae": 0.00511,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00342,
-     "mae_in_key": 0.00342,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 7 circles/ellipses, 13 text runs (13 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00519,
+    "cov_1px": 1
    },
-   "excess": 0.00169
+   "emitter_error": {
+    "mae": 0.00054,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00511,
+    "floor_plus_emitter": 0.00573,
+    "gap": -0.00062
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 25564,
+    "no_vector_form": {}
+   }
   },
   "plaza-clockplate": {
    "file": "plaza-clockplate.svg",
@@ -57999,27 +58216,29 @@
     "mae": 0.0032,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.0032,
-     "mae_in_key": 0.0032,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 1 text runs (1 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00319,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00007,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0032,
+    "floor_plus_emitter": 0.00326,
+    "gap": -0.00006
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 25837,
+    "no_vector_form": {}
+   }
   },
   "plaza-manhole": {
    "file": "plaza-manhole.svg",
@@ -58142,27 +58361,29 @@
     "mae": 0.00078,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00036,
-     "mae_in_key": 0.00036,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 7 circles/ellipses, 11 text runs (11 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.0009,
+    "cov_1px": 1
    },
-   "excess": 0.00042
+   "emitter_error": {
+    "mae": 0.00064,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00078,
+    "floor_plus_emitter": 0.00154,
+    "gap": -0.00075
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 21880,
+    "no_vector_form": {}
+   }
   },
   "plaza-grate": {
    "file": "plaza-grate.svg",
@@ -58238,27 +58459,29 @@
     "mae": 0,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 7 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00004,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00004,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0,
+    "floor_plus_emitter": 0.00008,
+    "gap": -0.00008
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 848,
+    "no_vector_form": {}
+   }
   },
   "plaza-taxi-mark": {
    "file": "plaza-taxi-mark.svg",
@@ -58298,27 +58521,29 @@
     "mae": 0.00226,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00499,
-     "mae_in_key": 0.0019,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs"
-    }
+   "floor": {
+    "mae": 0.00218,
+    "cov_1px": 1
    },
-   "excess": 0.00036
+   "emitter_error": {
+    "mae": 0.00009,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00226,
+    "floor_plus_emitter": 0.00227,
+    "gap": -0.00001
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 7671,
+    "no_vector_form": {}
+   }
   },
   "plaza-emblem": {
    "file": "plaza-emblem.svg",
@@ -58406,27 +58631,29 @@
     "mae": 0.00171,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00174,
-     "mae_in_key": 0.00174,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 7 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00163,
+    "cov_1px": 1
    },
-   "excess": -0.00003
+   "emitter_error": {
+    "mae": 0.00115,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00171,
+    "floor_plus_emitter": 0.00278,
+    "gap": -0.00107
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1409,
+    "no_vector_form": {}
+   }
   },
   "plaza-bag-logo": {
    "file": "plaza-bag-logo.svg",
@@ -58516,27 +58743,29 @@
     "mae": 0.01714,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.01766,
-     "mae_in_key": 0.01767,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 6 circles/ellipses, 2 text runs"
-    }
+   "floor": {
+    "mae": 0.01706,
+    "cov_1px": 1
    },
-   "excess": -0.00053
+   "emitter_error": {
+    "mae": 0.00078,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.01714,
+    "floor_plus_emitter": 0.01784,
+    "gap": -0.0007
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 24809,
+    "no_vector_form": {}
+   }
   },
   "plaza-bench-plate": {
    "file": "plaza-bench-plate.svg",
@@ -58576,27 +58805,29 @@
     "mae": 0.00336,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00349,
-     "mae_in_key": 0.00349,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 1 text runs"
-    }
+   "floor": {
+    "mae": 0.00334,
+    "cov_1px": 1
    },
-   "excess": -0.00013
+   "emitter_error": {
+    "mae": 0.00007,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00336,
+    "floor_plus_emitter": 0.00341,
+    "gap": -0.00005
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 22755,
+    "no_vector_form": {}
+   }
   },
   "plaza-welcome": {
    "file": "plaza-welcome.svg",
@@ -58637,27 +58868,29 @@
     "mae": 0.00228,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00346,
-     "mae_in_key": 0.00228,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 1 text runs (1 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00228,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00007,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00228,
+    "floor_plus_emitter": 0.00235,
+    "gap": -0.00007
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 32409,
+    "no_vector_form": {}
+   }
   },
   "plaza-newspaper": {
    "file": "plaza-newspaper.svg",
@@ -58735,27 +58968,29 @@
     "mae": 0.00336,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00336,
-     "mae_in_key": 0.00336,
-     "cov_1px": 1,
-     "scene": "own: 65 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00336,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00005,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00336,
+    "floor_plus_emitter": 0.00341,
+    "gap": -0.00004
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 39550,
+    "no_vector_form": {}
+   }
   },
   "plaza-taxi-queue": {
    "file": "plaza-taxi-queue.svg",
@@ -58797,27 +59032,29 @@
     "mae": 0.00475,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00817,
-     "mae_in_key": 0.00475,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00476,
+    "cov_1px": 1
    },
-   "excess": 0
+   "emitter_error": {
+    "mae": 0.00011,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00475,
+    "floor_plus_emitter": 0.00487,
+    "gap": -0.00012
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 30270,
+    "no_vector_form": {}
+   }
   },
   "plaza-name-sign": {
    "file": "plaza-name-sign.svg",
@@ -58910,27 +59147,29 @@
     "mae": 0.00514,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00444,
-     "mae_in_key": 0.00444,
-     "cov_1px": 1,
-     "scene": "own: 3 rects, 6 circles/ellipses, 7 text runs (7 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00515,
+    "cov_1px": 1
    },
-   "excess": 0.0007
+   "emitter_error": {
+    "mae": 0.00014,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00514,
+    "floor_plus_emitter": 0.00529,
+    "gap": -0.00015
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 51442,
+    "no_vector_form": {}
+   }
   },
   "plaza-sticker": {
    "file": "plaza-sticker.svg",
@@ -59055,27 +59294,29 @@
     "mae": 0.00309,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00195,
-     "mae_in_key": 0.00179,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 7 circles/ellipses, 1 text runs (1 on backdrops)"
-    }
+   "floor": {
+    "mae": 0.00351,
+    "cov_1px": 1
    },
-   "excess": 0.0013
+   "emitter_error": {
+    "mae": 0.00204,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00309,
+    "floor_plus_emitter": 0.00555,
+    "gap": -0.00246
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 10497,
+    "no_vector_form": {}
+   }
   },
   "sakura-bark-old": {
    "file": "sakura-bark-old.svg",
@@ -59528,27 +59769,29 @@
     "mae": 0.00241,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00088,
-     "mae_in_key": 0.00088,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 594 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00241,
+    "cov_1px": 1
    },
-   "excess": 0.00154
+   "emitter_error": {
+    "mae": 0.00016,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00241,
+    "floor_plus_emitter": 0.00258,
+    "gap": -0.00016
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 984253,
+    "no_vector_form": {}
+   }
   },
   "sakura-bark-young": {
    "file": "sakura-bark-young.svg",
@@ -59634,27 +59877,29 @@
     "mae": 0.00279,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00103,
-     "mae_in_key": 0.00103,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 126 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00282,
+    "cov_1px": 1
    },
-   "excess": 0.00176
+   "emitter_error": {
+    "mae": 0.00022,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00279,
+    "floor_plus_emitter": 0.00303,
+    "gap": -0.00024
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 412731,
+    "no_vector_form": {}
+   }
   },
   "sakura-blossom-atlas": {
    "file": "sakura-blossom-atlas.svg",
@@ -61333,27 +61578,29 @@
     "mae": 0.0085,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00688,
-     "mae_in_key": 0.0042,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 1707 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00845,
+    "cov_1px": 1
    },
-   "excess": 0.00429
+   "emitter_error": {
+    "mae": 0.00138,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.0085,
+    "floor_plus_emitter": 0.00983,
+    "gap": -0.00134
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 1273450,
+    "no_vector_form": {}
+   }
   },
   "sakura-flora-atlas": {
    "file": "sakura-flora-atlas.svg",
@@ -62262,27 +62509,29 @@
     "mae": 0.00314,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00319,
-     "mae_in_key": 0.001,
-     "cov_1px": 1,
-     "scene": "own: 0 rects, 23 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00316,
+    "cov_1px": 1
    },
-   "excess": 0.00214
+   "emitter_error": {
+    "mae": 0.00057,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00314,
+    "floor_plus_emitter": 0.00373,
+    "gap": -0.00059
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 45833,
+    "no_vector_form": {}
+   }
   },
   "sakura-ground-atlas": {
    "file": "sakura-ground-atlas.svg",
@@ -62367,27 +62616,29 @@
     "mae": 0.00064,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0.00164,
-     "mae_in_key": 0.00338,
-     "cov_1px": 1,
-     "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
-    }
+   "floor": {
+    "mae": 0.00063,
+    "cov_1px": 1
    },
-   "excess": -0.00274
+   "emitter_error": {
+    "mae": 0.0004,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00064,
+    "floor_plus_emitter": 0.00103,
+    "gap": -0.0004
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 48136,
+    "no_vector_form": {}
+   }
   },
   "sakura-speck4": {
    "file": "sakura-speck4.svg",
@@ -62474,59 +62725,59 @@
     "mae": 0.00285,
     "cov_1px": 1
    },
-   "floors": {
-    "canvas": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "svg": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "identical": true
-    },
-    "raster": {
-     "mae": 0,
-     "mae_in_key": 0,
-     "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
-    }
+   "floor": {
+    "mae": 0.00295,
+    "cov_1px": 1
    },
-   "excess": 0.00285
+   "emitter_error": {
+    "mae": 0.00204,
+    "cov_1px": 1
+   },
+   "sanity": {
+    "residual": 0.00285,
+    "floor_plus_emitter": 0.00499,
+    "gap": -0.00214
+   },
+   "deterministic": {
+    "canvas": true,
+    "direct_svg": true,
+    "optimized_svg": true,
+    "pass": true
+   },
+   "direct": {
+    "bytes": 3935025,
+    "no_vector_form": {}
+   }
   }
  },
  "summary": {
   "keys": 120,
   "failed": 0,
   "total_bytes": 18748236,
-  "floors": {
+  "direct_total_bytes": 24473643,
+  "three_way": {
    "keys": 120,
-   "canvas": {
-    "mean": 0,
-    "median": 0,
-    "identical_keys": 120
+   "floor": {
+    "mean": 0.00388,
+    "median": 0.00325
    },
-   "svg": {
-    "mean": 0,
-    "median": 0,
-    "identical_keys": 120
-   },
-   "raster": {
-    "mean": 0.00357,
-    "median": 0.003,
-    "scene_normalised_mean": 0.00346,
-    "own_content_keys": 113
+   "emitter_error": {
+    "mean": 0.00045,
+    "median": 0.0002,
+    "max": 0.00306,
+    "min_cov_1px": 1
    },
    "residual": {
     "mean": 0.00386,
     "median": 0.0032
    },
-   "excess": {
-    "mean": 0.00029,
-    "median": 0.00035
-   }
+   "sanity_gap": {
+    "mean": -0.00046,
+    "min": -0.00351,
+    "max": 0
+   },
+   "deterministic_keys": 120,
+   "no_vector_form": {}
   },
   "run_sources": {
    "procedural": {

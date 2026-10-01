@@ -13,12 +13,15 @@
 //   --ablate text|tiny  deliberately drop text or tiny (<=16 px2) fills, to see what the score does when content is missing
 //   --no-stamp / --stamp-min N  disable stamping (instancing) / change the minimum run length (default 8: below it,
 //                  runs save little; 32 -> 8 saved 4.3k curves on the port keys, 8 -> 4 only 0.7k for 32 more runs)
-//   --png <dir>    also write <key>.real.png / <key>.svg.png, and labelled contact sheets <out>/oracle-sheet-NN.png
-//                  (12 keys per sheet: real | SVG | |diff| x4, labelled with residual, floors and excess; failing keys first, then
-//                  worst residual-minus-floor)
+//   --png <dir>    also write <key>.real/.direct/.svg.png and labelled contact sheets <out>/oracle-sheet-NN.png
+//                  (12 keys per sheet: canvas | direct SVG | optimized SVG | |A-B| x4 | |B-C| x4; failing keys first,
+//                  then the worst emitter error)
 //   --sheet-copy <dir>  also copy each sheet to <dir>/oracle-canvas-vs-svg-NN.png, numbering after the highest existing NN
+//   --direct-out <dir>  also write the direct (1:1) SVGs B there
 //   --no-font-gate skip the second pass that preloads the webfonts before the page draws
-//   --no-floors    skip the floor measurement (second page load, raster-floor scenes)
+//   --no-determinism    skip the second page load that checks A, B and C reproduce byte for byte
+// Three-way verification per key: A = the real canvas, B = a direct 1:1 SVG of the recorded calls, C = the optimized
+// SVG; floor = d(A,B), emitter error = d(B,C), residual = d(A,C) (what pass/fail uses); see manifest.verification.
 // Text is converted to outlines with opentype.js (fetched once from jsdelivr) and the TTF subsets of the
 // Google Fonts families that index.html loads (fetched with text=<the characters drawn>); both are
 // cached under <os tmp>/sakuragaoka-canvas-svg-cache. Glyph positions come from the browser's own
@@ -96,12 +99,13 @@ function installRecorder() {
     const p0 = ap(m, ...P(a0));
     if (r.cur) { if (Math.hypot(p0[0] - r.cur[0], p0[1] - r.cur[1]) > 1e-6) lineTo(r, p0); } else moveTo(r, p0);
     if (!sweep) return;
-    const n = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2) - 1e-9)), h = sweep / n, k = 4 / 3 * Math.tan(h / 4);
-    for (let i = 0; i < n; i++) {
-      const t0 = a0 + i * h, t1 = t0 + h, q0 = P(t0), d0 = D(t0), q1 = P(t1), d1 = D(t1);
-      const c1 = ap(m, q0[0] + k * d0[0], q0[1] + k * d0[1]), c2 = ap(m, q1[0] - k * d1[0], q1[1] - k * d1[1]), e = ap(m, q1[0], q1[1]);
-      r.path.push(['C', c1[0], c1[1], c2[0], c2[1], e[0], e[1]]); r.cur = e;
-    }
+    // the arc is kept EXACT: ['A', cx, cy, rx, ry, rot, a0, sweep, m0..m5] (user-space ellipse + construction CTM).
+    // Node expands it into the cubic approximation the optimized SVG uses; the direct SVG emits an SVG arc.
+    // The end point is computed with the same arithmetic as that cubic expansion.
+    const n = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2) - 1e-9)), h = sweep / n;
+    r.path.push(['A', cx, cy, rx, ry, rot, a0, sweep, ...m]);
+    r.cur = ap(m, ...P(a0 + (n - 1) * h + h));
+    void D;
   };
   const sweepOf = (a0, a1, ccw) => {
     let s = a1 - a0;
@@ -205,7 +209,7 @@ function installRecorder() {
     fill(ctx, r, a) { if (a[0] instanceof Path2D) { bump(r.unsup, 'Path2D'); return; } r.items.push({ k: 'fill', d: r.path.slice(), rule: a[0] === 'evenodd' ? 'evenodd' : 'nonzero', paint: paint(r, ctx.fillStyle), ...common(ctx, r) }); },
     stroke(ctx, r, a) { if (a[0] instanceof Path2D) { bump(r.unsup, 'Path2D'); return; } r.items.push({ k: 'stroke', d: r.path.slice(), paint: paint(r, ctx.strokeStyle), ...strokeState(ctx), ...common(ctx, r) }); },
     fillRect(ctx, r, [x, y, w, h]) { if (!w || !h) return; const c = common(ctx, r); r.items.push({ k: 'fill', rect: true, d: rectPoly(c.m, x, y, w, h), rule: 'nonzero', paint: paint(r, ctx.fillStyle), ...c }); },
-    strokeRect(ctx, r, [x, y, w, h]) { if (!w && !h) return; const c = common(ctx, r); r.items.push({ k: 'stroke', d: rectPoly(c.m, x, y, w, h), paint: paint(r, ctx.strokeStyle), ...strokeState(ctx), ...c }); },
+    strokeRect(ctx, r, [x, y, w, h]) { if (!w && !h) return; const c = common(ctx, r); r.items.push({ k: 'stroke', rect: true, d: rectPoly(c.m, x, y, w, h), paint: paint(r, ctx.strokeStyle), ...strokeState(ctx), ...c }); },
     clearRect(ctx, r, [x, y, w, h]) { if (!w || !h) return; const m = T(ctx); r.items.push({ k: 'clear', d: rectPoly(m, x, y, w, h), m, clip: r.clip, rg: window.__rngCalls || 0 }); },
     fillText(ctx, r, [t, x, y, mw]) { r.items.push(textItem(ctx, r, false, t, x, y, mw)); },
     strokeText(ctx, r, [t, x, y, mw]) { r.items.push(textItem(ctx, r, true, t, x, y, mw)); },
@@ -365,6 +369,29 @@ try {
   const ids = keyed.res.filter(k => k.id >= 0).map(k => k.id);
   const dump = JSON.parse(await page.evaluate((ids) => window.__cr.export(ids), ids));
   const { canvases, clips } = dump;
+  // exact arcs -> the cubic approximation the optimized SVG has always used (same arithmetic as the former in-page
+  // expansion, so its output is unchanged); the exact segments stay in .dx for the direct SVG
+  const expandArcs = (d) => {
+    if (!d.some(x => x[0] === 'A')) return d;
+    const out = [];
+    for (const sg of d) {
+      if (sg[0] !== 'A') { out.push(sg); continue; }
+      const [, cx, cy, rx, ry, rot, a0, sweep, ...m] = sg;
+      const cr = Math.cos(rot), sr = Math.sin(rot);
+      const P = (t) => { const x = rx * Math.cos(t), y = ry * Math.sin(t); return [cx + x * cr - y * sr, cy + x * sr + y * cr]; };
+      const D = (t) => { const x = -rx * Math.sin(t), y = ry * Math.cos(t); return [x * cr - y * sr, x * sr + y * cr]; };
+      const ap = (x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+      const n = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2) - 1e-9)), h = sweep / n, k = 4 / 3 * Math.tan(h / 4);
+      for (let i = 0; i < n; i++) {
+        const t0 = a0 + i * h, t1 = t0 + h, q0 = P(t0), d0 = D(t0), q1 = P(t1), d1 = D(t1);
+        const c1 = ap(q0[0] + k * d0[0], q0[1] + k * d0[1]), c2 = ap(q1[0] - k * d1[0], q1[1] - k * d1[1]), e = ap(q1[0], q1[1]);
+        out.push(['C', c1[0], c1[1], c2[0], c2[1], e[0], e[1]]);
+      }
+    }
+    return out;
+  };
+  for (const c of Object.values(canvases)) for (const it of c.items) if (it.d) { it.dx = it.d; it.d = expandArcs(it.d); }
+  for (const c of Object.values(clips)) { c.dx = c.d; c.d = expandArcs(c.d); }
 
   // ---------------------------------------------------------------- fonts for text outlines
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -946,6 +973,172 @@ try {
     return segs;
   }
 
+  // ---------------------------------------------------------------- DIRECT SVG (B): every recorded call, 1:1
+  // Each call in its plainest SVG form at full precision (0.0001 px coordinates, 9 significant digits elsewhere):
+  // fillRect/strokeRect -> <rect> in user space + transform; fills -> <path> in device space (canvas transforms path
+  // points when they are added), arcs as SVG elliptical arcs (exact, not cubics); strokes -> <path> in the user space
+  // of the stroke with transform = that CTM and the exact width/cap/join/miter/dash; linear/radial gradients with
+  // userSpaceOnUse + gradientTransform and every stop; globalAlpha as opacity; clips as nested clip groups; text as
+  // glyph outlines; drawImage of a recorded canvas inlined as a transformed, clipped group. No stamps, no merging,
+  // no clip lifting, no run detection, no rounding to 0.01 px. Calls with no vector form are listed per key.
+  const fx = (v) => { const r = Math.round(v * 1e4) / 1e4; return Object.is(r, -0) ? '0' : String(r); };
+  const g9 = (v) => { const r = +(+v).toPrecision(9); return Object.is(r, -0) ? '0' : String(r); };
+  const mat9 = (m) => `matrix(${m.map(g9).join(' ')})`;
+  // exact path data; T maps device space -> output space (null: device space)
+  const directPath = (segs, T) => {
+    const tp = (x, y) => (T ? apply(T, x, y) : [x, y]);
+    let d = '';
+    for (const sg of segs) {
+      const t = sg[0];
+      if (t === 'M' || t === 'L') { const p = tp(sg[1], sg[2]); d += `${t}${fx(p[0])} ${fx(p[1])}`; }
+      else if (t === 'Q') { const c = tp(sg[1], sg[2]), p = tp(sg[3], sg[4]); d += `Q${fx(c[0])} ${fx(c[1])} ${fx(p[0])} ${fx(p[1])}`; }
+      else if (t === 'C') { const c1 = tp(sg[1], sg[2]), c2 = tp(sg[3], sg[4]), p = tp(sg[5], sg[6]); d += `C${fx(c1[0])} ${fx(c1[1])} ${fx(c2[0])} ${fx(c2[1])} ${fx(p[0])} ${fx(p[1])}`; }
+      else if (t === 'Z') d += 'Z';
+      else if (t === 'A') {
+        // user-space ellipse (c + R(rot) diag(rx, ry) (cos t, sin t)) under its construction CTM m, then T
+        const [, cx, cy, rx, ry, rot, a0, sweep, ...m] = sg;
+        const M = T ? mul(T, m) : m, cr = Math.cos(rot), sr = Math.sin(rot);
+        const L = [(M[0] * cr + M[2] * sr) * rx, (M[1] * cr + M[3] * sr) * rx, (-M[0] * sr + M[2] * cr) * ry, (-M[1] * sr + M[3] * cr) * ry];
+        const C0 = apply(M, cx, cy), pt = (a) => [C0[0] + L[0] * Math.cos(a) + L[2] * Math.sin(a), C0[1] + L[1] * Math.cos(a) + L[3] * Math.sin(a)];
+        // 2x2 SVD of L -> the output ellipse's radii and x-axis rotation; a reflection flips the sweep direction
+        const E = (L[0] + L[3]) / 2, F = (L[0] - L[3]) / 2, G = (L[1] + L[2]) / 2, H = (L[1] - L[2]) / 2;
+        const Q = Math.hypot(E, H), R = Math.hypot(F, G), phi = (Math.atan2(H, E) + Math.atan2(G, F)) / 2, det = L[0] * L[3] - L[1] * L[2];
+        const pieces = Math.max(1, Math.ceil(Math.abs(sweep) / (2 * Math.PI / 3) - 1e-9)), h = sweep / pieces, sweepFlag = (h > 0) === (det > 0) ? 1 : 0;
+        for (let i = 1; i <= pieces; i++) { const p = pt(a0 + h * i); d += `A${g9(Q + R)} ${g9(Math.abs(Q - R))} ${g9(phi * 180 / Math.PI)} 0 ${sweepFlag} ${fx(p[0])} ${fx(p[1])}`; }
+      }
+    }
+    return d;
+  };
+
+  function emitDirect(cid, n, prefix, U) {
+    const cv = canvases[cid]; const W = cv.w, H = cv.h;
+    const defs = []; const defIds = new Map(); let seq = 0;
+    const def = (k, make) => { let id = defIds.get(k); if (!id) { id = `${prefix}${seq++}`; defIds.set(k, id); defs.push(make(id)); } return id; };
+    const chainOf = (cl) => { const ch = []; while (cl) { ch.unshift(cl); cl = clips[cl].parent; } return ch; };
+    const clipId = (cl) => def('clip' + cl, (id) => `<clipPath id="${id}" clipPathUnits="userSpaceOnUse"><path d="${directPath(clips[cl].dx, null)}"${clips[cl].rule === 'evenodd' ? ' clip-rule="evenodd"' : ''}/></clipPath>`);
+    const grad = (p, gm) => {
+      const stops = p.stops.slice().sort((a, b) => a[0] - b[0]);
+      const st = (list) => list.map(([o, c]) => `<stop offset="${g9(o)}" stop-color="${hex(c)}"${c[3] < 1 ? ` stop-opacity="${g9(c[3])}"` : ''}/>`).join('');
+      const gt = gm && !ident(gm) ? ` gradientTransform="${mat9(gm)}"` : '';
+      let body;
+      if (p.type === 'linear') { const [x1, y1, x2, y2] = p.a; body = (id) => `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${g9(x1)}" y1="${g9(y1)}" x2="${g9(x2)}" y2="${g9(y2)}"${gt}>${st(stops)}</linearGradient>`; }
+      else if (p.type === 'radial') {
+        const [x0, y0, r0, x1, y1, r1] = p.a, conc = Math.hypot(x1 - x0, y1 - y0) <= 1e-9 * (1 + r1);
+        let ss = stops, extra = conc ? '' : ` fx="${g9(x0)}" fy="${g9(y0)}"`;
+        if (r0 > 0 && conc && r0 < r1) ss = stops.map(([o, c]) => [r0 / r1 + o * (1 - r0 / r1), c]); // canvas start circle as stop offsets
+        else if (r0 > 0) { extra += ` fr="${g9(r0)}"`; U('no SVG 1.1 form: radial gradient with a focal radius (emitted as SVG 2 fr)'); }
+        if (Math.hypot(x1 - x0, y1 - y0) + r0 > r1 + 1e-9) U('no vector form: radial gradient whose start circle leaves the end circle (canvas cone)');
+        body = (id) => `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${g9(x1)}" cy="${g9(y1)}" r="${g9(Math.max(r1, 1e-9))}"${extra}${gt}>${st(ss)}</radialGradient>`;
+      } else { U('no vector form: conic gradient'); return null; }
+      return def(body('X'), body);
+    };
+    // paint -> [value, opacity] (opacity: the solid colour alpha; globalAlpha goes on the element)
+    const paintOf = (p, gm) => {
+      if (p.t === 'c') return p.c ? [hex(p.c), p.c[3]] : null;
+      if (p.t === 'g') { if (!p.stops.length) return null; const id = grad(p, gm); return id ? [`url(#${id})`, 1] : null; }
+      U('no vector form: pattern'); return null;
+    };
+    const op = (name, v) => (v < 1 ? ` ${name}="${g9(v)}"` : '');
+    const out = [];
+    const render = (list) => {
+      let s = ''; const open = [];
+      for (const nd of list) {
+        const ch = nd.clip ? chainOf(nd.clip) : [];
+        let i = 0; while (i < open.length && i < ch.length && open[i] === ch[i]) i++;
+        while (open.length > i) { s += '</g>'; open.pop(); }
+        for (; i < ch.length; i++) { s += `<g clip-path="url(#${clipId(ch[i])})">`; open.push(ch[i]); }
+        s += nd.xml;
+      }
+      while (open.length) { s += '</g>'; open.pop(); }
+      return s;
+    };
+    const BIG = Math.max(W, H) * 4 + 100, bigRect = `M${-BIG} ${-BIG}L${BIG} ${-BIG}L${BIG} ${BIG}L${-BIG} ${BIG}Z`;
+    const erase = (segs, rule, clip, frac) => { // exact for opaque erasing; partial erase keeps a faded copy inside the region
+      const inner = render(out); out.length = 0; if (!inner) return;
+      const kids = [`<path d="${bigRect}${directPath(segs, null)}" clip-rule="evenodd"/>`];
+      for (const cl of chainOf(clip)) kids.push(`<path d="${bigRect}${directPath(clips[cl].dx, null)}" clip-rule="evenodd"/>`);
+      const id = `${prefix}${seq++}`; defs.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse">${kids.join('')}</clipPath>`);
+      out.push({ clip: 0, xml: `<g clip-path="url(#${id})">${inner}</g>` });
+      if (frac < 1) { const id2 = `${prefix}${seq++}`; defs.push(`<clipPath id="${id2}" clipPathUnits="userSpaceOnUse"><path d="${directPath(segs, null)}"${rule === 'evenodd' ? ' clip-rule="evenodd"' : ''}/></clipPath>`); out.push({ clip, xml: `<g clip-path="url(#${id2})" opacity="${g9(1 - frac)}">${inner}</g>` }); }
+    };
+    const rectOf = (it) => { // a fillRect/strokeRect as <rect> in its user space
+      const im = invert(it.m); if (!im) return null;
+      const pts = it.d.filter(x => x[0] !== 'Z').map(x => apply(im, x[1], x[2])), xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+      const x = Math.min(...xs), y = Math.min(...ys);
+      return `x="${g9(x)}" y="${g9(y)}" width="${g9(Math.max(...xs) - x)}" height="${g9(Math.max(...ys) - y)}"${ident(it.m) ? '' : ` transform="${mat9(it.m)}"`}`;
+    };
+    const strokeAttrs = (it, pa) => {
+      let a = ` fill="none" stroke="${pa[0]}" stroke-width="${g9(it.lw)}"${op('stroke-opacity', pa[1])}${op('opacity', it.alpha)}`;
+      if (it.cap !== 'butt') a += ` stroke-linecap="${it.cap}"`;
+      a += it.join !== 'miter' ? ` stroke-linejoin="${it.join}"` : ` stroke-miterlimit="${g9(it.miter)}"`;
+      if (it.dash && it.dash.length) { a += ` stroke-dasharray="${it.dash.map(g9).join(' ')}"`; if (it.dashOff) a += ` stroke-dashoffset="${g9(it.dashOff)}"`; }
+      return a;
+    };
+    for (const it of cv.items.slice(0, n)) {
+      if (it.k === 'reset') { out.length = 0; continue; }
+      if (it.k === 'raster') { U(`no vector form: ${it.what}`); continue; }
+      if (it.k === 'clear') { if (!it.clip && /* full-canvas clear */ (() => { const b = bbox(it.d); return b[0] <= 0.01 && b[1] <= 0.01 && b[2] >= W - 0.01 && b[3] >= H - 0.01 && isAxisRectG(it.d); })()) out.length = 0; else erase(it.dx || it.d, 'nonzero', it.clip, 1); continue; }
+      if (it.shadow) U('no vector form: shadow');
+      if (it.filter) U('no vector form: filter ' + it.filter.replace(/\(.*$/, ''));
+      if (it.comp) {
+        if (it.comp === 'destination-out' && it.k === 'fill' && it.paint.t === 'c' && it.paint.c) { erase(it.dx, it.rule, it.clip, it.paint.c[3] * it.alpha); continue; }
+        U('no vector form: globalCompositeOperation ' + it.comp + (it.k === 'fill' ? '' : ' on ' + it.k));
+        if (it.comp === 'destination-out') continue;
+      }
+      if (it.k === 'fill') {
+        if (!it.d.some(x => x[0] !== 'M' && x[0] !== 'Z')) continue;
+        if (it.rect) { // fillRect: <rect> in its user space; a gradient is then already in the rect's space
+          const r = rectOf(it), pr = r && paintOf(it.paint, null); if (!pr) continue;
+          out.push({ clip: it.clip, xml: `<rect ${r} fill="${pr[0]}"${op('fill-opacity', pr[1])}${op('opacity', it.alpha)}/>` }); continue;
+        }
+        const pa = paintOf(it.paint, it.m); if (!pa) continue; // device-space path: gradient via gradientTransform = CTM
+        out.push({ clip: it.clip, xml: `<path d="${directPath(it.dx, null)}" fill="${pa[0]}"${op('fill-opacity', pa[1])}${op('opacity', it.alpha)}${it.rule === 'evenodd' ? ' fill-rule="evenodd"' : ''}/>` });
+        continue;
+      }
+      if (it.k === 'stroke') {
+        if (!(it.lw > 0)) continue;
+        const im = invert(it.m); if (!im) continue;
+        const pa = paintOf(it.paint, null); if (!pa) continue;
+        if (it.rect) { const r = rectOf(it); if (r) out.push({ clip: it.clip, xml: `<rect ${r}${strokeAttrs(it, pa)}/>` }); continue; }
+        out.push({ clip: it.clip, xml: `<path d="${directPath(it.dx, im)}"${ident(it.m) ? '' : ` transform="${mat9(it.m)}"`}${strokeAttrs(it, pa)}/>` });
+        continue;
+      }
+      if (it.k === 'text') {
+        const segs = textSegs(it, U); if (!segs || !segs.length) continue;
+        if (it.stroke) {
+          const im = invert(it.m); if (!im || !(it.lw > 0)) continue;
+          const pa = paintOf(it.paint, null); if (!pa) continue;
+          out.push({ clip: it.clip, xml: `<path d="${directPath(segs, im)}"${ident(it.m) ? '' : ` transform="${mat9(it.m)}"`}${strokeAttrs(it, pa)}/>` });
+          continue;
+        }
+        const pa = paintOf(it.paint, it.m); if (!pa) continue;
+        let extra = '';
+        if (it.synth) { // Chrome's synthetic bold: outline grown by textSize * (1/24 .. 1/32) in total stroke width
+          const sz = it.pf.size, ratio = sz <= 9 ? 1 / 24 : sz >= 36 ? 1 / 32 : 1 / 24 + (1 / 32 - 1 / 24) * (sz - 9) / 27;
+          const s = similarity(it.m) || Math.sqrt(Math.abs(it.m[0] * it.m[3] - it.m[1] * it.m[2]));
+          extra = ` stroke="${pa[0]}" stroke-width="${g9(sz * ratio * s)}" stroke-linejoin="round"${op('stroke-opacity', pa[1])}`;
+          U('approximated: synthetic bold as an outline stroke');
+        }
+        out.push({ clip: it.clip, xml: `<path d="${directPath(segs, null)}" fill="${pa[0]}"${op('fill-opacity', pa[1])}${op('opacity', it.alpha)} fill-rule="nonzero"${extra}/>` });
+        continue;
+      }
+      if (it.k === 'image') {
+        const src = canvases[it.src]; if (!src || !it.sw || !it.sh) continue;
+        const inner = emitDirect(it.src, it.n, `${prefix}i${seq++}_`, U); if (!inner.body) continue;
+        defs.push(...inner.defs);
+        const Tm = mul(it.m, [it.dw / it.sw, 0, 0, it.dh / it.sh, it.dx - it.sx * it.dw / it.sw, it.dy - it.sy * it.dh / it.sh]);
+        const x0 = Math.max(0, Math.min(it.sx, it.sx + it.sw)), y0 = Math.max(0, Math.min(it.sy, it.sy + it.sh)), x1 = Math.min(it.W, Math.max(it.sx, it.sx + it.sw)), y1 = Math.min(it.H, Math.max(it.sy, it.sy + it.sh));
+        if (x1 <= x0 || y1 <= y0) continue;
+        const cid2 = `${prefix}${seq++}`; defs.push(`<clipPath id="${cid2}" clipPathUnits="userSpaceOnUse"><rect x="${g9(x0)}" y="${g9(y0)}" width="${g9(x1 - x0)}" height="${g9(y1 - y0)}"/></clipPath>`);
+        out.push({ clip: it.clip, xml: `<g transform="${mat9(Tm)}"${op('opacity', it.alpha)}><g clip-path="url(#${cid2})">${inner.body}</g></g>` });
+        continue;
+      }
+    }
+    return { body: render(out), defs, W, H };
+  }
+  const isAxisRectG = (segs) => { const p = segs.filter(s => s[0] !== 'Z'); if (p.length !== 4) return false; for (let i = 0; i < 4; i++) { const a = p[i], b = p[(i + 1) % 4]; if (Math.abs(a[1] - b[1]) > 1e-6 && Math.abs(a[2] - b[2]) > 1e-6) return false; } return true; };
+  const bbox = (segs) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const s of segs) for (let i = 1; i < s.length; i += 2) { x0 = Math.min(x0, s[i]); x1 = Math.max(x1, s[i]); y0 = Math.min(y0, s[i + 1]); y1 = Math.max(y1, s[i + 1]); } return [x0, y0, x1, y1]; };
+
   const safe = (k) => { const s = k.replace(/[^A-Za-z0-9._-]+/g, '_'); return s.length > 80 || s !== k ? s.slice(0, 60) + '-' + crypto.createHash('sha1').update(k).digest('hex').slice(0, 8) : s; };
   const freshStats = () => ({ paths: 0, groups: 0, lines: 0, quads: 0, cubics: 0, tinyRects: 0, tinyShapes: 0, merged: 0, runs: [], runSeq: 0, uses: 0, stampCurvesExpanded: 0,
     protoInfo: new Map(), stampGradIds: new Set(), stampGradUses: 0, stampGradAlphaFactored: new Set(), inlined: 0, dupBytes: 0, unsup: {} });
@@ -959,7 +1152,9 @@ try {
     const em = emitCanvas(kk.id, cv.items.length, 'p', stats);
     const svg = wrapSvg(em);
     const ops = cv.ops;
-    results.push({ ...kk, file: safe(kk.key) + '.svg', svg, stats, ops });
+    // B: the direct 1:1 SVG of the same recording (reference for the emitter error)
+    const dnotes = {}, direct = wrapSvg(emitDirect(kk.id, cv.items.length, 'd', (k, c = 1) => { dnotes[k] = (dnotes[k] || 0) + c; }));
+    results.push({ ...kk, file: safe(kk.key) + '.svg', svg, stats, ops, direct, dnotes });
   }
 
   // ---------------------------------------------------------------- metric: ONE implementation, injected into the pages
@@ -1003,163 +1198,69 @@ try {
     window.__unb64 = (b) => { const s = atob(b); const u = new Uint8ClampedArray(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
   }, scoreRGBA.toString());
 
-  // ---------------------------------------------------------------- verify: rasterize SVG, compare with the real canvas
+  // ---------------------------------------------------------------- three-way verification
+  //  A = the real canvas (oracle); B = the DIRECT SVG (every recorded call 1:1, full precision); C = the optimized
+  //  SVG (what ships). floor = d(A,B): the rasterizer's irreducible canvas-vs-vector difference on the key's full
+  //  content; emitter error = d(B,C): what the optimizations add; residual = d(A,C), which is what pass/fail uses.
+  //  Same metric everywhere; both SVGs are rasterized on a CPU-backed canvas.
   await installHelpers(page);
-  const scores = {};
+  const scores = {}, three = {};
   const todo = results.filter(r => r.svg);
-  for (let i = 0; i < todo.length; i += 20) {
-    const batch = todo.slice(i, i + 20).map(r => [r.key, r.svg]);
-    Object.assign(scores, await page.evaluate(async (batch, png) => {
+  for (let i = 0; i < todo.length; i += 10) {
+    const batch = todo.slice(i, i + 10).map(r => [r.key, r.svg, r.direct]);
+    Object.assign(three, await page.evaluate(async (batch, png) => {
       const res = {};
-      for (const [key, svg] of batch) {
+      for (const [key, svgC, svgB] of batch) {
         const c = window.__texByKey.get(key).image, w = c.width, h = c.height;
         const A = c.getContext('2d').getImageData(0, 0, w, h).data;
-        const r = await window.__svgRaster(svg, w, h); if (!r) { res[key] = { error: 'svg decode failed' }; continue; }
-        res[key] = { ...window.__score(A, r.data, w, h), hashReal: await window.__hash(A), hashSvg: await window.__hash(r.data) };
-        if (png) res[key].png = [c.toDataURL('image/png'), r.canvas.toDataURL('image/png')];
+        const rC = await window.__svgRaster(svgC, w, h), rB = await window.__svgRaster(svgB, w, h);
+        if (!rC || !rB) { res[key] = { error: (!rC ? 'optimized' : 'direct') + ' svg decode failed' }; continue; }
+        res[key] = {
+          residual: window.__score(A, rC.data, w, h), floor: window.__score(A, rB.data, w, h), emitter: window.__score(rB.data, rC.data, w, h),
+          hashA: await window.__hash(A), hashB: await window.__hash(rB.data), hashC: await window.__hash(rC.data),
+        };
+        if (png) res[key].png = [c.toDataURL('image/png'), rB.canvas.toDataURL('image/png'), rC.canvas.toDataURL('image/png')];
       }
       return res;
     }, batch, !!args.png));
   }
+  for (const [k, t] of Object.entries(three)) scores[k] = t.error ? t : t.residual;
 
-  // ---------------------------------------------------------------- floors: rung 0 of the residual ladder
-  //  (a) canvas floor  the real canvas against itself: a second, independent page load (same URL, seed, t=0,
-  //                    font gate), each keyed canvas compared with the first load's
-  //  (b) svg floor     the SVG raster against itself: the same SVG rasterized independently in the second page
-  //  (c) raster floor  content both paths draw identically, drawn through the canvas API vs the same content
-  //                    as SVG (recorded by this recorder, emitted by this emitter, rasterized like the residual):
-  //                    the key's own pixel-aligned solid rects, full circles/ellipses (native arc) and text runs
-  //                    (fillText); a key with none gets a generic scene of its size (four pixel-aligned rects,
-  //                    one circle, one text run). Same metric throughout; byte-identical pixels score exactly 0.
-  const floors = {};
-  const ZERO = { mae: 0, alphaMae: 0, iou: 1, cov1px: 1 };
-  if (!args['no-floors']) {
-    const cleanG = (d) => d.filter((x, i) => !(x[0] === 'M' && (i + 1 >= d.length || d[i + 1][0] === 'M')));
-    const isInt = (v) => Math.abs(v - Math.round(v)) < 1e-6;
-    const floorOps = (cv) => {
-      const ops = [], backdrops = []; let nr = 0, ne = 0, nt = 0, nb = 0;
-      for (const it of cv.items) {
-        // clips are ignored: both sides draw the same unclipped content, which is all the floor needs
-        if (it.comp || it.filter || it.shadow || !it.paint || it.paint.t !== 'c' || !it.paint.c) continue;
-        if (it.k === 'fill') {
-          const segs = cleanG(it.d), types = segs.map(x => x[0]).join('');
-          if (it.rect && types === 'MLLLZ') {
-            const p = segs.slice(0, 4), xs = p.map(q => q[1]), ys = p.map(q => q[2]);
-            const axis = p.every((q, i) => { const r = p[(i + 1) % 4]; return Math.abs(q[1] - r[1]) < 1e-6 || Math.abs(q[2] - r[2]) < 1e-6; });
-            if (axis && [...xs, ...ys].every(isInt)) { ops.push({ t: 'rect', x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys), c: it.paint.c, a: it.alpha }); nr++; }
-          } else if (types === 'MCCCC' || types === 'MCCCCZ') {
-            const P0 = [segs[0][1], segs[0][2]], P1 = [segs[1][5], segs[1][6]], P2 = [segs[2][5], segs[2][6]], E = [segs[4][5], segs[4][6]];
-            if (Math.hypot(E[0] - P0[0], E[1] - P0[1]) <= 1e-6 * (1 + Math.abs(P0[0]) + Math.abs(P0[1]))) {
-              const cx = (P0[0] + P2[0]) / 2, cy = (P0[1] + P2[1]) / 2;
-              ops.push({ t: 'ell', m: [P0[0] - cx, P0[1] - cy, P1[0] - cx, P1[1] - cy, cx, cy], c: it.paint.c, a: it.alpha }); ne++;
-            }
-          }
-        } else if (it.k === 'text' && !it.stroke) {
-          ops.push({ t: 'text', m: it.m, font: it.font, text: it.chars.map(c => c[0]).join(''), x: it.x0, y: it.yA, maxW: it.sx < 1 ? it.w * it.sx : 0, c: it.paint.c, a: it.alpha }); nt++;
-          // glyph blending depends on what is under the text: give the run a pixel-aligned backdrop in the colour
-          // of the latest opaque solid fill that covers it (signs draw text on rounded or path backgrounds,
-          // which are not floor content themselves)
-          const size = (/(\d*\.?\d+)px/.exec(it.font) || [0, 16])[1] * 1;
-          const pts = [[it.x0, it.yA - size * 1.1], [it.x0 + it.w * it.sx, it.yA - size * 1.1], [it.x0, it.yA + size * 0.35], [it.x0 + it.w * it.sx, it.yA + size * 0.35]]
-            .map(([x, y]) => [it.m[0] * x + it.m[2] * y + it.m[4], it.m[1] * x + it.m[3] * y + it.m[5]]);
-          const tb = [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
-          for (let j = cv.items.indexOf(it) - 1; j >= 0; j--) {
-            const b = cv.items[j]; if (b.k !== 'fill' || b.comp || !b.paint || b.paint.t !== 'c' || !b.paint.c || b.paint.c[3] * b.alpha < 0.999) continue;
-            const bx = b.d.filter(x => x[0] !== 'Z'); const xs = bx.flatMap(x => x.filter((v, i) => i % 2 === 1)), ys = bx.flatMap(x => x.filter((v, i) => i > 0 && i % 2 === 0));
-            if (Math.min(...xs) <= tb[0] && Math.min(...ys) <= tb[1] && Math.max(...xs) >= tb[2] && Math.max(...ys) >= tb[3]) {
-              const x0 = Math.floor(tb[0]) - 2, y0 = Math.floor(tb[1]) - 2; backdrops.push({ t: 'rect', x: x0, y: y0, w: Math.ceil(tb[2]) + 2 - x0, h: Math.ceil(tb[3]) + 2 - y0, c: b.paint.c, a: 1 }); nb++;
-              break;
-            }
-          }
-        }
-      }
-      return { ops: [...backdrops, ...ops], scene: `own: ${nr} rects, ${ne} circles/ellipses, ${nt} text runs` + (nb ? ` (${nb} on backdrops)` : '') };
-    };
-    const genericOps = (w, h) => {
-      const ops = [], hw = Math.floor(w / 2), hh = Math.floor(h / 2), cols = [[214, 206, 190, 1], [120, 140, 170, 1], [200, 90, 110, 1], [90, 130, 90, 1]];
-      [[0, 0, hw, hh], [hw, 0, w - hw, hh], [0, hh, hw, h - hh], [hw, hh, w - hw, h - hh]].forEach(([x, y, ww, hh2], i) => ops.push({ t: 'rect', x, y, w: ww, h: hh2, c: cols[i], a: 1 }));
-      const r = Math.min(w, h) * 0.3; ops.push({ t: 'ell', m: [r, 0, 0, r, w / 2, h / 2], c: [250, 245, 235, 1], a: 1 });
-      ops.push({ t: 'text', m: [1, 0, 0, 1, 0, 0], font: `700 ${Math.max(10, Math.round(Math.min(w, h) / 8))}px "Noto Sans JP", sans-serif`, text: '桜ヶ丘 Sakuragaoka', x: Math.round(w * 0.08), y: Math.round(h * 0.62), maxW: 0, c: [40, 40, 60, 1], a: 1 });
-      return { ops, scene: 'generic: 4 pixel-aligned rects, 1 circle, 1 text run' };
-    };
-    const live = keyed.res.filter(k => k.id >= 0 && scores[k.key] && !scores[k.key].error);
-    const scenes = {}, specs = live.map(k => { const f = floorOps(canvases[k.id]), s = f.ops.length ? f : genericOps(k.w, k.h); scenes[k.key] = s.scene; return [k.key, k.w, k.h, s.ops]; });
-    const fr = await page.evaluate(async (specs) => {
-      const CR = window.__cr; window.__floorCanvas = new Map(); const ids = {};
-      for (const [key, w, h, ops] of specs) {
-        const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
-        CR.allow.add(c);
-        for (const op of ops) {
-          g.save(); g.globalAlpha = op.a; g.fillStyle = `rgba(${op.c[0]},${op.c[1]},${op.c[2]},${op.c[3]})`;
-          if (op.t === 'rect') { g.setTransform(1, 0, 0, 1, 0, 0); g.fillRect(op.x, op.y, op.w, op.h); }
-          else if (op.t === 'ell') { g.setTransform(...op.m); g.beginPath(); g.arc(0, 0, 1, 0, Math.PI * 2); g.fill(); }
-          else {
-            try { await document.fonts.load(op.font, op.text); } catch (e) { }
-            g.setTransform(...op.m); g.font = op.font; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-            if (op.maxW) g.fillText(op.text, op.x, op.y, op.maxW); else g.fillText(op.text, op.x, op.y);
-          }
-          g.restore();
-        }
-        CR.allow.delete(c);
-        const r = CR.recs.get(c); if (r) ids[key] = r.id;
-        window.__floorCanvas.set(key, c);
-      }
-      return { ids, dump: CR.export(Object.values(ids)) };
-    }, specs);
-    const fd = JSON.parse(fr.dump); Object.assign(canvases, fd.canvases); Object.assign(clips, fd.clips);
-    await ensureFonts(Object.values(fd.canvases));
-    const floorSvgs = Object.entries(fr.ids).map(([key, id]) => [key, wrapSvg(emitCanvas(id, canvases[id].items.length, 'f', freshStats(), { stamp: false }))]);
-    const rasterFloor = {};
-    for (let i = 0; i < floorSvgs.length; i += 20) Object.assign(rasterFloor, await page.evaluate(async (batch) => {
-      const res = {};
-      for (const [key, svg] of batch) {
-        const c = window.__floorCanvas.get(key), w = c.width, h = c.height, A = c.getContext('2d').getImageData(0, 0, w, h).data;
-        const r = await window.__svgRaster(svg, w, h); res[key] = r ? window.__score(A, r.data, w, h) : { error: 'svg decode failed' };
-        window.__floorCanvas.delete(key);
-      }
-      return res;
-    }, floorSvgs.slice(i, i + 20)));
-
-    // (a) + (b): an independent second load; exact hashes first, pixels move between pages only on a mismatch
+  // determinism precondition: a second, independent page load must reproduce A, B's raster and C's raster
+  // byte for byte ("0,0 is identity": canvas-vs-canvas and SVG-vs-SVG prove determinism, they are not floors)
+  const det = {};
+  if (!args['no-determinism']) {
     const page2 = await open(gateTexts);
     await installHelpers(page2);
     await collectKeyed(page2);
-    const h2 = {};
-    for (let i = 0; i < todo.length; i += 20) Object.assign(h2, await page2.evaluate(async (batch) => {
+    for (let i = 0; i < todo.length; i += 10) Object.assign(det, await page2.evaluate(async (batch) => {
       const res = {};
-      for (const [key, svg] of batch) {
+      for (const [key, svgC, svgB] of batch) {
         const t = window.__texByKey.get(key); if (!t || !t.image) { res[key] = null; continue; }
         const c = t.image, w = c.width, h = c.height, A = c.getContext('2d').getImageData(0, 0, w, h).data;
-        const r = await window.__svgRaster(svg, w, h);
-        res[key] = { w, h, hashReal: await window.__hash(A), hashSvg: r ? await window.__hash(r.data) : null };
+        const rC = await window.__svgRaster(svgC, w, h), rB = await window.__svgRaster(svgB, w, h);
+        res[key] = { hashA: await window.__hash(A), hashB: rB ? await window.__hash(rB.data) : null, hashC: rC ? await window.__hash(rC.data) : null };
       }
       return res;
-    }, todo.slice(i, i + 20).map(r => [r.key, r.svg])));
-    for (const r of todo) {
-      const s1 = scores[r.key], s2 = h2[r.key];
-      if (!s1 || s1.error || !s2 || s2.w !== r.w || s2.h !== r.h) { floors[r.key] = { canvas: { error: 'missing or resized on the second load' }, svg: { error: 'n/a' }, raster: rasterFloor[r.key] || { error: 'n/a' }, scene: scenes[r.key] }; continue; }
-      let canvas = { ...ZERO, identical: true }, svgF = { ...ZERO, identical: true };
-      if (s2.hashReal !== s1.hashReal) {
-        const b = await page2.evaluate((key) => { const c = window.__texByKey.get(key).image; return window.__b64(c.getContext('2d').getImageData(0, 0, c.width, c.height).data); }, r.key);
-        canvas = { ...await page.evaluate((key, b) => { const c = window.__texByKey.get(key).image; return window.__score(c.getContext('2d').getImageData(0, 0, c.width, c.height).data, window.__unb64(b), c.width, c.height); }, r.key, b), identical: false };
-      }
-      if (s2.hashSvg !== s1.hashSvg) {
-        const b = s2.hashSvg ? await page2.evaluate(async (svg, w, h) => { const x = await window.__svgRaster(svg, w, h); return x && window.__b64(x.data); }, r.svg, r.w, r.h) : null;
-        svgF = b ? { ...await page.evaluate(async (svg, w, h, b, h1) => { const x = await window.__svgRaster(svg, w, h); return { ...window.__score(x.data, window.__unb64(b), w, h), page1_reraster_same: (await window.__hash(x.data)) === h1 }; }, r.svg, r.w, r.h, b, s1.hashSvg), identical: false } : { error: 'svg decode failed on the second load' };
-      }
-      floors[r.key] = { canvas, svg: svgF, raster: rasterFloor[r.key] || { error: 'no floor scene' }, scene: scenes[r.key] };
-    }
+    }, todo.slice(i, i + 10).map(r => [r.key, r.svg, r.direct])));
     await page2.close();
+    for (const r of todo) {
+      const a = three[r.key], b = det[r.key];
+      det[r.key] = !a || a.error || !b ? { canvas: false, direct_svg: false, optimized_svg: false, pass: false, note: 'missing on one load' }
+        : (({ canvas, direct_svg, optimized_svg }) => ({ canvas, direct_svg, optimized_svg, pass: canvas && direct_svg && optimized_svg }))({ canvas: a.hashA === b.hashA, direct_svg: a.hashB === b.hashB, optimized_svg: a.hashC === b.hashC });
+    }
   }
 
   // ---------------------------------------------------------------- write
-  if (args.png) { fs.mkdirSync(args.png, { recursive: true }); for (const r of todo) { const sc = scores[r.key]; if (!sc || !sc.png) continue; for (const [i, tag] of [[0, 'real'], [1, 'svg']]) fs.writeFileSync(path.join(args.png, r.file.replace(/[.]svg$/, `.${tag}.png`)), Buffer.from(sc.png[i].split(',')[1], 'base64')); } }
+  if (args.png) { fs.mkdirSync(args.png, { recursive: true }); for (const r of todo) { const t = three[r.key]; if (!t || !t.png) continue; for (const [i, tag] of [[0, 'real'], [1, 'direct'], [2, 'svg']]) fs.writeFileSync(path.join(args.png, r.file.replace(/[.]svg$/, `.${tag}.png`)), Buffer.from(t.png[i].split(',')[1], 'base64')); } }
+  if (args['direct-out']) { const d = path.resolve(args['direct-out']); fs.mkdirSync(d, { recursive: true }); for (const r of todo) fs.writeFileSync(path.join(d, r.file), r.direct); }
   fs.mkdirSync(outDir, { recursive: true });
   if (!onlyKeys) for (const f of fs.readdirSync(outDir)) if (f.endsWith('.svg')) fs.unlinkSync(path.join(outDir, f));
   const manifest = {
     generated_by: 'tools/oracle/canvas_svg.mjs', only: args.only || null,
     thresholds: {
       mae: MAE_MAX, cov_1px: COV_MIN,
+      applies_to: 'residual = d(A,C) (the shipped SVG against the real canvas), plus the determinism precondition',
       why: [
         'mae = alpha-weighted mean |linear RGB| difference between the real canvas and this SVG, rasterized by the same browser on a CPU-backed canvas. On the 120 port keys correct output scores median 0.0032, p90 0.0083, worst 0.0172 (plaza-bag-logo: small text; Skia draws canvas glyph masks with a contrast/gamma boost, 3-12% heavier in alpha than the true outline). Dropping the text (--ablate text) scores median 0.0665 and fails 52 of the 53 text keys, so 0.02 sits above antialiasing, text gamma and gradient dithering and below missing content.',
         'Scoring raster: the CPU raster dithers gradients and the GPU-drawn originals do not, which adds up to ~0.006 on gradient-heavy keys, equally for stamped and unstamped SVGs. The GPU raster is not used because its rounding of translucent fills depends on the SVG structure (+-3/255 at alpha 0.3 between <use> and plain paths), which would bias the stamping comparison.',
@@ -1167,13 +1268,16 @@ try {
         'cov_1px = share of alpha>=0.5 pixels in either image that have a covered pixel within 1px in the other image. Strict IoU is reported but not gated, because transparent text-only keys score 0.85-0.95 on it purely from the glyph-mask boost. 0.99 fails missing or shifted shapes: with the text dropped, the three transparent text keys score 0, 0.70 and 0.76.',
       ],
     },
-    floors: args['no-floors'] ? null : {
-      canvas: 'the real canvas against itself: an independent second page load (same URL, seed, t=0, font gate); 0 when byte-identical',
-      svg: 'the SVG raster against itself: the same SVG rasterized in the second page (CPU-backed canvas); 0 when byte-identical',
-      raster: 'canvas API vs SVG on content both draw identically, taken from the key itself: its pixel-aligned solid rects, full circles/ellipses (native arc) and text runs (fillText), recorded and emitted by this tool; generic scene (4 pixel-aligned rects, 1 circle, 1 text run) for a key with none',
-      metric: 'the residual metric (alpha-weighted mean |linear RGB|, coverage within 1 px); no blur, masks or threshold changes',
-      units: 'mae is normalised by the weight of the floor scene itself; mae_in_key = the weighted error of the floor divided by the residual weight of the key, the unit the residual is in',
-      excess: 'residual mae minus the largest floor mae_in_key',
+    verification: {
+      A: 'the real canvas (oracle)',
+      B: 'direct SVG: every recorded call 1:1 in its plainest SVG form at full precision (0.0001 px): fillRect/strokeRect as <rect> in user space + transform, fills as device-space paths, arcs as exact SVG elliptical arcs, strokes in their own user space with exact width/cap/join/miter/dash, linear/radial gradients (userSpaceOnUse + gradientTransform, every stop), globalAlpha as opacity, clips, text as glyph outlines; no stamps, merging, clip lifting, run detection or 0.01 px rounding',
+      C: 'optimized SVG (the shipped file): stamps, rect merging, clip lifting, 0.01 px coordinates, arcs as cubic Beziers',
+      floor: 'd(A,B): the rasterizer’s irreducible canvas-vs-vector difference on the full content of the key',
+      emitter_error: 'd(B,C): what the optimizations add (what later rungs fix)',
+      residual: 'd(A,C): what pass/fail thresholds apply to',
+      sanity: 'residual ~ floor + emitter_error; gap = residual - floor - emitter_error (per pixel |A-C| <= |A-B| + |B-C|, so the gap is <= 0 up to the alpha weighting, and well below 0 when the two differences cancel)',
+      deterministic: 'precondition, not a floor: a second, independent page load reproduces A, the raster of B and the raster of C byte for byte',
+      metric: 'alpha-weighted mean |linear RGB| (mae) and coverage within 1 px; B and C rasterized on a CPU-backed canvas; no blur, masks or threshold changes',
     },
     run_source: STAMP ? {
       method: RNG_OK ? 'rng hook: the served source of mulberry32 (ctx.rng), hash2 and hash3 counts calls; every draw records the count' : 'placement regularity (rng hook not installed)',
@@ -1191,24 +1295,22 @@ try {
     } : null,
     keys: {},
   };
-  let totalBytes = 0;
-  // floors in key units: the floor scene's weighted error over THIS key's weight (residual = se_key / sw_key), so
-  // residual - floor = (error not explained by the floor content) / sw_key; mae alone is normalised by the scene's own weight
-  const inKey = (x, sc) => (x && !x.error && sc && sc.sw ? (x.se || 0) / sc.sw : 0);
-  const fmtF = (x, sc) => !x || x.error ? (x || { error: 'n/a' }) : { mae: +x.mae.toFixed(5), mae_in_key: +inKey(x, sc).toFixed(5), cov_1px: +x.cov1px.toFixed(5), ...(x.identical !== undefined ? { identical: x.identical } : {}), ...(x.page1_reraster_same !== undefined ? { page1_reraster_same: x.page1_reraster_same } : {}) };
-  const floorMax = (fl, sc) => Math.max(...[fl.canvas, fl.svg, fl.raster].map(x => inKey(x, sc)));
+  let totalBytes = 0, directBytes = 0;
+  const m5 = (x) => (x ? { mae: +x.mae.toFixed(5), cov_1px: +x.cov1px.toFixed(5) } : undefined);
+  const NOFORM = /^(no vector form|no SVG 1\.1 form|text:missing-glyph)/;
   const srcCount = (runs) => { const o = { procedural: { runs: 0, instances: 0 }, authored: { runs: 0, instances: 0 }, ambiguous: [] }; for (const r of runs) { o[r.source].runs++; o[r.source].instances += r.instances; if (r.ambiguous) o.ambiguous.push({ run: r.run, source: r.source, instances: r.instances, why: r.ambiguous }); } return o; };
   for (const r of results) {
     if (!r.svg) { manifest.keys[r.key] = { error: r.error, width: r.w, height: r.h }; failed++; continue; }
     fs.writeFileSync(path.join(outDir, r.file), r.svg);
-    const bytes = Buffer.byteLength(r.svg); totalBytes += bytes;
-    const sc = scores[r.key] || { error: 'not scored' };
-    const pass = !sc.error && sc.mae <= MAE_MAX && sc.cov1px >= COV_MIN;
+    const bytes = Buffer.byteLength(r.svg); totalBytes += bytes; directBytes += Buffer.byteLength(r.direct);
+    const sc = scores[r.key] || { error: 'not scored' }, t = three[r.key] || {}, dt = det[r.key];
+    const pass = !sc.error && sc.mae <= MAE_MAX && sc.cov1px >= COV_MIN && (!dt || dt.pass);
     if (!pass) failed++;
-    const st = r.stats, fl = floors[r.key];
+    const st = r.stats;
     const plainCurves = st.lines + st.quads + 2 * st.cubics;
     const protoList = [...st.protoInfo.values()], byKind = {};
     for (const p of protoList) byKind[p.kind] = (byKind[p.kind] || 0) + 1;
+    const noForm = Object.fromEntries(Object.entries(r.dnotes).filter(([k]) => NOFORM.test(k))), dnotes = Object.fromEntries(Object.entries(r.dnotes).filter(([k]) => !NOFORM.test(k)));
     manifest.keys[r.key] = {
       file: r.file, width: r.w, height: r.h, bytes,
       elements: st.paths + st.groups, paths: st.paths, groups: st.groups,
@@ -1231,23 +1333,25 @@ try {
       canvas_ops: r.ops,
       score: sc.error ? sc : { mae: +sc.mae.toFixed(5), alpha_mae: +sc.alphaMae.toFixed(5), iou: +sc.iou.toFixed(5), cov_1px: +sc.cov1px.toFixed(5) },
       pass,
-      residual: sc.error ? undefined : { mae: +sc.mae.toFixed(5), cov_1px: +sc.cov1px.toFixed(5) },
-      floors: fl ? { canvas: fmtF(fl.canvas, sc), svg: fmtF(fl.svg, sc), raster: { ...fmtF(fl.raster, sc), scene: fl.scene } } : undefined,
-      excess: fl && !sc.error ? +(sc.mae - floorMax(fl, sc)).toFixed(5) : undefined,
+      residual: m5(t.residual), floor: m5(t.floor), emitter_error: m5(t.emitter),
+      sanity: t.residual ? { residual: +t.residual.mae.toFixed(5), floor_plus_emitter: +(t.floor.mae + t.emitter.mae).toFixed(5), gap: +(t.residual.mae - t.floor.mae - t.emitter.mae).toFixed(5) } : undefined,
+      deterministic: dt,
+      direct: { bytes: Buffer.byteLength(r.direct), no_vector_form: noForm, notes: Object.keys(dnotes).length ? dnotes : undefined },
     };
   }
-  const live = Object.values(manifest.keys).filter(e => e.residual && e.floors);
+  const live = Object.values(manifest.keys).filter(e => e.residual && e.floor && e.emitter_error);
   const mean = (a) => a.length ? +(a.reduce((x, y) => x + y, 0) / a.length).toFixed(5) : null;
   const median = (a) => { if (!a.length) return null; const b = a.slice().sort((x, y) => x - y); return +b[b.length >> 1].toFixed(5); };
-  const col = (g) => live.map(g).filter(v => typeof v === 'number');
-  manifest.summary = { keys: results.length, failed, total_bytes: totalBytes,
-    floors: live.length ? {
+  const noFormAll = {}; for (const e of Object.values(manifest.keys)) for (const [k, v] of Object.entries((e.direct && e.direct.no_vector_form) || {})) noFormAll[k] = (noFormAll[k] || 0) + v;
+  manifest.summary = { keys: results.length, failed, total_bytes: totalBytes, direct_total_bytes: directBytes,
+    three_way: live.length ? {
       keys: live.length,
-      canvas: { mean: mean(col(e => e.floors.canvas.mae_in_key)), median: median(col(e => e.floors.canvas.mae_in_key)), identical_keys: live.filter(e => e.floors.canvas.identical).length },
-      svg: { mean: mean(col(e => e.floors.svg.mae_in_key)), median: median(col(e => e.floors.svg.mae_in_key)), identical_keys: live.filter(e => e.floors.svg.identical).length },
-      raster: { mean: mean(col(e => e.floors.raster.mae_in_key)), median: median(col(e => e.floors.raster.mae_in_key)), scene_normalised_mean: mean(col(e => e.floors.raster.mae)), own_content_keys: live.filter(e => /^own/.test(e.floors.raster.scene || '')).length },
-      residual: { mean: mean(col(e => e.residual.mae)), median: median(col(e => e.residual.mae)) },
-      excess: { mean: mean(col(e => e.excess)), median: median(col(e => e.excess)) },
+      floor: { mean: mean(live.map(e => e.floor.mae)), median: median(live.map(e => e.floor.mae)) },
+      emitter_error: { mean: mean(live.map(e => e.emitter_error.mae)), median: median(live.map(e => e.emitter_error.mae)), max: Math.max(...live.map(e => e.emitter_error.mae)), min_cov_1px: Math.min(...live.map(e => e.emitter_error.cov_1px)) },
+      residual: { mean: mean(live.map(e => e.residual.mae)), median: median(live.map(e => e.residual.mae)) },
+      sanity_gap: { mean: mean(live.map(e => e.sanity.gap)), min: Math.min(...live.map(e => e.sanity.gap)), max: Math.max(...live.map(e => e.sanity.gap)) },
+      deterministic_keys: Object.values(manifest.keys).filter(e => e.deterministic && e.deterministic.pass).length,
+      no_vector_form: noFormAll,
     } : undefined,
     run_sources: (() => { const o = { procedural: { runs: 0, instances: 0 }, authored: { runs: 0, instances: 0 }, ambiguous_runs: 0 }; for (const e of Object.values(manifest.keys)) if (e.stamp) { for (const t of ['procedural', 'authored']) { o[t].runs += e.stamp.sources[t].runs; o[t].instances += e.stamp.sources[t].instances; } o.ambiguous_runs += e.stamp.sources.ambiguous.length; } return o; })(),
   };
@@ -1255,31 +1359,30 @@ try {
   console.log(`canvas svg: ${results.length} keyed textures, ${failed} failed, ${(totalBytes / 1024).toFixed(0)} KiB -> ${path.relative(process.cwd(), outDir)}`);
 
   // ---------------------------------------------------------------- contact sheets (with --png): one row per key,
-  // real canvas | SVG rasterized by Edge | |diff| x4, labelled; failing, pixel-noise and stamping-priority keys first
+  // canvas | direct SVG | optimized SVG | |A-B| x4 | |B-C| x4; failing keys first, then the worst emitter error d(B,C)
   if (args.png) {
-    const PRIORITY = ['sakura-speck4', 'st-gravel', 'plaza-notice', 'sakura-blossom-atlas', 'sakura-bark-old', 'env-shrub2', 'plaza-tiles', 'plaza-circle'];
-    const keys = Object.keys(manifest.keys).filter(k => scores[k] && scores[k].png && manifest.keys[k].score && !manifest.keys[k].score.error);
-    // flagged first: failing or near a threshold (colour error > 75% of the limit, coverage < 0.995)
-    const near = (k) => { const e = manifest.keys[k]; return e.score.mae > 0.75 * MAE_MAX || e.score.cov_1px < 0.995; };
-    const rank = (k) => { const e = manifest.keys[k]; return !e.pass || near(k) ? 0 : e.noise_flag ? 1 : PRIORITY.includes(k) ? 2 : 3; };
-    // with floors measured: failing keys first, then worst residual-minus-floor (excess) first
-    if (Object.keys(floors).length) keys.sort((a, b) => (manifest.keys[a].pass - manifest.keys[b].pass) || (manifest.keys[b].excess ?? 0) - (manifest.keys[a].excess ?? 0));
-    else keys.sort((a, b) => rank(a) - rank(b) || (rank(a) === 2 ? PRIORITY.indexOf(a) - PRIORITY.indexOf(b) : 0) || manifest.keys[b].score.mae - manifest.keys[a].score.mae);
-    const f4 = (x) => (x && !x.error ? x.mae_in_key.toFixed(4) : 'n/a');
+    const keys = Object.keys(manifest.keys).filter(k => three[k] && three[k].png && manifest.keys[k].emitter_error);
+    keys.sort((a, b) => (manifest.keys[a].pass - manifest.keys[b].pass) || manifest.keys[b].emitter_error.mae - manifest.keys[a].emitter_error.mae);
     const rows = keys.map(k => {
-      const e = manifest.keys[k], s = e.stamp;
+      const e = manifest.keys[k], s = e.stamp, dt = e.deterministic;
       return {
-        title: `${k}   ${e.width}x${e.height}   ${e.pass ? (near(k) ? 'PASS (near limit)' : 'PASS') : 'FAIL'}${e.noise_flag ? '   pixel-noise' : ''}`,
-        info: `residual ${e.score.mae.toFixed(4)}   coverage(1px) ${e.score.cov_1px.toFixed(4)}   IoU ${e.score.iou.toFixed(3)}` +
-          (e.floors ? `   floors: canvas ${f4(e.floors.canvas)}  svg ${f4(e.floors.svg)}  raster ${f4(e.floors.raster)}   excess ${(e.excess ?? 0).toFixed(4)}` : ''),
+        title: `${k}   ${e.width}x${e.height}   ${e.pass ? 'PASS' : 'FAIL'}${dt ? (dt.pass ? '   deterministic' : '   NOT DETERMINISTIC') : ''}${e.noise_flag ? '   pixel-noise' : ''}`,
+        info: `floor d(A,B) ${e.floor.mae.toFixed(4)} (cov ${e.floor.cov_1px.toFixed(3)})   emitter error d(B,C) ${e.emitter_error.mae.toFixed(4)} (cov ${e.emitter_error.cov_1px.toFixed(3)})   residual d(A,C) ${e.residual.mae.toFixed(4)}   floor + emitter ${e.sanity.floor_plus_emitter.toFixed(4)}`,
         info2: (s ? `stamp ${s.runs.length} runs (${s.sources.procedural.runs} procedural / ${s.sources.authored.runs} authored), ${s.uses} inst, ${s.protos.total} protos   curves ${e.curves_before} -> ${e.curves_after}` : `no stamp runs   curves ${e.curves_before}`) +
-          (e.floors ? `   floor scene ${(e.floors.raster.scene || 'n/a').replace(/own: (\d+) rects, (\d+) circles\/ellipses, (\d+) text runs/, 'own $1 rects $2 ellipses $3 text').replace(/generic:.*/, 'generic')}` : ''),
-        fail: !e.pass || near(k), real: scores[k].png[0], svg: scores[k].png[1],
+          `   direct ${(e.direct.bytes / 1024).toFixed(0)} KiB / optimized ${(e.bytes / 1024).toFixed(0)} KiB` + (Object.keys(e.direct.no_vector_form).length ? `   NO VECTOR FORM: ${Object.keys(e.direct.no_vector_form).join(', ')}` : ''),
+        fail: !e.pass, imgs: three[k].png,
       };
     });
     const sheets = await page.evaluate(async (rows, per, cell) => {
       const load = (s) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = s; });
-      const LABEL = 56, GAP = 10, HEAD = 34, PAD = 10, W = PAD * 2 + cell * 3 + GAP * 2;
+      const LABEL = 56, GAP = 10, HEAD = 34, PAD = 10, W = PAD * 2 + cell * 5 + GAP * 4;
+      const diff = (P, Q, w, h) => {
+        const t = document.createElement('canvas'); t.width = w; t.height = h; const tg = t.getContext('2d');
+        tg.drawImage(P, 0, 0); const da = tg.getImageData(0, 0, w, h).data; tg.clearRect(0, 0, w, h); tg.drawImage(Q, 0, 0); const db = tg.getImageData(0, 0, w, h).data;
+        const D = tg.createImageData(w, h);
+        for (let i = 0; i < da.length; i += 4) { let m = 0; for (let k = 0; k < 4; k++) m = Math.max(m, Math.abs(da[i + k] - db[i + k])); const v = Math.min(255, m * 4); D.data[i] = v; D.data[i + 1] = v * 0.4; D.data[i + 2] = 0; D.data[i + 3] = 255; }
+        tg.putImageData(D, 0, 0); return t;
+      };
       const out = [];
       for (let p = 0; p < rows.length; p += per) {
         const pg = rows.slice(p, p + per);
@@ -1287,21 +1390,16 @@ try {
         const g = c.getContext('2d');
         g.fillStyle = '#1d1e22'; g.fillRect(0, 0, c.width, c.height);
         g.textBaseline = 'middle'; g.font = 'bold 14px "Segoe UI", Arial, sans-serif'; g.fillStyle = '#e6e6e6';
-        ['real canvas', 'SVG (rasterized in Edge)', '|real - SVG| x4 (max channel)'].forEach((t, i) => g.fillText(t, PAD + i * (cell + GAP), HEAD / 2));
+        ['A  real canvas', 'B  direct SVG', 'C  optimized SVG (ships)', '|A - B| x4  (floor)', '|B - C| x4  (emitter error)'].forEach((t, i) => g.fillText(t, PAD + i * (cell + GAP), HEAD / 2));
         let y = HEAD;
         for (const r of pg) {
           g.font = 'bold 13px "Segoe UI", Arial, sans-serif'; g.fillStyle = r.fail ? '#ff7070' : '#f2f2f2'; g.fillText(r.title, PAD, y + 11);
           g.font = '12px "Segoe UI", Arial, sans-serif'; g.fillStyle = r.fail ? '#ffb0b0' : '#aebccc'; g.fillText(r.info, PAD, y + 28); g.fillStyle = '#8f9bab'; g.fillText(r.info2, PAD, y + 44);
           y += LABEL;
-          const A = await load(r.real), B = await load(r.svg), w = A.width, h = A.height, sc = Math.min(cell / w, cell / h), dw = w * sc, dh = h * sc;
-          const t = document.createElement('canvas'); t.width = w; t.height = h; const tg = t.getContext('2d');
-          tg.drawImage(A, 0, 0); const da = tg.getImageData(0, 0, w, h).data; tg.clearRect(0, 0, w, h); tg.drawImage(B, 0, 0); const db = tg.getImageData(0, 0, w, h).data;
-          const D = tg.createImageData(w, h);
-          for (let i = 0; i < da.length; i += 4) { let m = 0; for (let k = 0; k < 4; k++) m = Math.max(m, Math.abs(da[i + k] - db[i + k])); const v = Math.min(255, m * 4); D.data[i] = v; D.data[i + 1] = v * 0.4; D.data[i + 2] = 0; D.data[i + 3] = 255; }
-          tg.putImageData(D, 0, 0);
-          [A, B, t].forEach((img, i) => {
+          const [A, B, C] = [await load(r.imgs[0]), await load(r.imgs[1]), await load(r.imgs[2])], w = A.width, h = A.height, sc = Math.min(cell / w, cell / h), dw = w * sc, dh = h * sc;
+          [A, B, C, diff(A, B, w, h), diff(B, C, w, h)].forEach((img, i) => {
             const x = PAD + i * (cell + GAP);
-            if (i < 2) for (let cy = 0; cy < cell; cy += 16) for (let cx = 0; cx < cell; cx += 16) { g.fillStyle = ((cx + cy) / 16) % 2 ? '#8f8f8f' : '#bdbdbd'; g.fillRect(x + cx, y + cy, 16, 16); }
+            if (i < 3) for (let cy = 0; cy < cell; cy += 16) for (let cx = 0; cx < cell; cx += 16) { g.fillStyle = ((cx + cy) / 16) % 2 ? '#8f8f8f' : '#bdbdbd'; g.fillRect(x + cx, y + cy, 16, 16); }
             else { g.fillStyle = '#000'; g.fillRect(x, y, cell, cell); }
             g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
             g.drawImage(img, x + (cell - dw) / 2, y + (cell - dh) / 2, dw, dh);
