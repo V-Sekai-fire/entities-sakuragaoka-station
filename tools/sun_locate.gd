@@ -444,14 +444,22 @@ func _analyze() -> void:
 		if opt.has("orig"):
 			engines.append({"name": "original_true_mask", "images": opt.oracle, "buffers": opt.port, "num": 0, "den": 1,
 				"den_images": opt.orig.path_join("noshadow_%d.png")})
+	if opt.has("engines"):
+		var keep: PackedStringArray = opt.engines.split(",")
+		engines = engines.filter(func(x): return x.name in keep)
 	var recs := {}
 	for e in engines:
 		e["boot"] = nboot
+		e["edge_boot"] = int(opt.get("edge-boot", "0"))
 		e["meta"] = meta
 		recs[e.name] = fit.engine(e, views)
 		if e.name in ["oracle", "port", "control", "original_rerender"]:
 			recs[e.name]["toon_bands"] = fit.toon(e, views, meta, nboot)
 	var out := _summary(recs, meta, opt, sp, fit)
+	out["run"] = {"port": opt.port.get_file(), "station_fit": meta.sun_shadow.get("station_fit"), "ramp_control": meta.get("ramp_control"),
+		"render": meta.views.map(func(v): return {"view": v.view, "visible": v.get("render_visible"), "shadow": v.get("render_shadow")})}
+	if opt.has("mad"):
+		out.run["mad"] = views.map(func(v): return fit.gpu.mad(opt.port.path_join("port-view_%d.png" % v), opt.mad % v))
 	out["log"] = fit.log_lines
 	if opt.has("json"):
 		var f := FileAccess.open(opt.json, FileAccess.WRITE)

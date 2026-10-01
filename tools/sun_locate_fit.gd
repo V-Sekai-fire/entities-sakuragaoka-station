@@ -215,6 +215,23 @@ func engine(e: Dictionary, views: Array) -> Dictionary:
 		boot_az.append(b.az)
 		boot_el.append(b.el)
 	rec.joint["bootstrap"] = _spread(boot_az, boot_el, joint)
+	# the edge model's own spread over posts: every parameter refitted per replicate
+	var eb := []
+	for r in int(e.get("edge_boot", 0)):
+		var f: Dictionary = gpu.fit(0, n_entries, 0, wins.size(), joint, null, 1000 + r, 8)
+		eb.append([f.d, f.b, exp(f.ls)])
+	if eb.size() >= 2:
+		var sd := []
+		for k in 3:
+			var m := 0.0
+			for x in eb:
+				m += x[k]
+			m /= eb.size()
+			var v := 0.0
+			for x in eb:
+				v += (x[k] - m) ** 2
+			sd.append(sqrt(v / (eb.size() - 1)))
+		rec.edge_model["bootstrap_sd"] = {"replicates": eb.size(), "dilation": sd[0], "normal_bias": sd[1], "blur_m": sd[2]}
 	# per view and per post, the edge model held
 	var by_view := {}
 	for wi in wins.size():

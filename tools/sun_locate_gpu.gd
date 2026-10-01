@@ -799,6 +799,24 @@ void main() {
 }
 """
 
+# sum over pixels of |img - outp| in RGB (8-bit codes) into acc[0], acc[1] (low, high 16 bits a pixel each)
+const K_MAD := """
+layout(local_size_x = 256) in;
+shared uint red[256];
+void main() {
+	uint i = gl_GlobalInvocationID.x, lid = gl_LocalInvocationID.x;
+	uint v = 0u;
+	if (i < uint(NPIX)) {
+		uvec4 a = uvec4(unpackUnorm4x8(img[i]) * 255.0 + 0.5), b = uvec4(unpackUnorm4x8(outp[i]) * 255.0 + 0.5);
+		v = uint(abs(int(a.r) - int(b.r)) + abs(int(a.g) - int(b.g)) + abs(int(a.b) - int(b.b)));
+	}
+	red[lid] = v;
+	barrier();
+	for (uint st = 128u; st > 0u; st >>= 1) { if (lid < st) red[lid] += red[lid + st]; barrier(); }
+	if (lid == 0u) atomicAdd(acc[(gl_WorkGroupID.x & 1u)], int(red[0]));
+}
+"""
+
 var rd: RenderingDevice
 var shaders := {}
 var pipes := {}
@@ -818,7 +836,7 @@ func _init() -> void:
 	var kernels := {"decode": K_DECODE, "rel": K_REL, "collect": K_COLLECT, "levels": K_LEVELS, "search": K_SEARCH,
 			"pick_angle": K_PICK_ANGLE, "corr": K_CORR, "centre": K_CENTRE, "window": K_WINDOW, "cost": K_COST,
 			"argmin": K_ARGMIN, "tip": K_TIP, "obstip": K_OBSTIP, "tb_collect": K_TB_COLLECT, "tb_regions": K_TB_REGIONS,
-			"tb_cost": K_TB_COST, "maskw": K_MASKW, "maskm": K_MASKM, "sheet": K_SHEET, "depthcmp": K_DEPTHCMP}
+			"tb_cost": K_TB_COST, "maskw": K_MASKW, "maskm": K_MASKM, "sheet": K_SHEET, "depthcmp": K_DEPTHCMP, "mad": K_MAD}
 	for k in kernels:
 		var src := RDShaderSource.new()
 		src.source_compute = hdr + kernels[k]
@@ -1280,3 +1298,13 @@ func depth_check(geo_path: String) -> Dictionary:
 				out[q[0]] = pow(10.0, (b + 0.5) / 256.0 * 7.0 - 6.0)
 				break
 	return out
+
+
+## Mean absolute difference of two 1920 x 1080 PNGs over every pixel and RGB channel, 0..255.
+func mad(a: String, b: String) -> float:
+	if not load_png(a, "img") or not load_png(b, "outp"):
+		return -1.0
+	rd.buffer_clear(bufs.acc, 0, 8)
+	run("mad", (NPIX + 255) / 256)
+	var t := uints("acc", 0, 2)
+	return (float(t[0]) + float(t[1])) / (NPIX * 3.0)
