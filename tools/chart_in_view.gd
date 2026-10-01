@@ -27,7 +27,6 @@ const NL_MIN := 0.25
 const TURN_MAX_DEG := 60.0
 const PROBE_MARGIN := 1.3
 const INSET := 2.0
-# every preferred candidate is probed; the wide grid only when a state has fewer than ENOUGH
 const DISTANCES := [3.0, 2.6, 3.4, 2.2, 3.8, 1.8, 4.4, 1.4, 1.1]
 const SY := [0.75, 0.68, 0.82, 0.6, 0.88]
 const SX := [0.5, 0.38, 0.62, 0.26, 0.74, 0.14, 0.86]
@@ -196,50 +195,11 @@ static func _quad_box(q: PackedVector2Array) -> Rect2:
 
 ## Classifies one probe from the frame: the pixels inside its quad, INSET px in from the edges.
 static func _classify(d: PackedByteArray, w: int, h: int, q: PackedVector2Array) -> Dictionary:
-	var centre := (q[0] + q[1] + q[2] + q[3]) / 4.0
-	var edges := []
-	for i in 4:
-		var a := q[i]
-		var e := (q[(i + 1) % 4] - a).normalized()
-		var n := Vector2(-e.y, e.x)
-		if (centre - a).dot(n) < 0.0:
-			n = -n
-		edges.append([a, n])
-	var box := _quad_box(q)
-	var n_px := 0
-	var hidden := 0
-	var lo := 255
-	var hi := 0
-	for y in range(maxi(int(box.position.y), 0), mini(int(box.end.y) + 1, h)):
-		var yc := y + 0.5
-		var x0 := -INF
-		var x1 := INF
-		var row_ok := true
-		for e in edges:
-			var a: Vector2 = e[0]
-			var n: Vector2 = e[1]
-			var rhs := INSET + a.dot(n) - n.y * yc
-			if absf(n.x) < 1e-6:
-				if rhs > 0.0:
-					row_ok = false
-			elif n.x > 0.0:
-				x0 = maxf(x0, rhs / n.x)
-			else:
-				x1 = minf(x1, rhs / n.x)
-		if not row_ok:
-			continue
-		for x in range(maxi(ceili(x0 - 0.5), 0), mini(floori(x1 - 0.5), w - 1) + 1):
-			var i := (y * w + x) * 3
-			n_px += 1
-			if d[i + 1] < 250 or d[i + 2] > 5:
-				hidden += 1
-				continue
-			lo = mini(lo, d[i])
-			hi = maxi(hi, d[i])
+	var r := Kernels.probe_scan(d, w, h, q, INSET)
 	var state := "offscreen"
-	if n_px > 0:
-		state = "hidden" if hidden > 0 else ("lit" if lo >= 250 else ("shadow" if hi <= 5 else "mixed"))
-	return {"state": state, "pixels": n_px, "hidden": hidden, "att_min": lo / 255.0, "att_max": hi / 255.0}
+	if r[0] > 0:
+		state = "hidden" if r[1] > 0 else ("lit" if r[2] >= 250 else ("shadow" if r[3] <= 5 else "mixed"))
+	return {"state": state, "pixels": r[0], "hidden": r[1], "att_min": r[2] / 255.0, "att_max": r[3] / 255.0}
 
 
 ## Every candidate's probe, in passes of probes that do not overlap on screen.
@@ -463,7 +423,6 @@ func _pick_all() -> void:
 	quit()
 
 
-# ------------------------------------------------------------------------------------ render
 
 func _render_all() -> void:
 	var pl: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(_a.get("placements", "")))
@@ -519,14 +478,8 @@ static func _same(a: Image, b: Image) -> Array:
 	var db := y.get_data()
 	if da == db:
 		return [true, 0, 0]
-	var n := 0
-	var m := 0
-	for i in range(0, mini(da.size(), db.size()), 3):
-		var dd := maxi(absi(da[i] - db[i]), maxi(absi(da[i + 1] - db[i + 1]), absi(da[i + 2] - db[i + 2])))
-		if dd > 0:
-			n += 1
-			m = maxi(m, dd)
-	return [false, n, m]
+	var r := Kernels.frame_diff(da, db, PackedByteArray(), 0)
+	return [false, r[4], r[5]]
 
 
 ## dE00 on a black-red-yellow-white scale: 0 black, 5 red, 10 yellow, 20 and up white.
@@ -630,7 +583,6 @@ func _report() -> void:
 			ce["de_original_port"] = {"mean": s_og / nn, "max": worst[0], "max_patch": worst[1]}
 			ce["de_original_truth_mean"] = s_ot / nn
 			ce["de_port_truth_mean"] = s_pt / nn
-			# the neutral row's tone curve: linear luminance and L*, reference and each engine
 			var tone := {"no": [], "truth_y": [], "original_y": [], "port_y": [], "truth_l": [], "original_l": [], "port_l": [],
 					"gain_original": [], "gain_port": []}
 			for no in NEUTRALS:
