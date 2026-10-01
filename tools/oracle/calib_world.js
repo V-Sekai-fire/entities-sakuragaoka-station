@@ -163,6 +163,7 @@ export async function build(ctx) {
   }
   if (scene.views) inViewCharts(ctx, chart, scene.views);
   if (scene.probe) shadowProbes(ctx, scene.probe);
+  for (const root of scene.hide ? [ctx.staticRoot, ctx.dynamicRoot] : []) root.traverse((o) => { if (scene.hide.some((h) => (o.name || '').startsWith(h))) o.visible = false; });
   if (ctx.renderer) hookPost(ctx.renderer);
   window.__calib = scene;
 }
