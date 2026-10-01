@@ -265,6 +265,14 @@ function installRecorder() {
     Object.defineProperty(C.prototype, n, { ...d, set(v) { d.set.call(this, v); const r = recs.get(this); if (r) { r.items.push({ k: 'reset', rg: window.__rngCalls || 0 }); r.path = []; r.cur = r.start = null; r.clip = null; r.stack = []; } } });
   }
 
+  CR.exportTexts = (ids) => {
+    const seen = new Set(), out = [], todo = [...ids];
+    while (todo.length) {
+      const id = todo.pop(); if (seen.has(id)) continue; seen.add(id);
+      for (const it of byId[id].items) { if (it.k === 'text') out.push({ k: 'text', font: it.font, chars: it.chars.map(c => [c[0]]) }); if (it.k === 'image') todo.push(it.src); }
+    }
+    return JSON.stringify(out);
+  };
   // export: the display lists of the given canvases and everything they drawImage from
   CR.export = (ids) => {
     const out = {}; const clips = {};
@@ -367,8 +375,8 @@ try {
   const keyed = await collectKeyed(page);
   if (keyed.nerr) console.warn(`recorder errors: ${keyed.nerr}`, keyed.errors);
   const ids = keyed.res.filter(k => k.id >= 0).map(k => k.id);
-  const dump = JSON.parse(await page.evaluate((ids) => window.__cr.export(ids), ids));
-  const { canvases, clips } = dump;
+  // one key at a time: an export of every key's display list grows with the scene past V8's string limit
+  const canvases = {}, clips = {};
   // exact arcs -> the cubic approximation the optimized SVG has always used (same arithmetic as the former in-page
   // expansion, so its output is unchanged); the exact segments stay in .dx for the direct SVG
   const expandArcs = (d) => {
@@ -390,8 +398,14 @@ try {
     }
     return out;
   };
-  for (const c of Object.values(canvases)) for (const it of c.items) if (it.d) { it.dx = it.d; it.d = expandArcs(it.d); }
-  for (const c of Object.values(clips)) { c.dx = c.d; c.d = expandArcs(c.d); }
+  const loadKey = async (id) => {
+    for (const k of Object.keys(canvases)) delete canvases[k];
+    for (const k of Object.keys(clips)) delete clips[k];
+    const d = JSON.parse(await page.evaluate((id) => window.__cr.export([id]), id));
+    Object.assign(canvases, d.canvases); Object.assign(clips, d.clips);
+    for (const c of Object.values(canvases)) for (const it of c.items) if (it.d) { it.dx = it.d; it.d = expandArcs(it.d); }
+    for (const c of Object.values(clips)) { c.dx = c.d; c.d = expandArcs(c.d); }
+  };
 
   // ---------------------------------------------------------------- fonts for text outlines
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -450,7 +464,7 @@ try {
       }
     }
   };
-  await ensureFonts(Object.values(canvases));
+  await ensureFonts([{ items: JSON.parse(await page.evaluate((ids) => window.__cr.exportTexts(ids), ids)) }]);
   const glyphFor = (pf, ch) => {
     for (const fam of pf.fams) {
       if (!GOOGLE[fam]) continue;
@@ -1053,13 +1067,25 @@ try {
       return s;
     };
     const BIG = Math.max(W, H) * 4 + 100, bigRect = `M${-BIG} ${-BIG}L${BIG} ${-BIG}L${BIG} ${BIG}L${-BIG} ${BIG}Z`;
-    const erase = (segs, rule, clip, frac) => { // exact for opaque erasing; partial erase keeps a faded copy inside the region
+    const erase = (segs, rule, clip) => { // opaque erase (clearRect, full-alpha destination-out) as a complement clip
       const inner = render(out); out.length = 0; if (!inner) return;
       const kids = [`<path d="${bigRect}${directPath(segs, null)}" clip-rule="evenodd"/>`];
       for (const cl of chainOf(clip)) kids.push(`<path d="${bigRect}${directPath(clips[cl].dx, null)}" clip-rule="evenodd"/>`);
       const id = `${prefix}${seq++}`; defs.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse">${kids.join('')}</clipPath>`);
       out.push({ clip: 0, xml: `<g clip-path="url(#${id})">${inner}</g>` });
-      if (frac < 1) { const id2 = `${prefix}${seq++}`; defs.push(`<clipPath id="${id2}" clipPathUnits="userSpaceOnUse"><path d="${directPath(segs, null)}"${rule === 'evenodd' ? ' clip-rule="evenodd"' : ''}/></clipPath>`); out.push({ clip, xml: `<g clip-path="url(#${id2})" opacity="${g9(1 - frac)}">${inner}</g>` }); }
+    };
+    // partial erase as a luminance mask, so what was drawn appears once; back-to-back erases share one mask
+    let lastMask = null;
+    const maskErase = (segs, rule, clip, frac) => {
+      let region = `<path d="${directPath(segs, null)}" fill="black" fill-opacity="${g9(frac)}"${rule === 'evenodd' ? ' fill-rule="evenodd"' : ''}/>`;
+      for (const cl of chainOf(clip).reverse()) region = `<g clip-path="url(#${clipId(cl)})">${region}</g>`;
+      if (lastMask && out.length === 1 && out[0] === lastMask.node) { lastMask.regions.push(region); return; }
+      const inner = render(out); out.length = 0; if (!inner) return;
+      const id = `${prefix}${seq++}`;
+      const m = { regions: [region], toString() { return `<mask id="${id}" maskUnits="userSpaceOnUse" x="${-BIG}" y="${-BIG}" width="${2 * BIG}" height="${2 * BIG}"><rect x="${-BIG}" y="${-BIG}" width="${2 * BIG}" height="${2 * BIG}" fill="white"/>${this.regions.join('')}</mask>`; } };
+      defs.push(m);
+      m.node = { clip: 0, xml: `<g mask="url(#${id})">${inner}</g>` };
+      out.push(m.node); lastMask = m;
     };
     const rectOf = (it) => { // a fillRect/strokeRect as <rect> in its user space
       const im = invert(it.m); if (!im) return null;
@@ -1081,7 +1107,7 @@ try {
       if (it.shadow) U('no vector form: shadow');
       if (it.filter) U('no vector form: filter ' + it.filter.replace(/\(.*$/, ''));
       if (it.comp) {
-        if (it.comp === 'destination-out' && it.k === 'fill' && it.paint.t === 'c' && it.paint.c) { erase(it.dx, it.rule, it.clip, it.paint.c[3] * it.alpha); continue; }
+        if (it.comp === 'destination-out' && it.k === 'fill' && it.paint.t === 'c' && it.paint.c) { const frac = it.paint.c[3] * it.alpha; if (frac < 1) maskErase(it.dx, it.rule, it.clip, frac); else erase(it.dx, it.rule, it.clip, 1); continue; }
         U('no vector form: globalCompositeOperation ' + it.comp + (it.k === 'fill' ? '' : ' on ' + it.k));
         if (it.comp === 'destination-out') continue;
       }
@@ -1144,19 +1170,6 @@ try {
     protoInfo: new Map(), stampGradIds: new Set(), stampGradUses: 0, stampGradAlphaFactored: new Set(), inlined: 0, dupBytes: 0, unsup: {} });
   const wrapSvg = (em) => `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="${em.W}" height="${em.H}" viewBox="0 0 ${em.W} ${em.H}">` +
     (em.defs.length ? `<defs>${em.defs.join('')}</defs>` : '') + em.body + '</svg>\n';
-  const results = [];
-  for (const kk of keyed.res) {
-    const stats = freshStats();
-    if (kk.id < 0) { results.push({ ...kk, file: null, error: `texture image is ${kk.kind}, not a recorded canvas` }); continue; }
-    const cv = canvases[kk.id];
-    const em = emitCanvas(kk.id, cv.items.length, 'p', stats);
-    const svg = wrapSvg(em);
-    const ops = cv.ops;
-    // B: the direct 1:1 SVG of the same recording (reference for the emitter error)
-    const dnotes = {}, direct = wrapSvg(emitDirect(kk.id, cv.items.length, 'd', (k, c = 1) => { dnotes[k] = (dnotes[k] || 0) + c; }));
-    results.push({ ...kk, file: safe(kk.key) + '.svg', svg, stats, ops, direct, dnotes });
-  }
-
   // ---------------------------------------------------------------- metric: ONE implementation, injected into the pages
   // A = reference RGBA, B = candidate RGBA (getImageData, unpremultiplied), both w x h.
   //  mae      alpha-weighted mean |linear RGB| difference (weight = max alpha of the two pixels)
@@ -1198,33 +1211,46 @@ try {
     window.__unb64 = (b) => { const s = atob(b); const u = new Uint8ClampedArray(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; };
   }, scoreRGBA.toString());
 
-  // ---------------------------------------------------------------- three-way verification
+  // ---------------------------------------------------------------- three-way verification, one key at a time
   //  A = the real canvas (oracle); B = the DIRECT SVG (every recorded call 1:1, full precision); C = the optimized
   //  SVG (what ships). floor = d(A,B): the rasterizer's irreducible canvas-vs-vector difference on the key's full
   //  content; emitter error = d(B,C): what the optimizations add; residual = d(A,C), which is what pass/fail uses.
   //  Same metric everywhere; both SVGs are rasterized on a CPU-backed canvas.
+  fs.mkdirSync(outDir, { recursive: true });
+  if (!onlyKeys) for (const f of fs.readdirSync(outDir)) if (f.endsWith('.svg')) fs.unlinkSync(path.join(outDir, f));
+  const directDir = args['direct-out'] ? path.resolve(args['direct-out']) : fs.mkdtempSync(path.join(os.tmpdir(), 'canvas-svg-direct-'));
+  fs.mkdirSync(directDir, { recursive: true });
+  if (args.png) fs.mkdirSync(args.png, { recursive: true });
   await installHelpers(page);
-  const scores = {}, three = {};
-  const todo = results.filter(r => r.svg);
-  for (let i = 0; i < todo.length; i += 10) {
-    const batch = todo.slice(i, i + 10).map(r => [r.key, r.svg, r.direct]);
-    Object.assign(three, await page.evaluate(async (batch, png) => {
-      const res = {};
-      for (const [key, svgC, svgB] of batch) {
-        const c = window.__texByKey.get(key).image, w = c.width, h = c.height;
-        const A = c.getContext('2d').getImageData(0, 0, w, h).data;
-        const rC = await window.__svgRaster(svgC, w, h), rB = await window.__svgRaster(svgB, w, h);
-        if (!rC || !rB) { res[key] = { error: (!rC ? 'optimized' : 'direct') + ' svg decode failed' }; continue; }
-        res[key] = {
-          residual: window.__score(A, rC.data, w, h), floor: window.__score(A, rB.data, w, h), emitter: window.__score(rB.data, rC.data, w, h),
-          hashA: await window.__hash(A), hashB: await window.__hash(rB.data), hashC: await window.__hash(rC.data),
-        };
-        if (png) res[key].png = [c.toDataURL('image/png'), rB.canvas.toDataURL('image/png'), rC.canvas.toDataURL('image/png')];
-      }
+  const results = [];
+  for (const kk of keyed.res) {
+    if (kk.id < 0) { results.push({ ...kk, file: null, error: `texture image is ${kk.kind}, not a recorded canvas` }); continue; }
+    await loadKey(kk.id);
+    await ensureFonts(Object.values(canvases));
+    const stats = freshStats(), cv = canvases[kk.id], file = safe(kk.key) + '.svg';
+    const svg = wrapSvg(emitCanvas(kk.id, cv.items.length, 'p', stats));
+    // B: the direct 1:1 SVG of the same recording (reference for the emitter error)
+    const dnotes = {}, direct = wrapSvg(emitDirect(kk.id, cv.items.length, 'd', (k, c = 1) => { dnotes[k] = (dnotes[k] || 0) + c; }));
+    fs.writeFileSync(path.join(outDir, file), svg);
+    fs.writeFileSync(path.join(directDir, file), direct);
+    const three = await page.evaluate(async (key, svgC, svgB, png) => {
+      const c = window.__texByKey.get(key).image, w = c.width, h = c.height;
+      const A = c.getContext('2d').getImageData(0, 0, w, h).data;
+      const rC = await window.__svgRaster(svgC, w, h), rB = await window.__svgRaster(svgB, w, h);
+      if (!rC || !rB) return { error: (!rC ? 'optimized' : 'direct') + ' svg decode failed' };
+      const res = {
+        residual: window.__score(A, rC.data, w, h), floor: window.__score(A, rB.data, w, h), emitter: window.__score(rB.data, rC.data, w, h),
+        hashA: await window.__hash(A), hashB: await window.__hash(rB.data), hashC: await window.__hash(rC.data),
+      };
+      if (png) res.png = [c.toDataURL('image/png'), rB.canvas.toDataURL('image/png'), rC.canvas.toDataURL('image/png')];
       return res;
-    }, batch, !!args.png));
+    }, kk.key, svg, direct, !!args.png);
+    if (three.png) { for (const [i, tag] of [[0, 'real'], [1, 'direct'], [2, 'svg']]) fs.writeFileSync(path.join(args.png, file.replace(/[.]svg$/, `.${tag}.png`)), Buffer.from(three.png[i].split(',')[1], 'base64')); delete three.png; }
+    results.push({ ...kk, file, stats, ops: cv.ops, dnotes, three, bytes: Buffer.byteLength(svg), directBytes: Buffer.byteLength(direct), gradients: (svg.match(/<(linear|radial)Gradient /g) || []).length });
   }
-  for (const [k, t] of Object.entries(three)) scores[k] = t.error ? t : t.residual;
+  for (const k of Object.keys(canvases)) delete canvases[k];
+  for (const k of Object.keys(clips)) delete clips[k];
+  await page.close();
 
   // determinism precondition: a second, independent page load must reproduce A, B's raster and C's raster
   // byte for byte ("0,0 is identity": canvas-vs-canvas and SVG-vs-SVG prove determinism, they are not floors)
@@ -1233,29 +1259,24 @@ try {
     const page2 = await open(gateTexts);
     await installHelpers(page2);
     await collectKeyed(page2);
-    for (let i = 0; i < todo.length; i += 10) Object.assign(det, await page2.evaluate(async (batch) => {
-      const res = {};
-      for (const [key, svgC, svgB] of batch) {
-        const t = window.__texByKey.get(key); if (!t || !t.image) { res[key] = null; continue; }
+    for (const r of results) {
+      if (!r.file) continue;
+      const svgC = fs.readFileSync(path.join(outDir, r.file), 'utf8'), svgB = fs.readFileSync(path.join(directDir, r.file), 'utf8');
+      const b = await page2.evaluate(async (key, svgC, svgB) => {
+        const t = window.__texByKey.get(key); if (!t || !t.image) return null;
         const c = t.image, w = c.width, h = c.height, A = c.getContext('2d').getImageData(0, 0, w, h).data;
         const rC = await window.__svgRaster(svgC, w, h), rB = await window.__svgRaster(svgB, w, h);
-        res[key] = { hashA: await window.__hash(A), hashB: rB ? await window.__hash(rB.data) : null, hashC: rC ? await window.__hash(rC.data) : null };
-      }
-      return res;
-    }, todo.slice(i, i + 10).map(r => [r.key, r.svg, r.direct])));
-    await page2.close();
-    for (const r of todo) {
-      const a = three[r.key], b = det[r.key];
+        return { hashA: await window.__hash(A), hashB: rB ? await window.__hash(rB.data) : null, hashC: rC ? await window.__hash(rC.data) : null };
+      }, r.key, svgC, svgB);
+      const a = r.three;
       det[r.key] = !a || a.error || !b ? { canvas: false, direct_svg: false, optimized_svg: false, pass: false, note: 'missing on one load' }
         : (({ canvas, direct_svg, optimized_svg }) => ({ canvas, direct_svg, optimized_svg, pass: canvas && direct_svg && optimized_svg }))({ canvas: a.hashA === b.hashA, direct_svg: a.hashB === b.hashB, optimized_svg: a.hashC === b.hashC });
     }
+    await page2.close();
   }
+  if (!args['direct-out']) fs.rmSync(directDir, { recursive: true, force: true });
 
   // ---------------------------------------------------------------- write
-  if (args.png) { fs.mkdirSync(args.png, { recursive: true }); for (const r of todo) { const t = three[r.key]; if (!t || !t.png) continue; for (const [i, tag] of [[0, 'real'], [1, 'direct'], [2, 'svg']]) fs.writeFileSync(path.join(args.png, r.file.replace(/[.]svg$/, `.${tag}.png`)), Buffer.from(t.png[i].split(',')[1], 'base64')); } }
-  if (args['direct-out']) { const d = path.resolve(args['direct-out']); fs.mkdirSync(d, { recursive: true }); for (const r of todo) fs.writeFileSync(path.join(d, r.file), r.direct); }
-  fs.mkdirSync(outDir, { recursive: true });
-  if (!onlyKeys) for (const f of fs.readdirSync(outDir)) if (f.endsWith('.svg')) fs.unlinkSync(path.join(outDir, f));
   const manifest = {
     generated_by: 'tools/oracle/canvas_svg.mjs', only: args.only || null,
     thresholds: {
@@ -1300,10 +1321,9 @@ try {
   const NOFORM = /^(no vector form|no SVG 1\.1 form|text:missing-glyph)/;
   const srcCount = (runs) => { const o = { procedural: { runs: 0, instances: 0 }, authored: { runs: 0, instances: 0 }, ambiguous: [] }; for (const r of runs) { o[r.source].runs++; o[r.source].instances += r.instances; if (r.ambiguous) o.ambiguous.push({ run: r.run, source: r.source, instances: r.instances, why: r.ambiguous }); } return o; };
   for (const r of results) {
-    if (!r.svg) { manifest.keys[r.key] = { error: r.error, width: r.w, height: r.h }; failed++; continue; }
-    fs.writeFileSync(path.join(outDir, r.file), r.svg);
-    const bytes = Buffer.byteLength(r.svg); totalBytes += bytes; directBytes += Buffer.byteLength(r.direct);
-    const sc = scores[r.key] || { error: 'not scored' }, t = three[r.key] || {}, dt = det[r.key];
+    if (!r.file) { manifest.keys[r.key] = { error: r.error, width: r.w, height: r.h }; failed++; continue; }
+    const bytes = r.bytes; totalBytes += bytes; directBytes += r.directBytes;
+    const t = r.three || { error: 'not scored' }, sc = t.error ? t : t.residual, dt = det[r.key];
     const pass = !sc.error && sc.mae <= MAE_MAX && sc.cov1px >= COV_MIN && (!dt || dt.pass);
     if (!pass) failed++;
     const st = r.stats;
@@ -1319,7 +1339,7 @@ try {
       // before: every stamped instance expanded; after: each prototype counted once per key
       curves_before: plainCurves + st.stampCurvesExpanded,
       curves_after: plainCurves + protoList.reduce((s, p) => s + p.curves, 0),
-      gradients: (r.svg.match(/<(linear|radial)Gradient /g) || []).length,
+      gradients: r.gradients,
       stamp: st.uses ? {
         runs: st.runs, uses: st.uses,
         protos: { total: protoList.length, by_kind: byKind, singletons: protoList.filter(p => p.uses === 1).length },
@@ -1336,7 +1356,7 @@ try {
       residual: m5(t.residual), floor: m5(t.floor), emitter_error: m5(t.emitter),
       sanity: t.residual ? { residual: +t.residual.mae.toFixed(5), floor_plus_emitter: +(t.floor.mae + t.emitter.mae).toFixed(5), gap: +(t.residual.mae - t.floor.mae - t.emitter.mae).toFixed(5) } : undefined,
       deterministic: dt,
-      direct: { bytes: Buffer.byteLength(r.direct), no_vector_form: noForm, notes: Object.keys(dnotes).length ? dnotes : undefined },
+      direct: { bytes: r.directBytes, no_vector_form: noForm, notes: Object.keys(dnotes).length ? dnotes : undefined },
     };
   }
   const live = Object.values(manifest.keys).filter(e => e.residual && e.floor && e.emitter_error);
@@ -1361,7 +1381,7 @@ try {
   // ---------------------------------------------------------------- contact sheets (with --png): one row per key,
   // canvas | direct SVG | optimized SVG | |A-B| x4 | |B-C| x4; failing keys first, then the worst emitter error d(B,C)
   if (args.png) {
-    const keys = Object.keys(manifest.keys).filter(k => three[k] && three[k].png && manifest.keys[k].emitter_error);
+    const keys = Object.keys(manifest.keys).filter(k => manifest.keys[k].emitter_error && fs.existsSync(path.join(args.png, manifest.keys[k].file.replace(/[.]svg$/, '.real.png'))));
     keys.sort((a, b) => (manifest.keys[a].pass - manifest.keys[b].pass) || manifest.keys[b].emitter_error.mae - manifest.keys[a].emitter_error.mae);
     const rows = keys.map(k => {
       const e = manifest.keys[k], s = e.stamp, dt = e.deterministic;
@@ -1370,48 +1390,50 @@ try {
         info: `floor d(A,B) ${e.floor.mae.toFixed(4)} (cov ${e.floor.cov_1px.toFixed(3)})   emitter error d(B,C) ${e.emitter_error.mae.toFixed(4)} (cov ${e.emitter_error.cov_1px.toFixed(3)})   residual d(A,C) ${e.residual.mae.toFixed(4)}   floor + emitter ${e.sanity.floor_plus_emitter.toFixed(4)}`,
         info2: (s ? `stamp ${s.runs.length} runs (${s.sources.procedural.runs} procedural / ${s.sources.authored.runs} authored), ${s.uses} inst, ${s.protos.total} protos   curves ${e.curves_before} -> ${e.curves_after}` : `no stamp runs   curves ${e.curves_before}`) +
           `   direct ${(e.direct.bytes / 1024).toFixed(0)} KiB / optimized ${(e.bytes / 1024).toFixed(0)} KiB` + (Object.keys(e.direct.no_vector_form).length ? `   NO VECTOR FORM: ${Object.keys(e.direct.no_vector_form).join(', ')}` : ''),
-        fail: !e.pass, imgs: three[k].png,
+        fail: !e.pass, file: e.file,
       };
     });
-    const sheets = await page.evaluate(async (rows, per, cell) => {
+    const sheetPage = await browser.newPage();
+    const drawSheet = async (pg, cell) => {
       const load = (s) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = s; });
       const LABEL = 56, GAP = 10, HEAD = 34, PAD = 10, W = PAD * 2 + cell * 5 + GAP * 4;
       const diff = (P, Q, w, h) => {
-        const t = document.createElement('canvas'); t.width = w; t.height = h; const tg = t.getContext('2d');
+        const t = document.createElement('canvas'); t.width = w; t.height = h; const tg = t.getContext('2d', { willReadFrequently: true });
         tg.drawImage(P, 0, 0); const da = tg.getImageData(0, 0, w, h).data; tg.clearRect(0, 0, w, h); tg.drawImage(Q, 0, 0); const db = tg.getImageData(0, 0, w, h).data;
         const D = tg.createImageData(w, h);
         for (let i = 0; i < da.length; i += 4) { let m = 0; for (let k = 0; k < 4; k++) m = Math.max(m, Math.abs(da[i + k] - db[i + k])); const v = Math.min(255, m * 4); D.data[i] = v; D.data[i + 1] = v * 0.4; D.data[i + 2] = 0; D.data[i + 3] = 255; }
         tg.putImageData(D, 0, 0); return t;
       };
-      const out = [];
-      for (let p = 0; p < rows.length; p += per) {
-        const pg = rows.slice(p, p + per);
-        const c = document.createElement('canvas'); c.width = W; c.height = HEAD + pg.length * (LABEL + cell + GAP) + PAD;
-        const g = c.getContext('2d');
-        g.fillStyle = '#1d1e22'; g.fillRect(0, 0, c.width, c.height);
-        g.textBaseline = 'middle'; g.font = 'bold 14px "Segoe UI", Arial, sans-serif'; g.fillStyle = '#e6e6e6';
-        ['A  real canvas', 'B  direct SVG', 'C  optimized SVG (ships)', '|A - B| x4  (floor)', '|B - C| x4  (emitter error)'].forEach((t, i) => g.fillText(t, PAD + i * (cell + GAP), HEAD / 2));
-        let y = HEAD;
-        for (const r of pg) {
-          g.font = 'bold 13px "Segoe UI", Arial, sans-serif'; g.fillStyle = r.fail ? '#ff7070' : '#f2f2f2'; g.fillText(r.title, PAD, y + 11);
-          g.font = '12px "Segoe UI", Arial, sans-serif'; g.fillStyle = r.fail ? '#ffb0b0' : '#aebccc'; g.fillText(r.info, PAD, y + 28); g.fillStyle = '#8f9bab'; g.fillText(r.info2, PAD, y + 44);
-          y += LABEL;
-          const [A, B, C] = [await load(r.imgs[0]), await load(r.imgs[1]), await load(r.imgs[2])], w = A.width, h = A.height, sc = Math.min(cell / w, cell / h), dw = w * sc, dh = h * sc;
-          [A, B, C, diff(A, B, w, h), diff(B, C, w, h)].forEach((img, i) => {
-            const x = PAD + i * (cell + GAP);
-            if (i < 3) for (let cy = 0; cy < cell; cy += 16) for (let cx = 0; cx < cell; cx += 16) { g.fillStyle = ((cx + cy) / 16) % 2 ? '#8f8f8f' : '#bdbdbd'; g.fillRect(x + cx, y + cy, 16, 16); }
-            else { g.fillStyle = '#000'; g.fillRect(x, y, cell, cell); }
-            g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
-            g.drawImage(img, x + (cell - dw) / 2, y + (cell - dh) / 2, dw, dh);
-          });
-          y += cell + GAP;
-        }
-        out.push(c.toDataURL('image/png'));
+      const c = document.createElement('canvas'); c.width = W; c.height = HEAD + pg.length * (LABEL + cell + GAP) + PAD;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.fillStyle = '#1d1e22'; g.fillRect(0, 0, c.width, c.height);
+      g.textBaseline = 'middle'; g.font = 'bold 14px "Segoe UI", Arial, sans-serif'; g.fillStyle = '#e6e6e6';
+      ['A  real canvas', 'B  direct SVG', 'C  optimized SVG (ships)', '|A - B| x4  (floor)', '|B - C| x4  (emitter error)'].forEach((t, i) => g.fillText(t, PAD + i * (cell + GAP), HEAD / 2));
+      let y = HEAD;
+      for (const r of pg) {
+        g.font = 'bold 13px "Segoe UI", Arial, sans-serif'; g.fillStyle = r.fail ? '#ff7070' : '#f2f2f2'; g.fillText(r.title, PAD, y + 11);
+        g.font = '12px "Segoe UI", Arial, sans-serif'; g.fillStyle = r.fail ? '#ffb0b0' : '#aebccc'; g.fillText(r.info, PAD, y + 28); g.fillStyle = '#8f9bab'; g.fillText(r.info2, PAD, y + 44);
+        y += LABEL;
+        const [A, B, C] = [await load(r.imgs[0]), await load(r.imgs[1]), await load(r.imgs[2])], w = A.width, h = A.height, sc = Math.min(cell / w, cell / h), dw = w * sc, dh = h * sc;
+        [A, B, C, diff(A, B, w, h), diff(B, C, w, h)].forEach((img, i) => {
+          const x = PAD + i * (cell + GAP);
+          if (i < 3) for (let cy = 0; cy < cell; cy += 16) for (let cx = 0; cx < cell; cx += 16) { g.fillStyle = ((cx + cy) / 16) % 2 ? '#8f8f8f' : '#bdbdbd'; g.fillRect(x + cx, y + cy, 16, 16); }
+          else { g.fillStyle = '#000'; g.fillRect(x, y, cell, cell); }
+          g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+          g.drawImage(img, x + (cell - dw) / 2, y + (cell - dh) / 2, dw, dh);
+        });
+        y += cell + GAP;
       }
-      return out;
-    }, rows, 12, 256);
+      return c.toDataURL('image/png');
+    };
     if (!onlyKeys) for (const f of fs.readdirSync(outDir)) if (/^oracle-sheet-\d+\.png$/.test(f)) fs.unlinkSync(path.join(outDir, f));
-    const written = sheets.map((u, i) => { const f = path.join(outDir, `oracle-sheet-${String(i + 1).padStart(2, '0')}.png`); fs.writeFileSync(f, Buffer.from(u.split(',')[1], 'base64')); return f; });
+    const written = [];
+    for (let p = 0; p < rows.length; p += 12) {
+      const pg = rows.slice(p, p + 12).map(r => ({ ...r, imgs: ['real', 'direct', 'svg'].map(tag => 'data:image/png;base64,' + fs.readFileSync(path.join(args.png, r.file.replace(/[.]svg$/, `.${tag}.png`))).toString('base64')) }));
+      const url = await sheetPage.evaluate(drawSheet, pg, 256);
+      const f = path.join(outDir, `oracle-sheet-${String(written.length + 1).padStart(2, '0')}.png`); fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64')); written.push(f);
+    }
+    await sheetPage.close();
     console.log(`contact sheets: ${written.length} (${rows.length} keys, 12 per sheet) -> ${path.relative(process.cwd(), outDir)}${path.sep}oracle-sheet-NN.png`);
     if (args['sheet-copy']) { // copies never overwrite: numbering continues after the highest existing NN
       const dir = path.resolve(args['sheet-copy']); fs.mkdirSync(dir, { recursive: true });
@@ -1419,6 +1441,7 @@ try {
       for (const f of written) { let dst; do { nn++; dst = path.join(dir, `oracle-canvas-vs-svg-${String(nn).padStart(2, '0')}.png`); } while (fs.existsSync(dst)); fs.copyFileSync(f, dst); console.log(`sheet copy: ${dst}`); }
     }
   }
+  console.log(`peak memory: node maxRSS ${(process.resourceUsage().maxRSS / 1024).toFixed(0)} MB`);
 } finally {
   await browser.close();
   server.close();
