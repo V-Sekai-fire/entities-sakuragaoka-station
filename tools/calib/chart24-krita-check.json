@@ -1,0 +1,177 @@
+{
+ "what": "Independent check of chart24.svg with Krita's colour sampler",
+ "tool": "Krita 5.3.4 (scoop extras), SVG imported at 100 PPI as a vector layer; Color Sampler tool; Specific Color Selector docker in RGB/Alpha (8-bit integer/channel), hex read from the docker",
+ "date": "2026-10-01",
+ "by": "windows-beta (cua-windows UIA read of the hex field after each pick)",
+ "result": "24/24 exact",
+ "patches": [
+  {
+   "no": 1,
+   "name": "dark skin",
+   "expected": "#735143",
+   "krita": "#735143",
+   "match": true
+  },
+  {
+   "no": 2,
+   "name": "light skin",
+   "expected": "#c49581",
+   "krita": "#c49581",
+   "match": true
+  },
+  {
+   "no": 3,
+   "name": "blue sky",
+   "expected": "#5d7b9d",
+   "krita": "#5d7b9d",
+   "match": true
+  },
+  {
+   "no": 4,
+   "name": "foliage",
+   "expected": "#5a6c41",
+   "krita": "#5a6c41",
+   "match": true
+  },
+  {
+   "no": 5,
+   "name": "blue flower",
+   "expected": "#8281b0",
+   "krita": "#8281b0",
+   "match": true
+  },
+  {
+   "no": 6,
+   "name": "bluish green",
+   "expected": "#63bfab",
+   "krita": "#63bfab",
+   "match": true
+  },
+  {
+   "no": 7,
+   "name": "orange",
+   "expected": "#dc7b2d",
+   "krita": "#dc7b2d",
+   "match": true
+  },
+  {
+   "no": 8,
+   "name": "purplish blue",
+   "expected": "#485ca8",
+   "krita": "#485ca8",
+   "match": true
+  },
+  {
+   "no": 9,
+   "name": "moderate red",
+   "expected": "#c35462",
+   "krita": "#c35462",
+   "match": true
+  },
+  {
+   "no": 10,
+   "name": "purple",
+   "expected": "#5b3b69",
+   "krita": "#5b3b69",
+   "match": true
+  },
+  {
+   "no": 11,
+   "name": "yellow green",
+   "expected": "#a0bd3e",
+   "krita": "#a0bd3e",
+   "match": true
+  },
+  {
+   "no": 12,
+   "name": "orange yellow",
+   "expected": "#e5a129",
+   "krita": "#e5a129",
+   "match": true
+  },
+  {
+   "no": 13,
+   "name": "blue",
+   "expected": "#2b3e93",
+   "krita": "#2b3e93",
+   "match": true
+  },
+  {
+   "no": 14,
+   "name": "green",
+   "expected": "#479548",
+   "krita": "#479548",
+   "match": true
+  },
+  {
+   "no": 15,
+   "name": "red",
+   "expected": "#b03038",
+   "krita": "#b03038",
+   "match": true
+  },
+  {
+   "no": 16,
+   "name": "yellow",
+   "expected": "#eec816",
+   "krita": "#eec816",
+   "match": true
+  },
+  {
+   "no": 17,
+   "name": "magenta",
+   "expected": "#bc5496",
+   "krita": "#bc5496",
+   "match": true
+  },
+  {
+   "no": 18,
+   "name": "cyan",
+   "expected": "#0088a6",
+   "krita": "#0088a6",
+   "match": true
+  },
+  {
+   "no": 19,
+   "name": "white 9.5",
+   "expected": "#f5f5f0",
+   "krita": "#f5f5f0",
+   "match": true
+  },
+  {
+   "no": 20,
+   "name": "neutral 8",
+   "expected": "#c8c9c9",
+   "krita": "#c8c9c9",
+   "match": true
+  },
+  {
+   "no": 21,
+   "name": "neutral 6.5",
+   "expected": "#a0a1a1",
+   "krita": "#a0a1a1",
+   "match": true
+  },
+  {
+   "no": 22,
+   "name": "neutral 5",
+   "expected": "#787979",
+   "krita": "#787979",
+   "match": true
+  },
+  {
+   "no": 23,
+   "name": "neutral 3.5",
+   "expected": "#535455",
+   "krita": "#535455",
+   "match": true
+  },
+  {
+   "no": 24,
+   "name": "black 2",
+   "expected": "#323232",
+   "krita": "#323232",
+   "match": true
+  }
+ ]
+}
