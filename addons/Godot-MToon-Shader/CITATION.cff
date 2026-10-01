@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: If you use these shaders, cite godot-vrm's MToon.
+title: Godot-MToon-Shader (vendored from godot-vrm, unchanged)
+abstract: >-
+  The MToon toon shader of V-Sekai's godot-vrm, copied unchanged from
+  addons/Godot-MToon-Shader at the commit below: the common include and the
+  opaque, cull-off, cutout and transparent variants the station's renderer uses.
+authors:
+  - name: V-Sekai Contributors
+  - name: Masataka SUMI
+repository-code: https://github.com/V-Sekai-fire/godot-vrm
+commit: e15199f980064028bfa4fbee5e70dddb82dd55c3
+license: MIT

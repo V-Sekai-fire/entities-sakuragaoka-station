@@ -124,6 +124,7 @@ class Textures extends RefCounted:
 			t.repeat = Vector2(opts.repeat[0], opts.repeat[1])
 		if key != null:
 			_keyed[key] = t
+			t.user_data["key"] = key
 		return t
 
 	func canvas(w: int, h: int) -> Dictionary:
