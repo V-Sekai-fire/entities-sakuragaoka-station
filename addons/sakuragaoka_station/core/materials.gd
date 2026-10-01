@@ -63,6 +63,7 @@ func toon(c = "#ffffff", opts: Dictionary = {}) -> T.Mat:
 	var m := T.Mat.new()
 	m.type = "toon"
 	m.key = key
+	m.opts = opts.duplicate()
 	m.color = col
 	m.map = opts.get("map")
 	m.alpha_map = opts.get("alphaMap")
