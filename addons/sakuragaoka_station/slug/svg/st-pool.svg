@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="128" height="128" viewBox="0 0 128 128"><defs><radialGradient id="p0" gradientUnits="userSpaceOnUse" cx="64" cy="64" r="64"><stop offset="0" stop-color="#ffffff"/><stop offset="0.35" stop-color="#ffffff" stop-opacity="0.72"/><stop offset="0.7" stop-color="#ffffff" stop-opacity="0.22"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient></defs><path d="M0 0L128 0L128 128L0 128Z" fill="url(#p0)"/></svg>

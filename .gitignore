@@ -1,3 +1,6 @@
 .godot/
 *.import
 .DS_Store
+
+# QA contact sheets the oracle writes beside its SVGs; they are not station data
+addons/sakuragaoka_station/slug/svg/*.png
