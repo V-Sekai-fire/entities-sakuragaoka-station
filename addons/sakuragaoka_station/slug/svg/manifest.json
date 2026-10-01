@@ -16,7 +16,8 @@
   "svg": "the SVG raster against itself: the same SVG rasterized in the second page (CPU-backed canvas); 0 when byte-identical",
   "raster": "canvas API vs SVG on content both draw identically, taken from the key itself: its pixel-aligned solid rects, full circles/ellipses (native arc) and text runs (fillText), recorded and emitted by this tool; generic scene (4 pixel-aligned rects, 1 circle, 1 text run) for a key with none",
   "metric": "the residual metric (alpha-weighted mean |linear RGB|, coverage within 1 px); no blur, masks or threshold changes",
-  "excess": "residual mae minus the largest of the three floor maes"
+  "units": "mae is normalised by the weight of the floor scene itself; mae_in_key = the weighted error of the floor divided by the residual weight of the key, the unit the residual is in",
+  "excess": "residual mae minus the largest floor mae_in_key"
  },
  "run_source": {
   "method": "rng hook: the served source of mulberry32 (ctx.rng), hash2 and hash3 counts calls; every draw records the count",
@@ -141,16 +142,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00034,
+     "mae_in_key": 0.00034,
      "cov_1px": 1,
      "scene": "own: 1 rects, 260 circles/ellipses, 0 text runs"
     }
@@ -39030,16 +39034,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -39135,16 +39142,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -39317,16 +39327,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -39641,21 +39654,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00235,
+     "mae_in_key": 0.00004,
      "cov_1px": 1,
      "scene": "own: 0 rects, 5 circles/ellipses, 0 text runs"
     }
    },
-   "excess": -0.00042
+   "excess": 0.00189
   },
   "env-flowers2": {
    "file": "env-flowers2.svg",
@@ -41279,21 +41295,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00206,
+     "mae_in_key": 0.00137,
      "cov_1px": 1,
      "scene": "own: 0 rects, 639 circles/ellipses, 0 text runs"
     }
    },
-   "excess": 0
+   "excess": 0.00069
   },
   "env-mats": {
    "file": "env-mats.svg",
@@ -41424,21 +41443,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00261,
+     "mae_in_key": 0.00227,
      "cov_1px": 1,
      "scene": "own: 0 rects, 894 circles/ellipses, 0 text runs"
     }
    },
-   "excess": -0.00049
+   "excess": -0.00015
   },
   "env-reeds2": {
    "file": "env-reeds2.svg",
@@ -41490,21 +41512,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00137,
+     "mae_in_key": 0.00534,
      "cov_1px": 1,
      "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
     }
    },
-   "excess": 0.00076
+   "excess": -0.00321
   },
   "env-field-dry": {
    "file": "env-field-dry.svg",
@@ -41597,16 +41622,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -41695,16 +41723,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00163,
+     "mae_in_key": 0.00163,
      "cov_1px": 1,
      "scene": "own: 9 rects, 152 circles/ellipses, 0 text runs"
     }
@@ -41793,16 +41824,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.003,
+     "mae_in_key": 0.003,
      "cov_1px": 1,
      "scene": "own: 1 rects, 700 circles/ellipses, 0 text runs"
     }
@@ -41886,16 +41920,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 23 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -41984,16 +42021,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00289,
+     "mae_in_key": 0.00289,
      "cov_1px": 1,
      "scene": "own: 1 rects, 900 circles/ellipses, 0 text runs"
     }
@@ -42083,16 +42123,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0002,
+     "mae_in_key": 0.0002,
      "cov_1px": 1,
      "scene": "own: 1 rects, 40 circles/ellipses, 0 text runs"
     }
@@ -42125,8 +42168,8 @@
       "kinds": {
        "rect": 15
       },
-      "source": "procedural",
-      "rng_share": 1,
+      "source": "authored",
+      "rng_share": 0,
       "regularity": 0.454
      }
     ],
@@ -42146,12 +42189,12 @@
     },
     "sources": {
      "procedural": {
-      "runs": 1,
-      "instances": 15
-     },
-     "authored": {
       "runs": 0,
       "instances": 0
+     },
+     "authored": {
+      "runs": 1,
+      "instances": 15
      },
      "ambiguous": []
     }
@@ -42177,16 +42220,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 15 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -42276,16 +42322,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00213,
+     "mae_in_key": 0.00213,
      "cov_1px": 1,
      "scene": "own: 1 rects, 3396 circles/ellipses, 0 text runs"
     }
@@ -42370,16 +42419,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 19 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -42463,16 +42515,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 52 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -42519,16 +42574,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00595,
+     "mae_in_key": 0.00595,
      "cov_1px": 1,
      "scene": "own: 0 rects, 0 circles/ellipses, 1 text runs"
     }
@@ -43994,18 +44052,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00427,
+     "mae_in_key": 0.00427,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 14 circles/ellipses, 4 text runs"
+     "scene": "own: 1 rects, 14 circles/ellipses, 4 text runs (4 on backdrops)"
     }
    },
    "excess": 0.00085
@@ -44050,18 +44111,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00683,
+     "mae_in_key": 0.00683,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs"
+     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
     }
    },
    "excess": 0
@@ -44106,18 +44170,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0066,
+     "mae_in_key": 0.0066,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs"
+     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
     }
    },
    "excess": 0
@@ -44164,18 +44231,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00589,
+     "mae_in_key": 0.00589,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 4 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
     }
    },
    "excess": 0
@@ -44220,18 +44290,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00996,
+     "mae_in_key": 0.00996,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0
@@ -44806,18 +44879,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00693,
+     "mae_in_key": 0.00693,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs (3 on backdrops)"
     }
    },
    "excess": 0.00138
@@ -44869,21 +44945,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00062,
+     "mae": 0.00727,
+     "mae_in_key": 0.00541,
      "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
-   "excess": 0.00482
+   "excess": 0.00004
   },
   "env-parking-sign": {
    "file": "env-parking-sign.svg",
@@ -44932,21 +45011,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00113,
+     "mae": 0.00587,
+     "mae_in_key": 0.00361,
      "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
-   "excess": 0.00252
+   "excess": 0.00004
   },
   "env-sale-sign": {
    "file": "env-sale-sign.svg",
@@ -44995,21 +45077,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00096,
+     "mae": 0.00582,
+     "mae_in_key": 0.00289,
      "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
-   "excess": 0.00194
+   "excess": 0.00001
   },
   "st-concrete": {
    "file": "st-concrete.svg",
@@ -45313,16 +45398,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00788,
+     "mae_in_key": 0.00788,
      "cov_1px": 1,
      "scene": "own: 6 rects, 1364 circles/ellipses, 0 text runs"
     }
@@ -45411,16 +45499,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00181,
+     "mae_in_key": 0.00181,
      "cov_1px": 1,
      "scene": "own: 3 rects, 75 circles/ellipses, 0 text runs"
     }
@@ -45511,16 +45602,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00001,
+     "mae_in_key": 0.00001,
      "cov_1px": 1,
      "scene": "own: 7 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -45609,16 +45703,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00122,
+     "mae_in_key": 0.00122,
      "cov_1px": 1,
      "scene": "own: 82 rects, 26 circles/ellipses, 0 text runs"
     }
@@ -45794,16 +45891,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00587,
+     "mae_in_key": 0.00587,
      "cov_1px": 1,
      "scene": "own: 1 rects, 540 circles/ellipses, 0 text runs"
     }
@@ -45887,16 +45987,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00008,
+     "mae_in_key": 0.00008,
      "cov_1px": 1,
      "scene": "own: 97 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -45985,16 +46088,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00054,
+     "mae_in_key": 0.00054,
      "cov_1px": 1,
      "scene": "own: 16 rects, 30 circles/ellipses, 0 text runs"
     }
@@ -46078,16 +46184,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 20 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -46177,16 +46286,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00428,
+     "mae_in_key": 0.00428,
      "cov_1px": 1,
      "scene": "own: 1 rects, 12600 circles/ellipses, 0 text runs"
     }
@@ -46298,16 +46410,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00208,
+     "mae_in_key": 0.00208,
      "cov_1px": 1,
      "scene": "own: 1 rects, 630 circles/ellipses, 0 text runs"
     }
@@ -46392,16 +46507,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -46487,21 +46605,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00211,
+     "mae_in_key": 0.01206,
      "cov_1px": 1,
      "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
     }
    },
-   "excess": 0.00135
+   "excess": -0.0086
   },
   "st-wiremesh": {
    "file": "st-wiremesh.svg",
@@ -46529,10 +46650,9 @@
       "kinds": {
        "stroke": 10
       },
-      "source": "procedural",
-      "rng_share": 1,
-      "regularity": 0.664,
-      "ambiguous": "rng-driven but regular placement 0.66"
+      "source": "authored",
+      "rng_share": 0,
+      "regularity": 0.664
      }
     ],
     "uses": 10,
@@ -46567,21 +46687,14 @@
     },
     "sources": {
      "procedural": {
-      "runs": 1,
-      "instances": 10
-     },
-     "authored": {
       "runs": 0,
       "instances": 0
      },
-     "ambiguous": [
-      {
-       "run": 0,
-       "source": "procedural",
-       "instances": 10,
-       "why": "rng-driven but regular placement 0.66"
-      }
-     ]
+     "authored": {
+      "runs": 1,
+      "instances": 10
+     },
+     "ambiguous": []
     }
    },
    "tiny_rects": 0,
@@ -46609,21 +46722,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00288,
+     "mae_in_key": 0.01338,
      "cov_1px": 1,
      "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
     }
    },
-   "excess": -0.00288
+   "excess": -0.01338
   },
   "st-grime": {
    "file": "st-grime.svg",
@@ -46653,7 +46769,7 @@
        "ellipse": 60
       },
       "source": "procedural",
-      "rng_share": 1,
+      "rng_share": 0.984,
       "regularity": 0.129
      }
     ],
@@ -46709,21 +46825,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00454,
+     "mae_in_key": 0.00079,
      "cov_1px": 0.98291,
      "scene": "own: 0 rects, 60 circles/ellipses, 0 text runs"
     }
    },
-   "excess": -0.00095
+   "excess": 0.00279
   },
   "st-atlas-signs": {
    "file": "st-atlas-signs.svg",
@@ -46779,18 +46898,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.0034,
-     "cov_1px": 0.99996,
-     "scene": "own: 11 rects, 2 circles/ellipses, 68 text runs"
+     "mae": 0.00749,
+     "mae_in_key": 0.00339,
+     "cov_1px": 1,
+     "scene": "own: 11 rects, 2 circles/ellipses, 68 text runs (64 on backdrops)"
     }
    },
    "excess": 0.0001
@@ -47279,21 +47401,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00587,
+     "mae": 0.00595,
+     "mae_in_key": 0.00556,
      "cov_1px": 1,
-     "scene": "own: 51 rects, 17 circles/ellipses, 74 text runs"
+     "scene": "own: 51 rects, 17 circles/ellipses, 74 text runs (72 on backdrops)"
     }
    },
-   "excess": -0.00001
+   "excess": 0.00031
   },
   "st-atlas-misc": {
    "file": "st-atlas-misc.svg",
@@ -47482,21 +47607,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00519,
-     "cov_1px": 0.99999,
-     "scene": "own: 35 rects, 20 circles/ellipses, 45 text runs"
+     "mae": 0.00584,
+     "mae_in_key": 0.00481,
+     "cov_1px": 1,
+     "scene": "own: 35 rects, 20 circles/ellipses, 45 text runs (41 on backdrops)"
     }
    },
-   "excess": -0.0001
+   "excess": 0.00028
   },
   "st-atlas-posters": {
    "file": "st-atlas-posters.svg",
@@ -48020,21 +48148,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00398,
+     "mae": 0.00399,
+     "mae_in_key": 0.00335,
      "cov_1px": 1,
-     "scene": "own: 45 rects, 353 circles/ellipses, 58 text runs"
+     "scene": "own: 45 rects, 353 circles/ellipses, 58 text runs (50 on backdrops)"
     }
    },
-   "excess": 0.00047
+   "excess": 0.0011
   },
   "st-atlas-boards": {
    "file": "st-atlas-boards.svg",
@@ -48908,21 +49039,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00368,
+     "mae": 0.00401,
+     "mae_in_key": 0.00381,
      "cov_1px": 1,
-     "scene": "own: 23 rects, 76 circles/ellipses, 93 text runs"
+     "scene": "own: 23 rects, 76 circles/ellipses, 93 text runs (91 on backdrops)"
     }
    },
-   "excess": 0.00178
+   "excess": 0.00164
   },
   "st-atlas-info": {
    "file": "st-atlas-info.svg",
@@ -49102,18 +49236,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00528,
+     "mae_in_key": 0.00528,
      "cov_1px": 1,
-     "scene": "own: 22 rects, 171 circles/ellipses, 290 text runs"
+     "scene": "own: 22 rects, 171 circles/ellipses, 290 text runs (285 on backdrops)"
     }
    },
    "excess": 0.00049
@@ -49286,18 +49423,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00437,
+     "mae_in_key": 0.00437,
      "cov_1px": 1,
-     "scene": "own: 11 rects, 13 circles/ellipses, 33 text runs"
+     "scene": "own: 11 rects, 13 circles/ellipses, 33 text runs (33 on backdrops)"
     }
    },
    "excess": 0.00106
@@ -50637,21 +50777,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00182,
+     "mae_in_key": 0.0008,
      "cov_1px": 1,
      "scene": "own: 0 rects, 415 circles/ellipses, 0 text runs"
     }
    },
-   "excess": -0.00014
+   "excess": 0.00088
   },
   "st-atlas-int": {
    "file": "st-atlas-int.svg",
@@ -51724,21 +51867,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00672,
-     "cov_1px": 0.99999,
-     "scene": "own: 159 rects, 99 circles/ellipses, 197 text runs"
+     "mae": 0.00739,
+     "mae_in_key": 0.00682,
+     "cov_1px": 1,
+     "scene": "own: 159 rects, 99 circles/ellipses, 197 text runs (185 on backdrops)"
     }
    },
-   "excess": 0.00092
+   "excess": 0.00082
   },
   "st-pool": {
    "file": "st-pool.svg",
@@ -51778,21 +51924,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00288,
+     "mae_in_key": 0.01162,
      "cov_1px": 1,
      "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
     }
    },
-   "excess": 0.00055
+   "excess": -0.0082
   },
   "st-cork": {
    "file": "st-cork.svg",
@@ -51872,16 +52021,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -52483,16 +52635,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -52644,16 +52799,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 4 circles/ellipses, 0 text runs"
     }
@@ -52761,16 +52919,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -52861,16 +53022,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 2 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -53080,16 +53244,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 11 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -53188,16 +53355,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -53289,16 +53459,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -53531,16 +53704,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00003,
+     "mae_in_key": 0.00003,
      "cov_1px": 1,
      "scene": "own: 1 rects, 2 circles/ellipses, 0 text runs"
     }
@@ -53631,16 +53807,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -53729,16 +53908,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00116,
+     "mae_in_key": 0.00116,
      "cov_1px": 1,
      "scene": "own: 1 rects, 360 circles/ellipses, 0 text runs"
     }
@@ -53828,16 +54010,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00156,
+     "mae_in_key": 0.00156,
      "cov_1px": 1,
      "scene": "own: 1 rects, 464 circles/ellipses, 0 text runs"
     }
@@ -53947,16 +54132,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.001,
+     "mae_in_key": 0.001,
      "cov_1px": 1,
      "scene": "own: 1 rects, 50 circles/ellipses, 0 text runs"
     }
@@ -54071,16 +54259,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -54195,16 +54386,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -54390,21 +54584,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0004,
+     "mae_in_key": 0.00003,
      "cov_1px": 1,
      "scene": "own: 0 rects, 8 circles/ellipses, 0 text runs"
     }
    },
-   "excess": 0.00083
+   "excess": 0.0012
   },
   "plaza-dust": {
    "file": "plaza-dust.svg",
@@ -54489,16 +54686,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -54587,16 +54787,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00159,
+     "mae_in_key": 0.00159,
      "cov_1px": 1,
      "scene": "own: 1 rects, 40 circles/ellipses, 0 text runs"
     }
@@ -54644,21 +54847,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00211,
+     "mae_in_key": 0.00818,
      "cov_1px": 1,
      "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
     }
    },
-   "excess": -0.00086
+   "excess": -0.00693
   },
   "plaza-daisy": {
    "file": "plaza-daisy.svg",
@@ -54742,16 +54948,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.003,
+     "mae_in_key": 0.00301,
      "cov_1px": 1,
      "scene": "own: 0 rects, 16 circles/ellipses, 0 text runs"
     }
@@ -54841,21 +55050,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0014,
+     "mae_in_key": 0.0014,
      "cov_1px": 1,
      "scene": "own: 0 rects, 7 circles/ellipses, 0 text runs"
     }
    },
-   "excess": -0.00018
+   "excess": -0.00019
   },
   "plaza-tiny": {
    "file": "plaza-tiny.svg",
@@ -54941,21 +55153,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00521,
+     "mae_in_key": 0.00526,
      "cov_1px": 1,
      "scene": "own: 0 rects, 49 circles/ellipses, 0 text runs"
     }
    },
-   "excess": -0.00346
+   "excess": -0.00351
   },
   "plaza-dandelion": {
    "file": "plaza-dandelion.svg",
@@ -55039,21 +55254,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00286,
+     "mae_in_key": 0.00287,
      "cov_1px": 1,
      "scene": "own: 0 rects, 47 circles/ellipses, 0 text runs"
     }
    },
-   "excess": -0.00164
+   "excess": -0.00166
   },
   "plaza-leafclump": {
    "file": "plaza-leafclump.svg",
@@ -55160,16 +55378,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00074,
+     "mae_in_key": 0.00074,
      "cov_1px": 1,
      "scene": "own: 0 rects, 16 circles/ellipses, 0 text runs"
     }
@@ -55259,21 +55480,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00288,
+     "mae_in_key": 0.01147,
      "cov_1px": 1,
      "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
     }
    },
-   "excess": -0.00191
+   "excess": -0.0105
   },
   "plaza-map": {
    "file": "plaza-map.svg",
@@ -55711,18 +55935,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00247,
+     "mae_in_key": 0.00247,
      "cov_1px": 1,
-     "scene": "own: 5 rects, 335 circles/ellipses, 54 text runs"
+     "scene": "own: 5 rects, 335 circles/ellipses, 54 text runs (54 on backdrops)"
     }
    },
    "excess": 0.00108
@@ -55769,18 +55996,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00573,
+     "mae_in_key": 0.00573,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 8 circles/ellipses, 10 text runs"
+     "scene": "own: 2 rects, 8 circles/ellipses, 10 text runs (10 on backdrops)"
     }
    },
    "excess": 0
@@ -55969,18 +56199,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00468,
+     "mae_in_key": 0.00468,
      "cov_1px": 1,
-     "scene": "own: 7 rects, 187 circles/ellipses, 29 text runs"
+     "scene": "own: 7 rects, 187 circles/ellipses, 29 text runs (29 on backdrops)"
     }
    },
    "excess": -0.00043
@@ -56266,18 +56499,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00368,
+     "mae_in_key": 0.00368,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 105 circles/ellipses, 46 text runs"
+     "scene": "own: 1 rects, 105 circles/ellipses, 46 text runs (46 on backdrops)"
     }
    },
    "excess": 0.00194
@@ -56326,18 +56562,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.01134,
+     "mae_in_key": 0.01134,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 1 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 1 text runs (1 on backdrops)"
     }
    },
    "excess": 0.00053
@@ -56385,18 +56624,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00387,
+     "mae_in_key": 0.00387,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 1 circles/ellipses, 4 text runs"
+     "scene": "own: 1 rects, 1 circles/ellipses, 4 text runs (4 on backdrops)"
     }
    },
    "excess": 0
@@ -56445,18 +56687,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00929,
+     "mae_in_key": 0.00929,
      "cov_1px": 1,
-     "scene": "own: 19 rects, 0 circles/ellipses, 54 text runs"
+     "scene": "own: 19 rects, 0 circles/ellipses, 54 text runs (54 on backdrops)"
     }
    },
    "excess": 0.00003
@@ -56506,18 +56751,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0035,
+     "mae_in_key": 0.0035,
      "cov_1px": 1,
-     "scene": "own: 3 rects, 0 circles/ellipses, 4 text runs"
+     "scene": "own: 3 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
     }
    },
    "excess": 0.00057
@@ -56632,21 +56880,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00057,
+     "mae_in_key": 0.00016,
      "cov_1px": 0.99999,
      "scene": "own: 12 rects, 36 circles/ellipses, 5 text runs"
     }
    },
-   "excess": 0.00261
+   "excess": 0.00302
   },
   "plaza-routemap": {
    "file": "plaza-routemap.svg",
@@ -56695,18 +56946,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00497,
+     "mae_in_key": 0.00497,
      "cov_1px": 1,
-     "scene": "own: 4 rects, 8 circles/ellipses, 12 text runs"
+     "scene": "own: 4 rects, 8 circles/ellipses, 12 text runs (12 on backdrops)"
     }
    },
    "excess": 0.00068
@@ -56758,18 +57012,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00434,
+     "mae_in_key": 0.00434,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs (3 on backdrops)"
     }
    },
    "excess": 0.00035
@@ -56825,18 +57082,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0038,
+     "mae_in_key": 0.0038,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0.00044
@@ -56892,18 +57152,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00671,
+     "mae_in_key": 0.00671,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 6 text runs"
+     "scene": "own: 2 rects, 0 circles/ellipses, 6 text runs (6 on backdrops)"
     }
    },
    "excess": 0.00061
@@ -56949,18 +57212,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00617,
+     "mae_in_key": 0.00617,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 12 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 12 text runs (12 on backdrops)"
     }
    },
    "excess": 0.0003
@@ -57008,18 +57274,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00432,
+     "mae_in_key": 0.00432,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0.00039
@@ -57065,18 +57334,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00344,
+     "mae_in_key": 0.00344,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs (3 on backdrops)"
     }
    },
    "excess": 0
@@ -57120,18 +57392,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00754,
+     "mae_in_key": 0.00754,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 3 text runs (3 on backdrops)"
     }
    },
    "excess": 0
@@ -57175,18 +57450,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.01363,
+     "mae_in_key": 0.01363,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs"
+     "scene": "own: 2 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
     }
    },
    "excess": 0
@@ -57230,18 +57508,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0148,
+     "mae_in_key": 0.0148,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0
@@ -57285,18 +57566,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00418,
+     "mae_in_key": 0.00418,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0
@@ -57340,18 +57624,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0105,
+     "mae_in_key": 0.0105,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 4 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 4 text runs (4 on backdrops)"
     }
    },
    "excess": 0
@@ -57396,18 +57683,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00783,
+     "mae_in_key": 0.00783,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0
@@ -57452,18 +57742,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00871,
+     "mae_in_key": 0.00871,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0
@@ -57508,18 +57801,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00853,
+     "mae_in_key": 0.00853,
      "cov_1px": 1,
-     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 2 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0
@@ -57648,18 +57944,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00342,
+     "mae_in_key": 0.00342,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 7 circles/ellipses, 13 text runs"
+     "scene": "own: 1 rects, 7 circles/ellipses, 13 text runs (13 on backdrops)"
     }
    },
    "excess": 0.00169
@@ -57703,18 +58002,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.0032,
+     "mae_in_key": 0.0032,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 0 circles/ellipses, 1 text runs"
+     "scene": "own: 1 rects, 0 circles/ellipses, 1 text runs (1 on backdrops)"
     }
    },
    "excess": 0
@@ -57843,18 +58145,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00036,
+     "mae_in_key": 0.00036,
      "cov_1px": 1,
-     "scene": "own: 1 rects, 7 circles/ellipses, 11 text runs"
+     "scene": "own: 1 rects, 7 circles/ellipses, 11 text runs (11 on backdrops)"
     }
    },
    "excess": 0.00042
@@ -57936,16 +58241,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 7 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -57993,21 +58301,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00499,
+     "mae_in_key": 0.0019,
      "cov_1px": 1,
      "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs"
     }
    },
-   "excess": -0.00272
+   "excess": 0.00036
   },
   "plaza-emblem": {
    "file": "plaza-emblem.svg",
@@ -58036,8 +58347,8 @@
        "ellipse": 7,
        "path": 5
       },
-      "source": "procedural",
-      "rng_share": 1,
+      "source": "authored",
+      "rng_share": 0,
       "regularity": 0.157
      }
     ],
@@ -58058,12 +58369,12 @@
     },
     "sources": {
      "procedural": {
-      "runs": 1,
-      "instances": 12
-     },
-     "authored": {
       "runs": 0,
       "instances": 0
+     },
+     "authored": {
+      "runs": 1,
+      "instances": 12
      },
      "ambiguous": []
     }
@@ -58098,16 +58409,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00174,
+     "mae_in_key": 0.00174,
      "cov_1px": 1,
      "scene": "own: 0 rects, 7 circles/ellipses, 0 text runs"
     }
@@ -58141,8 +58455,8 @@
        "ellipse": 6,
        "path": 5
       },
-      "source": "procedural",
-      "rng_share": 1,
+      "source": "authored",
+      "rng_share": 0,
       "regularity": 0.133
      }
     ],
@@ -58163,12 +58477,12 @@
     },
     "sources": {
      "procedural": {
-      "runs": 1,
-      "instances": 11
-     },
-     "authored": {
       "runs": 0,
       "instances": 0
+     },
+     "authored": {
+      "runs": 1,
+      "instances": 11
      },
      "ambiguous": []
     }
@@ -58205,21 +58519,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.01766,
+     "mae_in_key": 0.01767,
      "cov_1px": 1,
      "scene": "own: 0 rects, 6 circles/ellipses, 2 text runs"
     }
    },
-   "excess": -0.00051
+   "excess": -0.00053
   },
   "plaza-bench-plate": {
    "file": "plaza-bench-plate.svg",
@@ -58262,16 +58579,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00349,
+     "mae_in_key": 0.00349,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 1 text runs"
     }
@@ -58320,21 +58640,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00069,
+     "mae": 0.00346,
+     "mae_in_key": 0.00228,
      "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 1 text runs"
+     "scene": "own: 0 rects, 0 circles/ellipses, 1 text runs (1 on backdrops)"
     }
    },
-   "excess": 0.00159
+   "excess": 0
   },
   "plaza-newspaper": {
    "file": "plaza-newspaper.svg",
@@ -58415,18 +58738,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00336,
+     "mae_in_key": 0.00336,
      "cov_1px": 1,
-     "scene": "own: 65 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 65 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
    "excess": 0
@@ -58474,21 +58800,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00094,
+     "mae": 0.00817,
+     "mae_in_key": 0.00475,
      "cov_1px": 1,
-     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs"
+     "scene": "own: 0 rects, 0 circles/ellipses, 2 text runs (2 on backdrops)"
     }
    },
-   "excess": 0.00381
+   "excess": 0
   },
   "plaza-name-sign": {
    "file": "plaza-name-sign.svg",
@@ -58584,18 +58913,21 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00444,
+     "mae_in_key": 0.00444,
      "cov_1px": 1,
-     "scene": "own: 3 rects, 6 circles/ellipses, 7 text runs"
+     "scene": "own: 3 rects, 6 circles/ellipses, 7 text runs (7 on backdrops)"
     }
    },
    "excess": 0.0007
@@ -58628,8 +58960,8 @@
        "stroke": 2,
        "path": 7
       },
-      "source": "procedural",
-      "rng_share": 1,
+      "source": "authored",
+      "rng_share": 0,
       "regularity": 0.084
      }
     ],
@@ -58682,12 +59014,12 @@
     },
     "sources": {
      "procedural": {
-      "runs": 1,
-      "instances": 16
-     },
-     "authored": {
       "runs": 0,
       "instances": 0
+     },
+     "authored": {
+      "runs": 1,
+      "instances": 16
      },
      "ambiguous": []
     }
@@ -58726,21 +59058,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
-     "mae": 0.00198,
+     "mae": 0.00195,
+     "mae_in_key": 0.00179,
      "cov_1px": 1,
-     "scene": "own: 0 rects, 7 circles/ellipses, 1 text runs"
+     "scene": "own: 0 rects, 7 circles/ellipses, 1 text runs (1 on backdrops)"
     }
    },
-   "excess": 0.00111
+   "excess": 0.0013
   },
   "sakura-bark-old": {
    "file": "sakura-bark-old.svg",
@@ -59196,16 +59531,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00088,
+     "mae_in_key": 0.00088,
      "cov_1px": 1,
      "scene": "own: 1 rects, 594 circles/ellipses, 0 text runs"
     }
@@ -59299,16 +59637,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00103,
+     "mae_in_key": 0.00103,
      "cov_1px": 1,
      "scene": "own: 1 rects, 126 circles/ellipses, 0 text runs"
     }
@@ -60995,21 +61336,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00688,
+     "mae_in_key": 0.0042,
      "cov_1px": 1,
      "scene": "own: 0 rects, 1707 circles/ellipses, 0 text runs"
     }
    },
-   "excess": 0.00162
+   "excess": 0.00429
   },
   "sakura-flora-atlas": {
    "file": "sakura-flora-atlas.svg",
@@ -61921,21 +62265,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00319,
+     "mae_in_key": 0.001,
      "cov_1px": 1,
      "scene": "own: 0 rects, 23 circles/ellipses, 0 text runs"
     }
    },
-   "excess": -0.00005
+   "excess": 0.00214
   },
   "sakura-ground-atlas": {
    "file": "sakura-ground-atlas.svg",
@@ -62023,21 +62370,24 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0.00164,
+     "mae_in_key": 0.00338,
      "cov_1px": 1,
      "scene": "generic: 4 pixel-aligned rects, 1 circle, 1 text run"
     }
    },
-   "excess": -0.001
+   "excess": -0.00274
   },
   "sakura-speck4": {
    "file": "sakura-speck4.svg",
@@ -62127,16 +62477,19 @@
    "floors": {
     "canvas": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "svg": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "identical": true
     },
     "raster": {
      "mae": 0,
+     "mae_in_key": 0,
      "cov_1px": 1,
      "scene": "own: 1 rects, 0 circles/ellipses, 0 text runs"
     }
@@ -62161,8 +62514,9 @@
     "identical_keys": 120
    },
    "raster": {
-    "mean": 0.00319,
-    "median": 0.00247,
+    "mean": 0.00357,
+    "median": 0.003,
+    "scene_normalised_mean": 0.00346,
     "own_content_keys": 113
    },
    "residual": {
@@ -62170,20 +62524,20 @@
     "median": 0.0032
    },
    "excess": {
-    "mean": 0.00067,
-    "median": 0.00039
+    "mean": 0.00029,
+    "median": 0.00035
    }
   },
   "run_sources": {
    "procedural": {
-    "runs": 227,
-    "instances": 84782
+    "runs": 222,
+    "instances": 84718
    },
    "authored": {
-    "runs": 222,
-    "instances": 2699
+    "runs": 227,
+    "instances": 2763
    },
-   "ambiguous_runs": 13
+   "ambiguous_runs": 12
   }
  }
 }

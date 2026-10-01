@@ -206,24 +206,24 @@ function installRecorder() {
     stroke(ctx, r, a) { if (a[0] instanceof Path2D) { bump(r.unsup, 'Path2D'); return; } r.items.push({ k: 'stroke', d: r.path.slice(), paint: paint(r, ctx.strokeStyle), ...strokeState(ctx), ...common(ctx, r) }); },
     fillRect(ctx, r, [x, y, w, h]) { if (!w || !h) return; const c = common(ctx, r); r.items.push({ k: 'fill', rect: true, d: rectPoly(c.m, x, y, w, h), rule: 'nonzero', paint: paint(r, ctx.fillStyle), ...c }); },
     strokeRect(ctx, r, [x, y, w, h]) { if (!w && !h) return; const c = common(ctx, r); r.items.push({ k: 'stroke', d: rectPoly(c.m, x, y, w, h), paint: paint(r, ctx.strokeStyle), ...strokeState(ctx), ...c }); },
-    clearRect(ctx, r, [x, y, w, h]) { if (!w || !h) return; const m = T(ctx); r.items.push({ k: 'clear', d: rectPoly(m, x, y, w, h), m, clip: r.clip }); },
+    clearRect(ctx, r, [x, y, w, h]) { if (!w || !h) return; const m = T(ctx); r.items.push({ k: 'clear', d: rectPoly(m, x, y, w, h), m, clip: r.clip, rg: window.__rngCalls || 0 }); },
     fillText(ctx, r, [t, x, y, mw]) { r.items.push(textItem(ctx, r, false, t, x, y, mw)); },
     strokeText(ctx, r, [t, x, y, mw]) { r.items.push(textItem(ctx, r, true, t, x, y, mw)); },
     clip(ctx, r, a) { if (a[0] instanceof Path2D) { bump(r.unsup, 'Path2D'); return; } r.clip = { id: nextClip++, d: r.path.slice(), rule: a[0] === 'evenodd' ? 'evenodd' : 'nonzero', parent: r.clip }; },
     save(ctx, r) { r.stack.push(r.clip); },
     restore(ctx, r) { if (r.stack.length) r.clip = r.stack.pop(); },
-    reset(ctx, r) { r.items.push({ k: 'reset' }); r.path = []; r.cur = r.start = null; r.clip = null; r.stack = []; },
+    reset(ctx, r) { r.items.push({ k: 'reset', rg: window.__rngCalls || 0 }); r.path = []; r.cur = r.start = null; r.clip = null; r.stack = []; },
     drawImage(ctx, r, a) {
       const img = a[0]; const src = recs.get(img);
       const isCanvas = (typeof HTMLCanvasElement !== 'undefined' && img instanceof HTMLCanvasElement) || (typeof OffscreenCanvas !== 'undefined' && img instanceof OffscreenCanvas);
-      if (!isCanvas) { bump(r.unsup, 'drawImage:raster'); r.items.push({ k: 'raster', what: 'drawImage' }); return; }
+      if (!isCanvas) { bump(r.unsup, 'drawImage:raster'); r.items.push({ k: 'raster', what: 'drawImage', rg: window.__rngCalls || 0 }); return; }
       if (img === ctx.canvas) { bump(r.unsup, 'drawImage:self'); return; }
       const W = img.width, H = img.height; let sx = 0, sy = 0, sw = W, sh = H, dx, dy, dw, dh;
       if (a.length >= 9) [, sx, sy, sw, sh, dx, dy, dw, dh] = a; else if (a.length >= 5) { [, dx, dy, dw, dh] = a; } else { [, dx, dy] = a; dw = W; dh = H; }
       if (!src) return; // a never-drawn canvas is transparent
       r.items.push({ k: 'image', src: src.id, n: src.items.length, W, H, sx, sy, sw, sh, dx, dy, dw, dh, ...common(ctx, r) });
     },
-    putImageData(ctx, r) { bump(r.unsup, 'putImageData'); r.items.push({ k: 'raster', what: 'putImageData' }); },
+    putImageData(ctx, r) { bump(r.unsup, 'putImageData'); r.items.push({ k: 'raster', what: 'putImageData', rg: window.__rngCalls || 0 }); },
   };
 
   const wrap = (proto, name, fn) => {
@@ -258,7 +258,7 @@ function installRecorder() {
   // resizing a canvas resets its bitmap and context state
   for (const C of [window.HTMLCanvasElement, window.OffscreenCanvas].filter(Boolean)) for (const n of ['width', 'height']) {
     const d = Object.getOwnPropertyDescriptor(C.prototype, n); if (!d || !d.set) continue;
-    Object.defineProperty(C.prototype, n, { ...d, set(v) { d.set.call(this, v); const r = recs.get(this); if (r) { r.items.push({ k: 'reset' }); r.path = []; r.cur = r.start = null; r.clip = null; r.stack = []; } } });
+    Object.defineProperty(C.prototype, n, { ...d, set(v) { d.set.call(this, v); const r = recs.get(this); if (r) { r.items.push({ k: 'reset', rg: window.__rngCalls || 0 }); r.path = []; r.cur = r.start = null; r.clip = null; r.stack = []; } } });
   }
 
   // export: the display lists of the given canvases and everything they drawImage from
@@ -984,7 +984,8 @@ try {
     const near = (m, x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h && m[yy * w + xx]) return true; } return false; };
     let na = 0, nb = 0, ma = 0, mb = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (ca[i]) { na++; if (cb[i] || near(cb, x, y)) ma++; } if (cb[i]) { nb++; if (ca[i] || near(ca, x, y)) mb++; } }
-    return { mae: sw ? se / sw : 0, alphaMae: ae / n, iou: uni ? inter / uni : 1, cov1px: na + nb ? (ma + mb) / (na + nb) : 1 };
+    // sw / se (weight and weighted-error sums) let a floor be expressed in a key's own units: se_floor / sw_key
+    return { mae: sw ? se / sw : 0, alphaMae: ae / n, iou: uni ? inter / uni : 1, cov1px: na + nb ? (ma + mb) / (na + nb) : 1, sw, se };
   }
   const installHelpers = (pg) => pg.evaluate((src) => {
     window.__score = eval('(' + src + ')');
@@ -1036,7 +1037,7 @@ try {
     const cleanG = (d) => d.filter((x, i) => !(x[0] === 'M' && (i + 1 >= d.length || d[i + 1][0] === 'M')));
     const isInt = (v) => Math.abs(v - Math.round(v)) < 1e-6;
     const floorOps = (cv) => {
-      const ops = []; let nr = 0, ne = 0, nt = 0;
+      const ops = [], backdrops = []; let nr = 0, ne = 0, nt = 0, nb = 0;
       for (const it of cv.items) {
         // clips are ignored: both sides draw the same unclipped content, which is all the floor needs
         if (it.comp || it.filter || it.shadow || !it.paint || it.paint.t !== 'c' || !it.paint.c) continue;
@@ -1055,9 +1056,24 @@ try {
           }
         } else if (it.k === 'text' && !it.stroke) {
           ops.push({ t: 'text', m: it.m, font: it.font, text: it.chars.map(c => c[0]).join(''), x: it.x0, y: it.yA, maxW: it.sx < 1 ? it.w * it.sx : 0, c: it.paint.c, a: it.alpha }); nt++;
+          // glyph blending depends on what is under the text: give the run a pixel-aligned backdrop in the colour
+          // of the latest opaque solid fill that covers it (signs draw text on rounded or path backgrounds,
+          // which are not floor content themselves)
+          const size = (/(\d*\.?\d+)px/.exec(it.font) || [0, 16])[1] * 1;
+          const pts = [[it.x0, it.yA - size * 1.1], [it.x0 + it.w * it.sx, it.yA - size * 1.1], [it.x0, it.yA + size * 0.35], [it.x0 + it.w * it.sx, it.yA + size * 0.35]]
+            .map(([x, y]) => [it.m[0] * x + it.m[2] * y + it.m[4], it.m[1] * x + it.m[3] * y + it.m[5]]);
+          const tb = [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
+          for (let j = cv.items.indexOf(it) - 1; j >= 0; j--) {
+            const b = cv.items[j]; if (b.k !== 'fill' || b.comp || !b.paint || b.paint.t !== 'c' || !b.paint.c || b.paint.c[3] * b.alpha < 0.999) continue;
+            const bx = b.d.filter(x => x[0] !== 'Z'); const xs = bx.flatMap(x => x.filter((v, i) => i % 2 === 1)), ys = bx.flatMap(x => x.filter((v, i) => i > 0 && i % 2 === 0));
+            if (Math.min(...xs) <= tb[0] && Math.min(...ys) <= tb[1] && Math.max(...xs) >= tb[2] && Math.max(...ys) >= tb[3]) {
+              const x0 = Math.floor(tb[0]) - 2, y0 = Math.floor(tb[1]) - 2; backdrops.push({ t: 'rect', x: x0, y: y0, w: Math.ceil(tb[2]) + 2 - x0, h: Math.ceil(tb[3]) + 2 - y0, c: b.paint.c, a: 1 }); nb++;
+              break;
+            }
+          }
         }
       }
-      return { ops, scene: `own: ${nr} rects, ${ne} circles/ellipses, ${nt} text runs` };
+      return { ops: [...backdrops, ...ops], scene: `own: ${nr} rects, ${ne} circles/ellipses, ${nt} text runs` + (nb ? ` (${nb} on backdrops)` : '') };
     };
     const genericOps = (w, h) => {
       const ops = [], hw = Math.floor(w / 2), hh = Math.floor(h / 2), cols = [[214, 206, 190, 1], [120, 140, 170, 1], [200, 90, 110, 1], [90, 130, 90, 1]];
@@ -1156,7 +1172,8 @@ try {
       svg: 'the SVG raster against itself: the same SVG rasterized in the second page (CPU-backed canvas); 0 when byte-identical',
       raster: 'canvas API vs SVG on content both draw identically, taken from the key itself: its pixel-aligned solid rects, full circles/ellipses (native arc) and text runs (fillText), recorded and emitted by this tool; generic scene (4 pixel-aligned rects, 1 circle, 1 text run) for a key with none',
       metric: 'the residual metric (alpha-weighted mean |linear RGB|, coverage within 1 px); no blur, masks or threshold changes',
-      excess: 'residual mae minus the largest of the three floor maes',
+      units: 'mae is normalised by the weight of the floor scene itself; mae_in_key = the weighted error of the floor divided by the residual weight of the key, the unit the residual is in',
+      excess: 'residual mae minus the largest floor mae_in_key',
     },
     run_source: STAMP ? {
       method: RNG_OK ? 'rng hook: the served source of mulberry32 (ctx.rng), hash2 and hash3 counts calls; every draw records the count' : 'placement regularity (rng hook not installed)',
@@ -1175,8 +1192,11 @@ try {
     keys: {},
   };
   let totalBytes = 0;
-  const fmtF = (x) => !x || x.error ? (x || { error: 'n/a' }) : { mae: +x.mae.toFixed(5), cov_1px: +x.cov1px.toFixed(5), ...(x.identical !== undefined ? { identical: x.identical } : {}), ...(x.page1_reraster_same !== undefined ? { page1_reraster_same: x.page1_reraster_same } : {}) };
-  const floorMax = (fl) => Math.max(...[fl.canvas, fl.svg, fl.raster].map(x => (x && !x.error ? x.mae : 0)));
+  // floors in key units: the floor scene's weighted error over THIS key's weight (residual = se_key / sw_key), so
+  // residual - floor = (error not explained by the floor content) / sw_key; mae alone is normalised by the scene's own weight
+  const inKey = (x, sc) => (x && !x.error && sc && sc.sw ? (x.se || 0) / sc.sw : 0);
+  const fmtF = (x, sc) => !x || x.error ? (x || { error: 'n/a' }) : { mae: +x.mae.toFixed(5), mae_in_key: +inKey(x, sc).toFixed(5), cov_1px: +x.cov1px.toFixed(5), ...(x.identical !== undefined ? { identical: x.identical } : {}), ...(x.page1_reraster_same !== undefined ? { page1_reraster_same: x.page1_reraster_same } : {}) };
+  const floorMax = (fl, sc) => Math.max(...[fl.canvas, fl.svg, fl.raster].map(x => inKey(x, sc)));
   const srcCount = (runs) => { const o = { procedural: { runs: 0, instances: 0 }, authored: { runs: 0, instances: 0 }, ambiguous: [] }; for (const r of runs) { o[r.source].runs++; o[r.source].instances += r.instances; if (r.ambiguous) o.ambiguous.push({ run: r.run, source: r.source, instances: r.instances, why: r.ambiguous }); } return o; };
   for (const r of results) {
     if (!r.svg) { manifest.keys[r.key] = { error: r.error, width: r.w, height: r.h }; failed++; continue; }
@@ -1212,8 +1232,8 @@ try {
       score: sc.error ? sc : { mae: +sc.mae.toFixed(5), alpha_mae: +sc.alphaMae.toFixed(5), iou: +sc.iou.toFixed(5), cov_1px: +sc.cov1px.toFixed(5) },
       pass,
       residual: sc.error ? undefined : { mae: +sc.mae.toFixed(5), cov_1px: +sc.cov1px.toFixed(5) },
-      floors: fl ? { canvas: fmtF(fl.canvas), svg: fmtF(fl.svg), raster: { ...fmtF(fl.raster), scene: fl.scene } } : undefined,
-      excess: fl && !sc.error ? +(sc.mae - floorMax(fl)).toFixed(5) : undefined,
+      floors: fl ? { canvas: fmtF(fl.canvas, sc), svg: fmtF(fl.svg, sc), raster: { ...fmtF(fl.raster, sc), scene: fl.scene } } : undefined,
+      excess: fl && !sc.error ? +(sc.mae - floorMax(fl, sc)).toFixed(5) : undefined,
     };
   }
   const live = Object.values(manifest.keys).filter(e => e.residual && e.floors);
@@ -1223,9 +1243,9 @@ try {
   manifest.summary = { keys: results.length, failed, total_bytes: totalBytes,
     floors: live.length ? {
       keys: live.length,
-      canvas: { mean: mean(col(e => e.floors.canvas.mae)), median: median(col(e => e.floors.canvas.mae)), identical_keys: live.filter(e => e.floors.canvas.identical).length },
-      svg: { mean: mean(col(e => e.floors.svg.mae)), median: median(col(e => e.floors.svg.mae)), identical_keys: live.filter(e => e.floors.svg.identical).length },
-      raster: { mean: mean(col(e => e.floors.raster.mae)), median: median(col(e => e.floors.raster.mae)), own_content_keys: live.filter(e => /^own/.test(e.floors.raster.scene || '')).length },
+      canvas: { mean: mean(col(e => e.floors.canvas.mae_in_key)), median: median(col(e => e.floors.canvas.mae_in_key)), identical_keys: live.filter(e => e.floors.canvas.identical).length },
+      svg: { mean: mean(col(e => e.floors.svg.mae_in_key)), median: median(col(e => e.floors.svg.mae_in_key)), identical_keys: live.filter(e => e.floors.svg.identical).length },
+      raster: { mean: mean(col(e => e.floors.raster.mae_in_key)), median: median(col(e => e.floors.raster.mae_in_key)), scene_normalised_mean: mean(col(e => e.floors.raster.mae)), own_content_keys: live.filter(e => /^own/.test(e.floors.raster.scene || '')).length },
       residual: { mean: mean(col(e => e.residual.mae)), median: median(col(e => e.residual.mae)) },
       excess: { mean: mean(col(e => e.excess)), median: median(col(e => e.excess)) },
     } : undefined,
@@ -1245,7 +1265,7 @@ try {
     // with floors measured: failing keys first, then worst residual-minus-floor (excess) first
     if (Object.keys(floors).length) keys.sort((a, b) => (manifest.keys[a].pass - manifest.keys[b].pass) || (manifest.keys[b].excess ?? 0) - (manifest.keys[a].excess ?? 0));
     else keys.sort((a, b) => rank(a) - rank(b) || (rank(a) === 2 ? PRIORITY.indexOf(a) - PRIORITY.indexOf(b) : 0) || manifest.keys[b].score.mae - manifest.keys[a].score.mae);
-    const f4 = (x) => (x && !x.error ? x.mae.toFixed(4) : 'n/a');
+    const f4 = (x) => (x && !x.error ? x.mae_in_key.toFixed(4) : 'n/a');
     const rows = keys.map(k => {
       const e = manifest.keys[k], s = e.stamp;
       return {
