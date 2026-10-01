@@ -12,6 +12,7 @@
 extends RefCounted
 
 const Sheet = preload("res://tools/sheet.gd")
+const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const BRADFORD := [[1.0478112, 0.0228866, -0.0501270], [0.0295424, 0.9904844, -0.0170491], [-0.0092345, 0.0150436, 0.7521316]]
 const SRGB_XYZ := [[0.4124564, 0.3575761, 0.1804375], [0.2126729, 0.7151522, 0.0721750], [0.0193339, 0.1191920, 0.9503041]]
 const WHITE_D50 := Vector3(0.96422, 1.0, 0.82521)
@@ -110,18 +111,18 @@ static func patch_rects(cam: Camera3D, c: Dictionary, chart: Dictionary) -> Arra
 
 ## Each rect's mean 8-bit sRGB code.
 static func read(img: Image, rects: Array) -> Array:
+	if Kernels.sandbox() == null:
+		printerr("chart_calib.read: FAIL no kernels Sandbox (%s)" % Kernels.reason)
+		return []
 	var x: Image = img.duplicate()
 	x.convert(Image.FORMAT_RGB8)
-	var out := []
+	var flat := PackedInt32Array()
 	for r in rects:
-		var s := Vector3.ZERO
-		var n := 0
-		for j in range(r.position.y, r.end.y):
-			for i in range(r.position.x, r.end.x):
-				var c := x.get_pixel(i, j)
-				s += Vector3(c.r8, c.g8, c.b8)
-				n += 1
-		out.append(s / maxf(n, 1))
+		flat.append_array(PackedInt32Array([r.position.x, r.position.y, r.size.x, r.size.y]))
+	var s := Kernels.rect_sums(x.get_data(), x.get_width(), x.get_height(), flat)
+	var out := []
+	for k in rects.size():
+		out.append(Vector3(s[k * 4], s[k * 4 + 1], s[k * 4 + 2]) / maxf(s[k * 4 + 3], 1))
 	return out
 
 

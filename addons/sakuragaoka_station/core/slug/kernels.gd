@@ -514,3 +514,45 @@ static func diff_rgba(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray
 	if sandbox() == null:
 		return PackedByteArray()
 	return _sb.vmcall("diff_rgba", a, b)
+
+
+static func diff_stats(a: PackedByteArray, b: PackedByteArray) -> PackedInt64Array:
+	if sandbox() == null:
+		return PackedInt64Array()
+	return _sb.vmcall("frame_diff", a, b, PackedByteArray(), 0)
+
+
+static func heat_rgb(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
+	if sandbox() == null:
+		return PackedByteArray()
+	return _sb.vmcall("heat_rgb", a, b)
+
+
+static func stride_abs_sum(a: PackedByteArray, b: PackedByteArray, stride: int) -> int:
+	if sandbox() == null:
+		return -1
+	return _sb.vmcall("stride_abs_sum", a, b, stride)
+
+
+static func flat_split(a: PackedByteArray, b: PackedByteArray, w: int, h: int) -> PackedFloat64Array:
+	if sandbox() == null:
+		return PackedFloat64Array()
+	return _sb.vmcall("flat_split", a, b, w, h)
+
+
+static func class_mix(dc: PackedByteArray, dl: PackedByteArray, du: PackedByteArray, w: int, h: int, lut: PackedFloat32Array, far_m: float) -> PackedInt64Array:
+	if sandbox() == null:
+		return PackedInt64Array()
+	return _sb.vmcall("class_mix", dc, dl, du, w, h, lut, far_m)
+
+
+static func rect_sums(d: PackedByteArray, w: int, h: int, rects: PackedInt32Array) -> PackedFloat64Array:
+	if sandbox() == null:
+		return PackedFloat64Array()
+	return _sb.vmcall("rect_sums", d, w, h, rects)
+
+
+static func probe_read(px: PackedByteArray, w: int, h: int, quads: PackedFloat64Array) -> PackedInt64Array:
+	if sandbox() == null:
+		return PackedInt64Array()
+	return _sb.vmcall("probe_read", px, w, h, quads)

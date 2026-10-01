@@ -20,6 +20,7 @@
 extends SceneTree
 
 const Sheet = preload("res://tools/sheet.gd")
+const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const CELL := Vector2i(480, 270)
 
 var _a := {}
@@ -46,14 +47,8 @@ static func _exact(a: Image, b: Image) -> Vector2i:
 	var db := y.get_data()
 	if da == db:
 		return Vector2i(0, 0)
-	var px := 0
-	var mx := 0
-	for i in range(0, mini(da.size(), db.size()), 3):
-		var d := maxi(absi(da[i] - db[i]), maxi(absi(da[i + 1] - db[i + 1]), absi(da[i + 2] - db[i + 2])))
-		if d > 0:
-			px += 1
-			mx = maxi(mx, d)
-	return Vector2i(px, mx)
+	var r := Kernels.diff_stats(da, db)
+	return Vector2i(r[4], r[5])
 
 
 func _floor(a, b) -> Dictionary:
@@ -66,6 +61,10 @@ func _floor(a, b) -> Dictionary:
 
 
 func _make() -> void:
+	if Kernels.sandbox() == null:
+		print("parity_sheet: FAIL no kernels Sandbox (%s)" % Kernels.reason)
+		quit(1)
+		return
 	var orig: String = _a.get("original", "")
 	var before: String = _a.get("before", "")
 	var after: String = _a.get("after", "")
@@ -117,4 +116,5 @@ func _make() -> void:
 	var img: Image = await Sheet.render(self, title, [names[0], names[1], names[2], "|%s - %s|" % [names[2], names[0]]], rows, CELL)
 	for p in Sheet.publish(img, out, _a.get("topic", "parity-hammersley")):
 		print("parity_sheet: %d views, saved %s" % [rows.size(), p])
+	Kernels.shutdown()
 	quit()

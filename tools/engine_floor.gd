@@ -56,6 +56,10 @@ func _initialize() -> void:
 		if a.begins_with("--"):
 			var eq := a.find("=")
 			_a[a.substr(2, eq - 2) if eq > 0 else a.substr(2)] = a.substr(eq + 1) if eq > 0 else "1"
+	if Kernels.sandbox() == null:
+		print("engine_floor: FAIL no kernels Sandbox (%s)" % Kernels.reason)
+		quit(1)
+		return
 	(_station if _a.has("station") else _tiles).call_deferred()
 
 
@@ -501,47 +505,7 @@ static func _rgb(img: Image) -> Image:
 static func _split(a: Image, b: Image) -> Array:
 	var x := _rgb(a)
 	var y := _rgb(b)
-	var w := x.get_width()
-	var h := x.get_height()
-	var da := x.get_data()
-	var db := y.get_data()
-	var fa := _flat(da, w, h)
-	var fb := _flat(db, w, h)
-	var se := 0.0
-	var ne := 0
-	var si := 0.0
-	var ni := 0
-	for p in w * h:
-		var o := p * 3
-		var dd := (absi(da[o] - db[o]) + absi(da[o + 1] - db[o + 1]) + absi(da[o + 2] - db[o + 2])) / 3.0
-		if fa[p] and fb[p]:
-			si += dd
-			ni += 1
-		else:
-			se += dd
-			ne += 1
-	return [(se + si) / maxf(ne + ni, 1), se / maxf(ne, 1), si / maxf(ni, 1), float(ne) / maxf(ne + ni, 1)]
-
-
-## Per pixel: 1 when its 3x3 neighbourhood (clamped at the borders) is one colour.
-static func _flat(d: PackedByteArray, w: int, h: int) -> PackedByteArray:
-	var c := PackedInt32Array()
-	c.resize(w * h)
-	for p in w * h:
-		c[p] = (d[p * 3] << 16) | (d[p * 3 + 1] << 8) | d[p * 3 + 2]
-	var out := PackedByteArray()
-	out.resize(w * h)
-	for j in h:
-		var j0 := maxi(j - 1, 0) * w
-		var j1 := j * w
-		var j2 := mini(j + 1, h - 1) * w
-		for i in w:
-			var i0 := maxi(i - 1, 0)
-			var i2 := mini(i + 1, w - 1)
-			var v := c[j1 + i]
-			out[j1 + i] = 1 if (c[j0 + i0] == v and c[j0 + i] == v and c[j0 + i2] == v and c[j1 + i0] == v and c[j1 + i2] == v
-					and c[j2 + i0] == v and c[j2 + i] == v and c[j2 + i2] == v) else 0
-	return out
+	return Array(Kernels.flat_split(x.get_data(), y.get_data(), x.get_width(), x.get_height()))
 
 
 func _compare(scene: Dictionary, renders: Dictionary, a4: Image, out: String, a0: Image = null, ports: Dictionary = {}) -> void:
@@ -743,45 +707,12 @@ func _station() -> void:
 ## Class fractions of a full-resolution class render: sky, far, unlit, toon shadowed, toon lit (they sum
 ## to 1) and the edge fraction (class or depth jumps against a 4-neighbour).
 static func _mix(cls: Image, lit: Image, unshadowed: Image) -> Dictionary:
-	var w := cls.get_width()
-	var h := cls.get_height()
-	var dc := cls.get_data()
-	var dl := lit.get_data()
-	var du := unshadowed.get_data()
-	var n := {"sky": 0, "far": 0, "unlit": 0, "shadow": 0, "lit": 0, "edge": 0}
 	var lut := PackedFloat32Array()
 	for v in 256:
 		lut.append(Color8(v, 0, 0).srgb_to_linear().r)
-	var cx := PackedFloat32Array()
-	var cy := PackedFloat32Array()
-	cx.resize(w * h)
-	cy.resize(w * h)
-	for p in w * h:
-		cx[p] = lut[dc[p * 3]]
-		cy[p] = lut[dc[p * 3 + 1]]
-	for j in h:
-		for i in w:
-			var p := j * w + i
-			var c := Vector2(cx[p], cy[p])
-			var k := "sky"
-			if c.x > 0.25:
-				var dist := c.y * c.y * 2000.0
-				if dist > FAR_M:
-					k = "far"
-				elif c.x < 0.75:
-					k = "unlit"
-				else:
-					var dlum := (du[p * 3] + du[p * 3 + 1] + du[p * 3 + 2]) - (dl[p * 3] + dl[p * 3 + 1] + dl[p * 3 + 2])
-					k = "shadow" if dlum > 6 else "lit"
-			n[k] += 1
-			for q in [p - 1, p + 1, p - w, p + w]:
-				if q < 0 or q >= w * h:
-					continue
-				var cq := Vector2(cx[q], cy[q])
-				if (cq.x > 0.25) != (c.x > 0.25) or absf(cq.x - c.x) > 0.25 or absf(cq.y - c.y) > 0.02:
-					n.edge += 1
-					break
-	var total := float(w * h)
-	for k in n:
-		n[k] = n[k] / total
+	var c := Kernels.class_mix(cls.get_data(), lit.get_data(), unshadowed.get_data(), cls.get_width(), cls.get_height(), lut, FAR_M)
+	var total := float(cls.get_width() * cls.get_height())
+	var n := {}
+	for k in 6:
+		n[["sky", "far", "unlit", "shadow", "lit", "edge"][k]] = c[k] / total
 	return n

@@ -7,6 +7,7 @@
 # folder exists, never overwriting (NN counts up), for review alongside other agents' sheets.
 extends RefCounted
 
+const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const PAD := 6
 const TITLE_H := 34
 const HEAD_H := 24
@@ -82,45 +83,35 @@ static func _label(parent: Node, text: String, at: Vector2, size: int, colour: C
 
 ## |a - b| averaged over RGB per pixel, as a black-red-yellow-white heat map (255 = white).
 static func heat(a: Image, b: Image) -> Image:
+	if not _guest("heat"):
+		return null
 	var x: Image = a.duplicate()
 	var y: Image = b.duplicate()
 	x.convert(Image.FORMAT_RGB8)
 	y.convert(Image.FORMAT_RGB8)
 	if y.get_size() != x.get_size():
 		y.resize(x.get_width(), x.get_height())
-	var da := x.get_data()
-	var db := y.get_data()
-	var out := PackedByteArray()
-	out.resize(da.size())
-	for i in range(0, da.size(), 3):
-		var d := (absi(da[i] - db[i]) + absi(da[i + 1] - db[i + 1]) + absi(da[i + 2] - db[i + 2])) / 3.0 / 255.0
-		var t := clampf(d * 3.0, 0.0, 3.0)  # 0..1 red, 1..2 yellow, 2..3 white
-		out[i] = int(clampf(t, 0, 1) * 255)
-		out[i + 1] = int(clampf(t - 1.0, 0, 1) * 255)
-		out[i + 2] = int(clampf(t - 2.0, 0, 1) * 255)
+	var out := Kernels.heat_rgb(x.get_data(), y.get_data())
 	return Image.create_from_data(x.get_width(), x.get_height(), false, Image.FORMAT_RGB8, out)
 
 
 ## The parity measure: mean |a - b| over EVERY pixel and every RGB channel at full resolution, on
 ## the 0..255 scale (no resize, no subsample, no mask). -1 when the sizes differ.
 static func mad(a: Image, b: Image) -> float:
-	if a == null or b == null or a.get_size() != b.get_size():
+	if a == null or b == null or a.get_size() != b.get_size() or not _guest("mad"):
 		return -1.0
 	var x: Image = a.duplicate()
 	var y: Image = b.duplicate()
 	x.convert(Image.FORMAT_RGB8)
 	y.convert(Image.FORMAT_RGB8)
 	var da := x.get_data()
-	var db := y.get_data()
-	var sum := 0
-	for i in da.size():
-		sum += absi(da[i] - db[i])
-	return float(sum) / float(da.size())
+	return float(Kernels.diff_stats(da, y.get_data())[0]) / float(da.size())
 
 
-## The LEGACY measure, kept only to compare with older reports: both images halved (bilinear), then
-## every 7th byte of the RGB data. A blur and a subsample before the diff, so not the parity measure.
+## The LEGACY measure, for older reports only: both images halved (bilinear), every 7th RGB byte.
 static func mad_legacy(port: Image, orig: Image) -> float:
+	if not _guest("mad_legacy"):
+		return -1.0
 	var w := port.get_width() / 2
 	var h := port.get_height() / 2
 	var a: Image = port.duplicate()
@@ -130,11 +121,14 @@ static func mad_legacy(port: Image, orig: Image) -> float:
 	a.resize(w, h)
 	b.resize(w, h)
 	var da := a.get_data()
-	var db := b.get_data()
-	var sum := 0
-	for i in range(0, da.size(), 7):
-		sum += absi(da[i] - db[i])
-	return float(sum) / float(ceili(da.size() / 7.0))
+	return float(Kernels.stride_abs_sum(da, b.get_data(), 7)) / float(ceili(da.size() / 7.0))
+
+
+static func _guest(what: String) -> bool:
+	if Kernels.sandbox() != null:
+		return true
+	printerr("Sheet.%s: FAIL no kernels Sandbox (%s)" % [what, Kernels.reason])
+	return false
 
 
 ## Saves img at path, and copies it to <Desktop>/lookdev-contact-sheets/<topic>-<NN>.png (first free

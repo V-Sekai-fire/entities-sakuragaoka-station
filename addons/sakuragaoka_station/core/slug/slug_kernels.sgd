@@ -20,6 +20,12 @@
 #   probe_scan      chart_in_view.gd's shadow probe read (pixels inside a screen quad, hidden ones, red range)
 #   score_rgba      tools/oracle/score_renders.gd's image metric (guest only, no GDScript twin)
 #   diff_rgba       tools/oracle/score_renders.gd's contact-sheet difference images (guest only, no GDScript twin)
+#   heat_rgb        tools/sheet.gd heat's |a - b| heat map (guest only, no GDScript twin, as are those below)
+#   stride_abs_sum  tools/sheet.gd mad_legacy's every-7th-byte sum
+#   flat_split      tools/engine_floor.gd _split and _flat (MAD over flat and edge pixels)
+#   class_mix       tools/engine_floor.gd _mix's class and edge counts
+#   rect_sums       tools/chart_calib.gd read's patch sums, summed in float32 as its Vector3 was
+#   probe_read      tools/oracle/calib_probe.mjs's read of the original's shadow probes
 extends Node
 
 const DATA_WIDTH := 1024
@@ -601,3 +607,184 @@ func diff_rgba(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
 		out[p + 2] = 0
 		out[p + 3] = 255
 	return out
+
+
+func heat_rgb(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(a.size())
+	for i in range(0, a.size(), 3):
+		var d := (absi(a[i] - b[i]) + absi(a[i + 1] - b[i + 1]) + absi(a[i + 2] - b[i + 2])) / 3.0 / 255.0
+		var t := clampf(d * 3.0, 0.0, 3.0)
+		out[i] = int(clampf(t, 0, 1) * 255)
+		out[i + 1] = int(clampf(t - 1.0, 0, 1) * 255)
+		out[i + 2] = int(clampf(t - 2.0, 0, 1) * 255)
+	return out
+
+
+func stride_abs_sum(a: PackedByteArray, b: PackedByteArray, stride: int) -> int:
+	var sum := 0
+	for i in range(0, a.size(), stride):
+		sum += absi(a[i] - b[i])
+	return sum
+
+
+func flat_split(a: PackedByteArray, b: PackedByteArray, w: int, h: int) -> PackedFloat64Array:
+	var fa := _flat(a, w, h)
+	var fb := _flat(b, w, h)
+	var se := 0.0
+	var ne := 0
+	var si := 0.0
+	var ni := 0
+	for p in w * h:
+		var o := p * 3
+		var dd := (absi(a[o] - b[o]) + absi(a[o + 1] - b[o + 1]) + absi(a[o + 2] - b[o + 2])) / 3.0
+		if fa[p] and fb[p]:
+			si += dd
+			ni += 1
+		else:
+			se += dd
+			ne += 1
+	var out := PackedFloat64Array()
+	out.append((se + si) / maxf(ne + ni, 1))
+	out.append(se / maxf(ne, 1))
+	out.append(si / maxf(ni, 1))
+	out.append(float(ne) / maxf(ne + ni, 1))
+	return out
+
+
+func _flat(d: PackedByteArray, w: int, h: int) -> PackedByteArray:
+	var c := PackedInt32Array()
+	c.resize(w * h)
+	for p in w * h:
+		c[p] = (d[p * 3] << 16) | (d[p * 3 + 1] << 8) | d[p * 3 + 2]
+	var out := PackedByteArray()
+	out.resize(w * h)
+	for j in h:
+		var j0 := maxi(j - 1, 0) * w
+		var j1 := j * w
+		var j2 := mini(j + 1, h - 1) * w
+		for i in w:
+			var i0 := maxi(i - 1, 0)
+			var i2 := mini(i + 1, w - 1)
+			var v := c[j1 + i]
+			out[j1 + i] = 1 if (c[j0 + i0] == v and c[j0 + i] == v and c[j0 + i2] == v and c[j1 + i0] == v and c[j1 + i2] == v
+					and c[j2 + i0] == v and c[j2 + i] == v and c[j2 + i2] == v) else 0
+	return out
+
+
+func class_mix(dc: PackedByteArray, dl: PackedByteArray, du: PackedByteArray, w: int, h: int, lut: PackedFloat32Array, far_m: float) -> PackedInt64Array:
+	var cx := PackedFloat32Array()
+	var cy := PackedFloat32Array()
+	cx.resize(w * h)
+	cy.resize(w * h)
+	for p in w * h:
+		cx[p] = lut[dc[p * 3]]
+		cy[p] = lut[dc[p * 3 + 1]]
+	var n := PackedInt64Array()
+	n.resize(6)
+	var wh := w * h
+	for j in h:
+		for i in w:
+			var p := j * w + i
+			var x: float = cx[p]
+			var y: float = cy[p]
+			var k := 0
+			if x > 0.25:
+				if y * y * 2000.0 > far_m:
+					k = 1
+				elif x < 0.75:
+					k = 2
+				else:
+					var dlum := (du[p * 3] + du[p * 3 + 1] + du[p * 3 + 2]) - (dl[p * 3] + dl[p * 3 + 1] + dl[p * 3 + 2])
+					k = 3 if dlum > 6 else 4
+			n[k] += 1
+			if ((p - 1 >= 0 and _mix_edge(cx, cy, p - 1, x, y)) or (p + 1 < wh and _mix_edge(cx, cy, p + 1, x, y))
+					or (p - w >= 0 and _mix_edge(cx, cy, p - w, x, y)) or (p + w < wh and _mix_edge(cx, cy, p + w, x, y))):
+				n[5] += 1
+	return n
+
+
+func _mix_edge(cx: PackedFloat32Array, cy: PackedFloat32Array, q: int, x: float, y: float) -> bool:
+	var qx: float = cx[q]
+	var qy: float = cy[q]
+	return (qx > 0.25) != (x > 0.25) or absf(qx - x) > 0.25 or absf(qy - y) > 0.02
+
+
+func rect_sums(d: PackedByteArray, w: int, h: int, rects: PackedInt32Array) -> PackedFloat64Array:
+	var out := PackedFloat64Array()
+	var s := PackedFloat32Array()
+	s.resize(3)
+	for r in range(0, rects.size(), 4):
+		s[0] = 0.0
+		s[1] = 0.0
+		s[2] = 0.0
+		var n := 0
+		for j in range(rects[r + 1], rects[r + 1] + rects[r + 3]):
+			for i in range(rects[r], rects[r] + rects[r + 2]):
+				n += 1
+				if i < 0 or i >= w or j < 0 or j >= h:
+					continue
+				var o := (j * w + i) * 3
+				s[0] += d[o]
+				s[1] += d[o + 1]
+				s[2] += d[o + 2]
+		out.append(s[0])
+		out.append(s[1])
+		out.append(s[2])
+		out.append(n)
+	return out
+
+
+func probe_read(px: PackedByteArray, w: int, h: int, quads: PackedFloat64Array) -> PackedInt64Array:
+	var out := PackedInt64Array()
+	for b in range(0, quads.size(), 18):
+		var n := 0
+		var hidden := 0
+		var lo := 255
+		var hi := 0
+		var y: float = quads[b]
+		while y <= quads[b + 1]:
+			var yc := y + 0.5
+			var x0 := -INF
+			var x1 := INF
+			var ok := true
+			for e in range(b + 2, b + 18, 4):
+				var nx: float = quads[e + 2]
+				var rhs: float = 2.0 + quads[e] * nx + quads[e + 1] * quads[e + 3] - quads[e + 3] * yc
+				if absf(nx) < 1e-6:
+					if rhs > 0.0:
+						ok = false
+				elif nx > 0.0:
+					x0 = _js_max(x0, rhs / nx)
+				else:
+					x1 = _js_min(x1, rhs / nx)
+			if ok:
+				var x := _js_max(0.0, ceil(x0 - 0.5))
+				var xe := _js_min(float(w - 1), floor(x1 - 0.5))
+				while x <= xe:
+					var i := ((h - 1 - int(y)) * w + int(x)) * 4
+					n += 1
+					if px[i + 1] > 4 or absi(px[i] - px[i + 2]) > 4:
+						hidden += 1
+					else:
+						lo = mini(lo, px[i])
+						hi = maxi(hi, px[i])
+					x += 1.0
+			y += 1.0
+		out.append(n)
+		out.append(hidden)
+		out.append(lo)
+		out.append(hi)
+	return out
+
+
+func _js_max(a: float, b: float) -> float:
+	if a != a or b != b:
+		return a + b
+	return a if a > b else b
+
+
+func _js_min(a: float, b: float) -> float:
+	if a != a or b != b:
+		return a + b
+	return a if a < b else b

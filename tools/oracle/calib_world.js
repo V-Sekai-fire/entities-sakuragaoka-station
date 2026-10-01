@@ -169,7 +169,7 @@ export async function build(ctx) {
 }
 
 // Shadow probes for calib_probe.mjs: a black ShadowMaterial quad over a magenta one reads magenta in sun, black in shadow.
-// __probeShow(ids) shows those probes; __probeRead(ids) classifies each as lit, shadow, mixed, hidden or offscreen.
+// __probeShow(ids) shows those probes; __probeRead(ids) returns the frame read back and each probe's screen quad.
 function shadowProbes(ctx, probe) {
   const screenMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, fog: false });
   const shadowMat = new THREE.ShadowMaterial({ color: 0x000000, opacity: 1, fog: false, depthWrite: false });
@@ -196,7 +196,7 @@ function shadowProbes(ctx, probe) {
     const px = new Uint8Array(W * H * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    const out = {};
+    const on = [], quads = [];
     for (const id of ids) {
       const p = all.get(id);
       p.g.updateMatrixWorld(true);
@@ -204,32 +204,18 @@ function shadowProbes(ctx, probe) {
         const v = new THREE.Vector3(sx * p.w / 2, sy * p.h / 2, 0).applyMatrix4(p.g.matrixWorld).project(ctx.camera);
         return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * H, v.z];
       });
-      if (q.some((c) => c[2] > 1 || c[2] < -1)) { out[id] = { state: 'offscreen' }; continue; }
+      on.push(!q.some((c) => c[2] > 1 || c[2] < -1));
+      if (!on[on.length - 1]) continue;
       const cx = q.reduce((a, c) => a + c[0], 0) / 4, cy = q.reduce((a, c) => a + c[1], 0) / 4;
       const edges = q.map((a, i) => {
         const b = q[(i + 1) % 4]; let ex = b[0] - a[0], ey = b[1] - a[1]; const l = Math.hypot(ex, ey); ex /= l; ey /= l;
         let nx = -ey, ny = ex; if ((cx - a[0]) * nx + (cy - a[1]) * ny < 0) { nx = -nx; ny = -ny; }
         return [a[0], a[1], nx, ny];
       });
-      const y0 = Math.max(0, Math.floor(Math.min(...q.map((c) => c[1])))), y1 = Math.min(H - 1, Math.ceil(Math.max(...q.map((c) => c[1]))));
-      let n = 0, hidden = 0, lo = 255, hi = 0;
-      for (let y = y0; y <= y1; y++) {
-        const yc = y + 0.5; let x0 = -Infinity, x1 = Infinity, ok = true;
-        for (const [ax, ay, nx, ny] of edges) {
-          const rhs = 2 + ax * nx + ay * ny - ny * yc;
-          if (Math.abs(nx) < 1e-6) { if (rhs > 0) ok = false; } else if (nx > 0) x0 = Math.max(x0, rhs / nx); else x1 = Math.min(x1, rhs / nx);
-        }
-        if (!ok) continue;
-        for (let x = Math.max(0, Math.ceil(x0 - 0.5)); x <= Math.min(W - 1, Math.floor(x1 - 0.5)); x++) {
-          const i = ((H - 1 - y) * W + x) * 4;
-          n++;
-          if (px[i + 1] > 4 || Math.abs(px[i] - px[i + 2]) > 4) { hidden++; continue; }
-          lo = Math.min(lo, px[i]); hi = Math.max(hi, px[i]);
-        }
-      }
-      out[id] = { state: n === 0 ? 'offscreen' : hidden > 0 ? 'hidden' : lo >= 250 ? 'lit' : hi <= 5 ? 'shadow' : 'mixed', pixels: n, hidden, att_min: lo / 255, att_max: hi / 255 };
+      quads.push(Math.max(0, Math.floor(Math.min(...q.map((c) => c[1])))), Math.min(H - 1, Math.ceil(Math.max(...q.map((c) => c[1])))), ...edges.flat());
     }
-    return out;
+    const b64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+    return { w: W, h: H, ids, on, frame: b64(px), quads: b64(new Uint8Array(new Float64Array(quads).buffer)) };
   };
 }
 

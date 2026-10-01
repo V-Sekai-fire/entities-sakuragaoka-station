@@ -1,10 +1,13 @@
 // The original's shadow probes of chart_in_view.gd's candidate placements, so a chart goes only where both engines agree.
-// node tools/oracle/calib_probe.mjs --candidates <candidates.json> --out <candidates_original.json> [--root <dir>] [--chrome <path>]
+// node tools/oracle/calib_probe.mjs --candidates <candidates.json> --out <candidates_original.json> [--root <dir>] [--chrome <path>] [--godot <exe>] [--keep <dir>]
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import os from 'node:os';
+import zlib from 'node:zlib';
 
 const args = {};
 for (let i = 2; i < process.argv.length; i++) { const a = process.argv[i]; if (a.startsWith('--')) { const k = a.slice(2); const v = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[++i] : '1'; args[k] = v; } }
@@ -51,6 +54,9 @@ try {
   if (errors && errors.length) throw new Error('module errors: ' + JSON.stringify(errors).slice(0, 2000));
   await page.evaluate(() => { window.__post = { outline: 0, bloom: 0, grade: 0, leak: 0, vignette: 0, dither: 0 }; });
   const result = { note: 'the original\'s shadow probes of the port\'s candidate placements', views: [] };
+  const tmp = args.keep ? path.resolve(args.keep) : fs.mkdtempSync(path.join(os.tmpdir(), 'calib-probe-'));
+  fs.mkdirSync(tmp, { recursive: true });
+  const plan = [];
   for (const v of views) {
     await page.evaluate((c) => window.__setCam(c[0], null, c[1], c[2], c[3]), v.cam);
     const passes = [];
@@ -58,19 +64,43 @@ try {
       const p = passes.find((ps) => ps.every((o) => !overlaps(o.box, c.box)));
       if (p) p.push(c); else passes.push([c]);
     }
-    const states = {};
+    const reads = [];
     for (const ps of passes) {
       const ids = ps.map((c) => c.id);
       await page.evaluate((ids) => window.__probeShow(ids), ids);
       await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r))))));
-      Object.assign(states, await page.evaluate((ids) => window.__probeRead(ids), ids));
+      const r = await page.evaluate((ids) => window.__probeRead(ids), ids);
+      const file = `view${v.view}-pass${reads.length}`;
+      fs.writeFileSync(path.join(tmp, file + '.zst'), zlib.zstdCompressSync(Buffer.from(r.frame, 'base64')));
+      fs.writeFileSync(path.join(tmp, file + '.f64'), Buffer.from(r.quads, 'base64'));
+      reads.push({ file, w: r.w, h: r.h, ids: r.ids, on: r.on });
     }
     await page.evaluate(() => window.__probeShow([]));
+    plan.push({ v, passes: passes.length, reads });
+  }
+  fs.writeFileSync(path.join(tmp, 'passes.json'), JSON.stringify(plan.flatMap((p) => p.reads.map(({ file, w, h }) => ({ file, w, h })))));
+  const g = spawnSync(args.godot || 'godot', ['--headless', '--path', path.resolve(here, '../..'), '--script', 'res://tools/oracle/probe_read.gd', '--',
+    `--passes=${path.join(tmp, 'passes.json')}`, `--out=${path.join(tmp, 'reads.json')}`], { encoding: 'utf8', maxBuffer: 64 << 20 });
+  for (const l of `${g.stdout || ''}${g.stderr || ''}`.split(/\r?\n/)) if (/probe_read/.test(l)) console.log(l);
+  if (g.status !== 0) throw new Error(`probe_read.gd exited ${g.status}${g.error ? ': ' + g.error.message : ''}`);
+  const counts = JSON.parse(fs.readFileSync(path.join(tmp, 'reads.json'), 'utf8'));
+  for (const { v, passes, reads } of plan) {
+    const states = {};
+    for (const r of reads) {
+      let k = 0;
+      r.ids.forEach((id, i) => {
+        if (!r.on[i]) { states[id] = { state: 'offscreen' }; return; }
+        const [n, hidden, lo, hi] = counts[r.file].slice(k * 4, k * 4 + 4);
+        k++;
+        states[id] = { state: n === 0 ? 'offscreen' : hidden > 0 ? 'hidden' : lo >= 250 ? 'lit' : hi <= 5 ? 'shadow' : 'mixed', pixels: n, hidden, att_min: lo / 255, att_max: hi / 255 };
+      });
+    }
     const tally = {};
     for (const s of Object.values(states)) tally[s.state] = (tally[s.state] || 0) + 1;
-    console.log(`calib_probe: view ${v.view}: ${v.cands.length} candidates in ${passes.length} passes: ${JSON.stringify(tally)}`);
+    console.log(`calib_probe: view ${v.view}: ${v.cands.length} candidates in ${passes} passes: ${JSON.stringify(tally)}`);
     result.views.push({ view: v.view, states });
   }
+  if (!args.keep) fs.rmSync(tmp, { recursive: true, force: true });
   fs.mkdirSync(path.dirname(path.resolve(args.out)), { recursive: true });
   fs.writeFileSync(args.out, JSON.stringify(result, null, 1));
   console.log('calib_probe: saved', args.out);
