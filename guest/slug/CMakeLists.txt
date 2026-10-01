@@ -40,9 +40,10 @@ foreach(opt SLUGHORN_SERIAL SLUGHORN_NANOSVG SLUGHORN_FREETYPE SLUGHORN_SDF SLUG
 		SLUGHORN_RENDER_PARALLEL SLUGHORN_BUILD_TESTS SLUGHORN_BUILD_EXAMPLES SLUGHORN_THORVG_THREADS)
 	set(${opt} OFF CACHE BOOL "" FORCE)
 endforeach()
-foreach(opt SLUGHORN_THORVG SLUGHORN_CLIPPER2 SLUGHORN_TESSELLATE)
+foreach(opt SLUGHORN_THORVG SLUGHORN_CLIPPER2 SLUGHORN_TESSELLATE SLUGHORN_MESHOPT)
 	set(${opt} ON CACHE BOOL "" FORCE)
 endforeach()
+set(SLUGHORN_MESHOPTIMIZER_DIR "${WEFT_ROOT}/2-contract/meshoptimizer" CACHE PATH "" FORCE)
 add_subdirectory(${SLUGHORN_ROOT} slughorn EXCLUDE_FROM_ALL)
 
 # No FMA contraction anywhere: rv64gc has FMA and x86-64 baseline does not, so with contraction the
@@ -51,7 +52,7 @@ add_subdirectory(${SLUGHORN_ROOT} slughorn EXCLUDE_FROM_ALL)
 set(SLUG_FP_FLAGS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	set(SLUG_FP_FLAGS -ffp-contract=off)
-	foreach(lib slughorn slughorn_thorvg slughorn_clipper2)
+	foreach(lib slughorn slughorn_thorvg slughorn_clipper2 slughorn_meshopt)
 		target_compile_options(${lib} PRIVATE ${SLUG_FP_FLAGS})
 	endforeach()
 endif()
@@ -63,7 +64,7 @@ if(SLUG_RISCV)
 	add_subdirectory(${GUEST_RUNTIME_ROOT}/vendor/sandbox-api/cmake sandbox_api)
 
 	# The libraries build at sandbox-api's -march/-mabi too (same ABI, lp64d).
-	foreach(lib slughorn slughorn_thorvg slughorn_clipper2)
+	foreach(lib slughorn slughorn_thorvg slughorn_clipper2 slughorn_meshopt)
 		target_compile_options(${lib} PRIVATE $<TARGET_PROPERTY:sandbox_api,INTERFACE_COMPILE_OPTIONS>)
 	endforeach()
 

@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -47,6 +48,9 @@ void operator delete[](void *p) noexcept { operator delete(p); }
 void operator delete[](void *p, std::size_t) noexcept { operator delete(p); }
 
 static int g_fail = 0;
+
+// The per-surface budget the baseline test bakes every key into.
+static constexpr int64_t BASELINE_CAP = 4096;
 
 static void expect(bool ok, const std::string &what) {
 	if (!ok) {
@@ -95,7 +99,7 @@ int main(int argc, char **argv) {
 	}
 
 	std::vector<fs::path> svgs;
-	for (const auto &e : fs::directory_iterator(dir)) {
+	for (const fs::directory_entry &e : fs::directory_iterator(dir)) {
 		if (e.path().extension() == ".svg") {
 			svgs.push_back(e.path());
 		}
@@ -104,7 +108,9 @@ int main(int argc, char **argv) {
 
 	std::cout << "slug_native: " << svgs.size() << " SVGs from " << dir << std::endl;
 
-	Heaviest hLoad, hMesh, hCost, hDecal;
+	Heaviest hLoad, hMesh, hCost, hDecal, hBaseline;
+	std::vector<int64_t> lodCount(size_t(slug::LOD_MEAN) + 1, 0);
+	std::vector<std::string> lodLines;
 	double tAll = 0;
 
 	for (const fs::path &p : svgs) {
@@ -164,7 +170,7 @@ int main(int argc, char **argv) {
 
 		expect(a.stamp_layers.size() % 5 == 0 && a.stamp_instances.size() % 12 == 0 && a.stamp_protos.size() % 2 == 0, "stamp array strides");
 
-		auto u16 = [&](size_t element) { return uint32_t(a.stamp_cells[element * 2]) | (uint32_t(a.stamp_cells[element * 2 + 1]) << 8); };
+		std::function<uint32_t(size_t)> u16 = [&](size_t element) { return uint32_t(a.stamp_cells[element * 2]) | (uint32_t(a.stamp_cells[element * 2 + 1]) << 8); };
 
 		for (size_t si = 0; si < a.stamp_layers.size() / 5; ++si) {
 			const int32_t G = a.stamp_layers[si * 5], B = a.stamp_layers[si * 5 + 1], first = a.stamp_layers[si * 5 + 2];
@@ -308,15 +314,16 @@ int main(int argc, char **argv) {
 
 					for (int e = 0; e < 4 && !poly.empty(); ++e) {
 						std::vector<std::pair<double, double>> outp;
-						auto inside = [&](const std::pair<double, double> &p) { return e == 0 ? p.first >= 0.5 : e == 1 ? p.first <= 1.0 : e == 2 ? p.second >= 0.5 : p.second <= 1.0; };
-						auto cut = [&](const std::pair<double, double> &p, const std::pair<double, double> &q) {
+						std::function<bool(const std::pair<double, double> &)> inside = [&](const std::pair<double, double> &p) { return e == 0 ? p.first >= 0.5 : e == 1 ? p.first <= 1.0 : e == 2 ? p.second >= 0.5 : p.second <= 1.0; };
+						std::function<std::pair<double, double>(const std::pair<double, double> &, const std::pair<double, double> &)> cut =
+							[&](const std::pair<double, double> &p, const std::pair<double, double> &q) {
 							const double edge = e == 0 ? 0.5 : e == 1 ? 1.0 : e == 2 ? 0.5 : 1.0;
 							const double u = (e < 2) ? (edge - p.first) / (q.first - p.first) : (edge - p.second) / (q.second - p.second);
 							return std::pair<double, double>{p.first + (q.first - p.first) * u, p.second + (q.second - p.second) * u};
 						};
 
 						for (size_t i = 0; i < poly.size(); ++i) {
-							const auto &p = poly[i], &q = poly[(i + 1) % poly.size()];
+							const std::pair<double, double> &p = poly[i], &q = poly[(i + 1) % poly.size()];
 
 							if (inside(p)) outp.push_back(p);
 							if (inside(p) != inside(q)) outp.push_back(cut(p, q));
@@ -350,6 +357,32 @@ int main(int argc, char **argv) {
 			expect(std::abs(baseArea - opaqueArea) < 1e-3, key + ": decal base area " + std::to_string(baseArea) + " == bake opaque area " + std::to_string(opaqueArea));
 		}
 
+		// slug-baked: the key on a full-canvas quad with a 4096-triangle budget bakes at SOME level
+		// within it (cards alpha-tested, the rest opaque), never handed to slug-runtime.
+		{
+			slug::BakeParams bp;
+			slug::Decal fd;
+
+			bp.mode = opaqueArea < 0.95 ? 2 : 0;
+			bp.alpha_test = 0.5;
+			bp.cap = BASELINE_CAP;
+
+			Timer tb;
+			const bool ok = slug::decal_final(key, qv, {}, quv, qf, {1, 1, 0, 0, 0}, {0, 0}, bp, 0.0, fd, err);
+			const double bakeMs = tb.ms();
+
+			hBaseline.see(bakeMs, key);
+			expect(ok && !fd.capped, key + ": slug-baked decal: " + err);
+			expect(ok && int64_t(fd.paint.size()) <= BASELINE_CAP, key + ": slug-baked within " + std::to_string(BASELINE_CAP) + " triangles (" + std::to_string(fd.paint.size()) + ")");
+			expect(ok && fd.lod >= 0 && fd.lod <= slug::LOD_MEAN, key + ": slug-baked LOD level");
+
+			if (ok) {
+				lodCount[size_t(std::clamp(fd.lod, 0, slug::LOD_MEAN))]++;
+				lodLines.push_back(key + " lod " + std::to_string(fd.lod) + " tris " + std::to_string(fd.paint.size()) + " feature_px " + std::to_string(fd.feature_px) +
+						" (" + std::to_string(bakeMs) + " ms)");
+			}
+		}
+
 		js << (firstKey ? "" : ", ") << "\"" << key << "\": {\"mode\": \"" << c.mode << "\", \"curves_after\": " << c.curves_after
 		   << ", \"layers_after\": " << c.layers_after << ", \"vertices\": " << n << ", \"triangles\": " << m.triangles.size() / 3
 		   << ", \"overlay\": " << m.overlay_count << ", \"opaque_area\": " << opaqueArea << "}";
@@ -368,10 +401,103 @@ int main(int argc, char **argv) {
 		std::ofstream(jsonPath) << js.str();
 	}
 
+	// A planted over-budget surface must coarsen, not fail: the heaviest key on a quad with a
+	// 500-triangle budget. Control: the legacy (planar) decal with the same cap gives up.
+	{
+		const std::vector<float> qv = {0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0};
+		const std::vector<float> quv = {0, 0, 1, 0, 1, 1, 0, 1};
+		const std::vector<int32_t> qf = {0, 1, 2, 0, 2, 3};
+		const std::string heavy = "st-gravel";
+		slug::BakeParams bp;
+		slug::Decal fd, legacy;
+		std::string err;
+
+		bp.mode = 0;
+		bp.cap = 500;
+
+		const bool ok = slug::decal_final(heavy, qv, {}, quv, qf, {1, 1, 0, 0, 0}, {0, 0}, bp, 0.0, fd, err);
+
+		expect(ok && !fd.capped && int64_t(fd.paint.size()) <= 500 && fd.lod > 0, heavy + " at 500 triangles coarsens (lod " + std::to_string(fd.lod) + ", " +
+				std::to_string(fd.paint.size()) + " triangles): " + err);
+
+		const bool lok = slug::decal(heavy, qv, {}, quv, qf, {1, 1, 0, 0, 0}, {0, 0}, 500, 0.0, legacy, err);
+
+		expect(lok && legacy.capped, "control: the legacy decal of " + heavy + " at 500 triangles is capped");
+
+		std::cout << "planted over-budget: " << heavy << " cap 500 -> lod " << fd.lod << ", " << fd.paint.size() << " triangles, feature_px " << fd.feature_px
+				  << "; legacy decal capped=" << legacy.capped << std::endl;
+
+		for (const slug::Lod &l : fd.lods) {
+			std::cout << "  level " << l.level << ": window " << l.triangles << " surface " << l.surface_triangles << " feature_px " << l.feature_px
+					  << " tolerance_px " << l.tolerance_px << " simplify_err " << l.simplify_error_px << (l.aborted ? " (aborted)" : "") << std::endl;
+		}
+	}
+
+	// Per-surface budgets after UV-footprint clipping: a sign that samples one cell of a text atlas
+	// bakes only that cell's glyphs - its window, and so its triangles, are the cell's share.
+	{
+		const std::vector<float> qv = {0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0};
+		const std::vector<float> full = {0, 0, 1, 0, 1, 1, 0, 1};
+		const std::vector<float> cell = {0.0f, 0.5f, 0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 1.0f};
+		const std::vector<int32_t> qf = {0, 1, 2, 0, 2, 3};
+		slug::BakeParams bp;
+		slug::Decal whole, part;
+		std::string err;
+
+		bp.mode = 2;
+		bp.cap = 1000000;
+
+		const bool ok = slug::decal_final("st-atlas-info", qv, {}, full, qf, {1, 1, 0, 0, 0}, {0, 0}, bp, 0.0, whole, err) &&
+			slug::decal_final("st-atlas-info", qv, {}, cell, qf, {1, 1, 0, 0, 0}, {0, 0}, bp, 0.0, part, err);
+
+		expect(ok && part.lod == 0 && whole.lod == 0, "st-atlas-info whole / cell bake at level 0: " + err);
+		expect(ok && part.paint.size() < whole.paint.size() && part.canvas_area < 0.3 * whole.canvas_area,
+				"a one-cell sign bakes only its cell (" + std::to_string(part.paint.size()) + " of " + std::to_string(whole.paint.size()) + " triangles)");
+		std::cout << "atlas cell: st-atlas-info top-left cell " << part.paint.size() << " triangles (window " << part.canvas_area << " px^2) vs whole "
+				  << whole.paint.size() << " (" << whole.canvas_area << " px^2)" << std::endl;
+	}
+
+	// The plaza tree moss: no map, alphaMap plaza-moss, opacity 0.85, transparent - the alpha map
+	// folded in: paints carry alpha 0.85 (inside the moss) and nothing is drawn where it is black.
+	{
+		slug::BakeParams bp;
+		slug::FinalBake fb;
+		std::string err;
+
+		bp.mode = 1;
+		bp.opacity = 0.85;
+
+		const bool ok = slug::bake("|plaza-moss", bp, fb, err);
+		float amax = 0.0f;
+
+		for (size_t i = 1; i + 6 < fb.mesh.paints.size();) {
+			const int type = int(fb.mesh.paints[i]);
+			const int k = int(fb.mesh.paints[i + 1]);
+
+			for (int j = 0; j < k; ++j) amax = std::max(amax, fb.mesh.paints[i + 2 + size_t(j) * 5 + 4]);
+
+			i += 2 + size_t(k) * 5;
+			(void)type;
+		}
+
+		expect(ok && !fb.mesh.triangles.empty(), "|plaza-moss bakes: " + err);
+		expect(std::abs(amax - 0.85f) < 1e-3f, "|plaza-moss: max alpha " + std::to_string(amax) + " == opacity 0.85");
+		std::cout << "moss: " << fb.mesh.triangles.size() / 3 << " triangles, max alpha " << amax << std::endl;
+	}
+
+	std::cout << "slug-baked (cap " << BASELINE_CAP << " a full-canvas quad): levels";
+
+	for (int l = 0; l <= slug::LOD_MEAN; ++l) std::cout << " " << l << ":" << lodCount[size_t(l)];
+
+	std::cout << std::endl;
+
+	for (const std::string &l : lodLines) std::cout << "  " << l << std::endl;
+
 	std::cout << "modes: mesh=" << modes[0] << " slug=" << modes[1] << " stamp=" << modes[3] << " mean=" << modes[2] << std::endl;
  	std::cout << "allocations: live " << g_live.load() << " peak " << g_peak.load() << std::endl;
 	std::cout << "heaviest: load " << hLoad.key << " " << hLoad.ms << " ms (all loads " << tAll << " ms), atlas " << atlasMs
-			  << " ms, bake (slug_mesh) " << hMesh.key << " " << hMesh.ms << " ms, cost " << hCost.key << " " << hCost.ms << " ms, decal " << hDecal.key << " " << hDecal.ms << " ms" << std::endl;
+			  << " ms, bake (slug_mesh) " << hMesh.key << " " << hMesh.ms << " ms, cost " << hCost.key << " " << hCost.ms << " ms, decal " << hDecal.key << " " << hDecal.ms
+			  << " ms, slug-baked decal " << hBaseline.key << " " << hBaseline.ms << " ms" << std::endl;
 	std::cout << (g_fail ? "FAILED: " : "ok: ") << g_fail << " failures" << std::endl;
 
 	return g_fail ? 1 : 0;

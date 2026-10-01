@@ -52,9 +52,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
 namespace slug {
@@ -138,7 +141,7 @@ std::string layerKey(const std::string &key, size_t i) {
 
 const KeyData *findKey(const std::string &key) {
 	State &s = state();
-	auto it = s.index.find(key);
+	std::unordered_map<std::string, size_t>::iterator it = s.index.find(key);
 	return it == s.index.end() ? nullptr : &s.keys[it->second];
 }
 
@@ -154,7 +157,7 @@ bool ensureAtlas(std::string &err) {
 		return false;
 	}
 
-	auto atlas = std::make_unique<slughorn::Atlas>();
+	std::unique_ptr<slughorn::Atlas> atlas = std::make_unique<slughorn::Atlas>();
 	std::vector<Built> built;
 	size_t stampBase = 0;
 
@@ -237,7 +240,7 @@ bool ensureAtlas(std::string &err) {
 
 Baked *ensureBaked(const std::string &key, double alphaTest, std::string &err) {
 	State &s = state();
-	auto it = s.index.find(key);
+	std::unordered_map<std::string, size_t>::iterator it = s.index.find(key);
 
 	if (it == s.index.end()) {
 		err = "unknown key '" + key + "'";
@@ -250,14 +253,14 @@ Baked *ensureBaked(const std::string &key, double alphaTest, std::string &err) {
 
 	const KeyData &k = s.keys[it->second];
 	const Built &b = s.built[it->second];
-	const auto cacheKey = std::make_pair(key, int64_t(std::llround(std::max(0.0, alphaTest) * 1e6)));
+	const std::pair<std::string, int64_t> cacheKey = std::make_pair(key, int64_t(std::llround(std::max(0.0, alphaTest) * 1e6)));
 
-	auto touch = [&]() {
+	std::function<void()> touch = [&]() {
 		s.bakeOrder.erase(std::remove(s.bakeOrder.begin(), s.bakeOrder.end(), cacheKey), s.bakeOrder.end());
 		s.bakeOrder.push_back(cacheKey);
 	};
 
-	auto hit = s.baked.find(cacheKey);
+	std::map<std::pair<std::string, int64_t>, Baked>::iterator hit = s.baked.find(cacheKey);
 
 	if (hit != s.baked.end()) {
 		touch();
@@ -342,7 +345,7 @@ std::string load_svg(const std::string &key, const std::string &svg, double tole
 	std::vector<slughorn::bake::LayerSource> meta;
 	meta.reserve(cfg.layers.size());
 
-	for (const auto &li : cfg.layers) {
+	for (const slughorn::thorvg::LayerInfo &li : cfg.layers) {
 		meta.push_back({li.fillRule, li.stroke, static_cast<uint8_t>(li.spread)});
 	}
 
@@ -376,7 +379,7 @@ std::string load_svg(const std::string &key, const std::string &svg, double tole
 			continue;
 		}
 
-		const auto shape = keyAtlas.getShape(l.key);
+		const std::optional<slughorn::Atlas::Shape> shape = keyAtlas.getShape(l.key);
 
 		if (!shape) {
 			continue;
@@ -398,7 +401,7 @@ std::string load_svg(const std::string &key, const std::string &svg, double tole
 
 	size_t instances = 0;
 
-	for (const auto &l : k.stamps.layers) {
+	for (const slughorn::stamp::Layer &l : k.stamps.layers) {
 		instances += l.instances.size();
 	}
 
@@ -414,7 +417,7 @@ std::string load_svg(const std::string &key, const std::string &svg, double tole
 	}
 
 	State &s = state();
-	auto it = s.index.find(key);
+	std::unordered_map<std::string, size_t>::iterator it = s.index.find(key);
 
 	if (it != s.index.end()) {
 		k.wrap = s.keys[it->second].wrap;
@@ -437,7 +440,7 @@ std::string load_svg(const std::string &key, const std::string &svg, double tole
 
 std::string set_wrap(const std::string &key, bool wrap) {
 	State &s = state();
-	auto it = s.index.find(key);
+	std::unordered_map<std::string, size_t>::iterator it = s.index.find(key);
 
 	if (it == s.index.end()) {
 		return "FAIL: unknown key '" + key + "'";
@@ -469,8 +472,8 @@ bool atlas(Atlas &out, std::string &err) {
 	const State &s = state();
 	const slughorn::Atlas &a = *s.atlas;
 
-	const auto &ct = a.getCurveTextureData();
-	const auto &bt = a.getBandTextureData();
+	const slughorn::Atlas::TextureData &ct = a.getCurveTextureData();
+	const slughorn::Atlas::TextureData &bt = a.getBandTextureData();
 
 	out = Atlas{};
 	out.tex_width = int(a.getTextureWidth());
@@ -480,7 +483,8 @@ bool atlas(Atlas &out, std::string &err) {
 	out.band_height = int(bt.height);
 	out.bands = bt.bytes;
 
-	auto pushShapeRecord = [&](const slughorn::Atlas::Shape &sh, const slughorn::Layer &l, float gradient, float blend) {
+	std::function<void(const slughorn::Atlas::Shape &, const slughorn::Layer &, float, float)> pushShapeRecord =
+			[&](const slughorn::Atlas::Shape &sh, const slughorn::Layer &l, float gradient, float blend) {
 		const float rec[16] = {
 			float(sh.bandTexX), float(sh.bandTexY), float(sh.bandMaxX), float(sh.bandMaxY),
 			sh.bandScaleX, sh.bandScaleY, sh.bandOffsetX, sh.bandOffsetY,
@@ -522,7 +526,7 @@ bool atlas(Atlas &out, std::string &err) {
 					continue;
 				}
 
-				const auto sh = a.getShape(l.key);
+				const std::optional<slughorn::Atlas::Shape> sh = a.getShape(l.key);
 
 				if (!sh) {
 					continue;
@@ -552,11 +556,11 @@ bool atlas(Atlas &out, std::string &err) {
 
 		protoBase[ki] = nproto;
 
-		for (const auto &p : b.stamps.protos) {
+		for (const slughorn::stamp::Proto &p : b.stamps.protos) {
 			float layer = -1.0f;
 
 			if (p.kind == slughorn::stamp::Kind::Curve) {
-				const auto sh = a.getShape(p.key);
+				const std::optional<slughorn::Atlas::Shape> sh = a.getShape(p.key);
 
 				if (sh) {
 					slughorn::Layer l;
@@ -581,8 +585,8 @@ bool atlas(Atlas &out, std::string &err) {
 		const Built &b = s.built[ki];
 		const float heightEm = k.height / k.width;
 
-		for (const auto &layer : b.stamps.layers) {
-			const auto g = slughorn::stamp::buildGrid(a, b.stamps, layer, 1.0f, heightEm, k.width, 32, true, true);
+		for (const slughorn::stamp::Layer &layer : b.stamps.layers) {
+			const slughorn::stamp::Grid g = slughorn::stamp::buildGrid(a, b.stamps, layer, 1.0f, heightEm, k.width, 32, true, true);
 
 			// Header block at texel B, lists after it, u16 elements counted from 2B.
 			const size_t B = out.stamp_cells.size() / 4;
@@ -591,7 +595,7 @@ bool atlas(Atlas &out, std::string &err) {
 			out.stamp_cells.resize((B + size_t(g.G) * g.G) * 4, 0);
 
 			for (uint32_t c = 0; c < g.G * g.G; ++c) {
-				const auto &list = g.cells[c];
+				const std::vector<uint32_t> &list = g.cells[c];
 
 				putU16(out.stamp_cells, 2 * (B + c), uint32_t(element - 2 * B));
 				putU16(out.stamp_cells, 2 * (B + c) + 1, uint32_t(list.size()));
@@ -613,8 +617,8 @@ bool atlas(Atlas &out, std::string &err) {
 			out.stamp_means.insert(out.stamp_means.end(), g.means.begin(), g.means.end());
 			out.stamp_cell_max.insert(out.stamp_cell_max.end(), g.cellMax.begin(), g.cellMax.end());
 
-			for (const auto &in : layer.instances) {
-				const auto inv = slughorn::stamp::invert(in.m);
+			for (const slughorn::stamp::Instance &in : layer.instances) {
+				const slughorn::stamp::Inverse inv = slughorn::stamp::invert(in.m);
 
 				out.stamp_instances.push_back(inv.a);
 				out.stamp_instances.push_back(inv.c);
@@ -634,7 +638,7 @@ bool atlas(Atlas &out, std::string &err) {
 		}
 	}
 
-	const auto &grads = a.getGradients();
+	const std::vector<slughorn::GradientInfo> &grads = a.getGradients();
 
 	out.gradients.push_back(float(grads.size()));
 
@@ -655,7 +659,7 @@ bool atlas(Atlas &out, std::string &err) {
 
 		out.gradients.insert(out.gradients.end(), hdr, hdr + 11);
 
-		for (const auto &st : g.stops) {
+		for (const slughorn::GradientStop &st : g.stops) {
 			out.gradients.push_back(st.t);
 			pushLinear(out.gradients, st.color);
 		}
@@ -671,7 +675,7 @@ bool mesh(const std::string &key, double alpha_test, Mesh &out, std::string &err
 		return false;
 	}
 
-	const auto &m = b->mesh;
+	const slughorn::bake::BakedMesh &m = b->mesh;
 
 	out = Mesh{};
 
@@ -693,7 +697,7 @@ bool mesh(const std::string &key, double alpha_test, Mesh &out, std::string &err
 
 	out.paints.push_back(float(m.paints.size()));
 
-	for (const auto &p : m.paints) {
+	for (const slughorn::bake::Paint &p : m.paints) {
 		using PT = slughorn::bake::Paint::Type;
 
 		out.paints.push_back(p.type == PT::Solid ? 0.0f : p.type == PT::Linear ? 1.0f : 2.0f);
@@ -711,7 +715,7 @@ bool mesh(const std::string &key, double alpha_test, Mesh &out, std::string &err
 		// stop by +inner is exact (pad clamps at the first / last stop either way).
 		const float shift = p.type == PT::Radial ? p.innerRadius : 0.0f;
 
-		for (const auto &st : p.stops) {
+		for (const slughorn::GradientStop &st : p.stops) {
 			out.paints.push_back(st.t + shift);
 			pushLinear(out.paints, st.color);
 		}
@@ -746,7 +750,7 @@ bool cost(const std::string &key, Cost &out, std::string &err) {
 		s.costs[key] = slughorn::bake::cost(*s.atlas, bt.comp, b->mesh, k.layersBefore, 1.0f, k.height / k.width, &bt.stamps, k.width);
 	}
 
-	const auto &c = s.costs.at(key);
+	const slughorn::bake::Cost &c = s.costs.at(key);
 
 	out = Cost{};
 	out.mode = c.mode;
@@ -783,7 +787,7 @@ bool render(const std::string &key, int width, int height, std::vector<float> &o
 	}
 
 	State &s = state();
-	auto it = s.index.find(key);
+	std::unordered_map<std::string, size_t>::iterator it = s.index.find(key);
 
 	if (it == s.index.end()) {
 		err = "unknown key '" + key + "'";
@@ -796,7 +800,7 @@ bool render(const std::string &key, int width, int height, std::vector<float> &o
 
 	const KeyData &k = s.keys[it->second];
 	const Built &b = s.built[it->second];
-	const auto img = slughorn::stamp::renderComposite(*s.atlas, b.comp, b.stamps, uint32_t(width), uint32_t(height),
+	const slughorn::render::Image img = slughorn::stamp::renderComposite(*s.atlas, b.comp, b.stamps, uint32_t(width), uint32_t(height),
 			0.0f, 0.0f, 1.0f, k.height / k.width, true);
 
 	out.assign(img.data.begin(), img.data.end());
@@ -912,37 +916,47 @@ struct Grid {
 	static int cell(double v) { return std::clamp(int(std::floor(v * N)), 0, N - 1); }
 };
 
-} // namespace
+// The surface a bake is clipped onto.
+struct Surface {
+	const std::vector<float> &v;
+	const std::vector<float> &nv;
+	const std::vector<float> &uvs;
+	const std::vector<int32_t> &f;
+	const std::vector<float> &xform;
+};
 
-bool decal(const std::string &key, const std::vector<float> &v, const std::vector<float> &nv,
-		const std::vector<float> &uvs, const std::vector<int32_t> &f, const std::vector<float> &xform,
-		const std::vector<float> &lift, int64_t cap, double alpha_test, Decal &out, std::string &err) {
-	out = Decal{};
+// Clips @p m onto @p s (the procedure described above) into @p out (vertices, normals, paint,
+// param, overlay_from). 1: done; 0: past cap (out cleared); -1: bad input (err).
+int clipToSurface(const slughorn::bake::BakedMesh &m, const Surface &s, double liftBase, double liftOverlay, int64_t cap,
+		Decal &out, std::string &err) {
+	const std::vector<float> &v = s.v;
+	const std::vector<float> &nv = s.nv;
+	const std::vector<float> &uvs = s.uvs;
+	const std::vector<int32_t> &f = s.f;
+	const std::vector<float> &xform = s.xform;
 
-	Baked *b = ensureBaked(key, alpha_test, err);
-
-	if (!b) {
-		return false;
-	}
-
-	if (xform.size() < 5 || lift.size() < 2) {
-		err = "decal: uv_xform wants 5 floats, lift 2";
-		return false;
+	if (xform.size() < 5) {
+		err = "decal: uv_xform wants 5 floats";
+		return -1;
 	}
 
 	const size_t nverts = v.size() / 3;
 
 	if (v.size() % 3 || f.size() % 3 || uvs.size() < nverts * 2) {
 		err = "decal: vertices 3N, uvs 2N, triangles 3F";
-		return false;
+		return -1;
 	}
 
-	const auto &m = b->mesh;
+	out.vertices.clear();
+	out.normals.clear();
+	out.paint.clear();
+	out.param.clear();
+
 	const size_t nb = m.indices.size() / 3;
 	const size_t ovFirst = m.overlayIndexCount > 0 ? m.opaqueIndexCount : m.indices.size();
 
-	auto bp = [&](uint32_t i) { return V2{m.positions[i * 2], m.positions[i * 2 + 1]}; };
-	auto bpar = [&](uint32_t i) { return V2{m.params[i * 2], m.params[i * 2 + 1]}; };
+	std::function<V2(uint32_t)> bp = [&](uint32_t i) { return V2{m.positions[i * 2], m.positions[i * 2 + 1]}; };
+	std::function<V2(uint32_t)> bpar = [&](uint32_t i) { return V2{m.params[i * 2], m.params[i * 2 + 1]}; };
 
 	struct Box {
 		double x0, y0, x1, y1;
@@ -971,20 +985,20 @@ bool decal(const std::string &key, const std::vector<float> &v, const std::vecto
 	std::vector<int32_t> opaint;
 	int64_t tris = 0;
 
-	auto P = [&](int32_t i) { return V3{v[size_t(i) * 3], v[size_t(i) * 3 + 1], v[size_t(i) * 3 + 2]}; };
-	auto N3 = [&](int32_t i) { return V3{nv[size_t(i) * 3], nv[size_t(i) * 3 + 1], nv[size_t(i) * 3 + 2]}; };
-	auto UV = [&](int32_t i) { return V2{uvs[size_t(i) * 2] * rep.x + off.x, uvs[size_t(i) * 2 + 1] * rep.y + off.y}; };
+	std::function<V3(int32_t)> P = [&](int32_t i) { return V3{v[size_t(i) * 3], v[size_t(i) * 3 + 1], v[size_t(i) * 3 + 2]}; };
+	std::function<V3(int32_t)> N3 = [&](int32_t i) { return V3{nv[size_t(i) * 3], nv[size_t(i) * 3 + 1], nv[size_t(i) * 3 + 2]}; };
+	std::function<V2(int32_t)> UV = [&](int32_t i) { return V2{uvs[size_t(i) * 2] * rep.x + off.x, uvs[size_t(i) * 2 + 1] * rep.y + off.y}; };
 
 	std::vector<uint32_t> stamp(nb, 0);
 	std::vector<uint32_t> candidates;
 	uint32_t stampId = 0;
 
-	for (size_t s = 0; s + 2 < f.size(); s += 3) {
-		const int32_t ia = f[s], ib = f[s + 1], ic = f[s + 2];
+	for (size_t sf = 0; sf + 2 < f.size(); sf += 3) {
+		const int32_t ia = f[sf], ib = f[sf + 1], ic = f[sf + 2];
 
 		if (ia < 0 || ib < 0 || ic < 0 || size_t(ia) >= nverts || size_t(ib) >= nverts || size_t(ic) >= nverts) {
 			err = "decal: triangle index out of range";
-			return false;
+			return -1;
 		}
 
 		const V2 ta = UV(ia), tb = UV(ib), tc = UV(ic);
@@ -1032,73 +1046,71 @@ bool decal(const std::string &key, const std::vector<float> &v, const std::vecto
 				// Baked order, as the reference walks them: the overlay is painter's-ordered.
 				std::sort(candidates.begin(), candidates.end());
 
-				{
-					{
-						for (uint32_t t : candidates) {
-							const Box &bx = boxes[t];
+				for (uint32_t t : candidates) {
+					const Box &bx = boxes[t];
 
-							// Rect2.intersects(include_borders = true)
-							if (bx.x0 > qx1 || bx.x1 < qx0 || bx.y0 > qy1 || bx.y1 < qy0) {
-								continue;
-							}
+					// Rect2.intersects(include_borders = true)
+					if (bx.x0 > qx1 || bx.x1 < qx0 || bx.y0 > qy1 || bx.y1 < qy0) {
+						continue;
+					}
 
-							const uint32_t b0 = m.indices[t * 3], b1 = m.indices[t * 3 + 1], b2 = m.indices[t * 3 + 2];
-							const V2 q[3] = {bp(b0) + sh, bp(b1) + sh, bp(b2) + sh};
+					const uint32_t b0 = m.indices[t * 3], b1 = m.indices[t * 3 + 1], b2 = m.indices[t * 3 + 2];
+					const V2 q[3] = {bp(b0) + sh, bp(b1) + sh, bp(b2) + sh};
 
-							const std::vector<V2> poly = clipToTriangle({q[0], q[1], q[2]}, face, area > 0.0);
+					const std::vector<V2> poly = clipToTriangle({q[0], q[1], q[2]}, face, area > 0.0);
 
-							if (poly.size() < 3) {
-								continue;
-							}
+					if (poly.size() < 3) {
+						continue;
+					}
 
-							const bool ovl = t * 3 >= ovFirst;
-							const double lf = ovl ? lift[1] : lift[0];
+					const bool ovl = t * 3 >= ovFirst;
+					const double lf = ovl ? liftOverlay : liftBase;
 
-							std::vector<V3> pts, nrs;
-							std::vector<V2> prs;
+					std::vector<V3> pts, nrs;
+					std::vector<V2> prs;
 
-							for (const V2 &p : poly) {
-								V3 w;
-								if (!bary(p, ta, tb, tc, w)) {
-									w = {1, 0, 0};
-								}
+					for (const V2 &p : poly) {
+						V3 w;
+						if (!bary(p, ta, tb, tc, w)) {
+							w = {1, 0, 0};
+						}
 
-								const V3 n = haveNormals ? normalized(N3(ia) * w.x + N3(ib) * w.y + N3(ic) * w.z) : fn;
+						const V3 n = haveNormals ? normalized(N3(ia) * w.x + N3(ib) * w.y + N3(ic) * w.z) : fn;
 
-								pts.push_back(pa * w.x + pb * w.y + pc * w.z + n * lf);
-								nrs.push_back(n);
+						pts.push_back(pa * w.x + pb * w.y + pc * w.z + n * lf);
+						nrs.push_back(n);
 
-								V3 wb;
-								prs.push_back(bary(p, q[0], q[1], q[2], wb) ? bpar(b0) * wb.x + bpar(b1) * wb.y + bpar(b2) * wb.z : bpar(b0));
-							}
+						V3 wb;
+						prs.push_back(bary(p, q[0], q[1], q[2], wb) ? bpar(b0) * wb.x + bpar(b1) * wb.y + bpar(b2) * wb.z : bpar(b0));
+					}
 
-							auto &dv = ovl ? ov3 : out.vertices;
-							auto &dn = ovl ? on3 : out.normals;
-							auto &dp = ovl ? op2 : out.param;
-							auto &dpaint = ovl ? opaint : out.paint;
+					std::vector<float> &dv = ovl ? ov3 : out.vertices;
+					std::vector<float> &dn = ovl ? on3 : out.normals;
+					std::vector<float> &dp = ovl ? op2 : out.param;
+					std::vector<int32_t> &dpaint = ovl ? opaint : out.paint;
 
-							for (size_t k = 1; k + 1 < poly.size(); ++k) {
-								size_t vv[3] = {0, k, k + 1};
+					for (size_t k = 1; k + 1 < poly.size(); ++k) {
+						size_t vv[3] = {0, k, k + 1};
 
-								if (dot3(cross3(pts[k] - pts[0], pts[k + 1] - pts[0]), fn) < 0.0) {
-									vv[1] = k + 1;
-									vv[2] = k;
-								}
+						if (dot3(cross3(pts[k] - pts[0], pts[k + 1] - pts[0]), fn) < 0.0) {
+							vv[1] = k + 1;
+							vv[2] = k;
+						}
 
-								for (size_t mi : vv) {
-									dv.insert(dv.end(), {float(pts[mi].x), float(pts[mi].y), float(pts[mi].z)});
-									dn.insert(dn.end(), {float(nrs[mi].x), float(nrs[mi].y), float(nrs[mi].z)});
-									dp.insert(dp.end(), {float(prs[mi].x), float(prs[mi].y)});
-								}
+						for (size_t mi : vv) {
+							dv.insert(dv.end(), {float(pts[mi].x), float(pts[mi].y), float(pts[mi].z)});
+							dn.insert(dn.end(), {float(nrs[mi].x), float(nrs[mi].y), float(nrs[mi].z)});
+							dp.insert(dp.end(), {float(prs[mi].x), float(prs[mi].y)});
+						}
 
-								dpaint.push_back(int32_t(m.paintIds[b0]));
+						dpaint.push_back(int32_t(m.paintIds[b0]));
 
-								if (++tris > cap) {
-									out = Decal{};
-									out.capped = true;
-									return true;
-								}
-							}
+						if (++tris > cap) {
+							out.vertices.clear();
+							out.normals.clear();
+							out.paint.clear();
+							out.param.clear();
+							return 0;
 						}
 					}
 				}
@@ -1111,6 +1123,732 @@ bool decal(const std::string &key, const std::vector<float> &v, const std::vecto
 	out.normals.insert(out.normals.end(), on3.begin(), on3.end());
 	out.param.insert(out.param.end(), op2.begin(), op2.end());
 	out.paint.insert(out.paint.end(), opaint.begin(), opaint.end());
+
+	return 1;
+}
+
+} // namespace
+
+bool decal(const std::string &key, const std::vector<float> &v, const std::vector<float> &nv,
+		const std::vector<float> &uvs, const std::vector<int32_t> &f, const std::vector<float> &xform,
+		const std::vector<float> &lift, int64_t cap, double alpha_test, Decal &out, std::string &err) {
+	out = Decal{};
+
+	Baked *b = ensureBaked(key, alpha_test, err);
+
+	if (!b) {
+		return false;
+	}
+
+	if (lift.size() < 2) {
+		err = "decal: lift wants 2 floats";
+		return false;
+	}
+
+	const int r = clipToSurface(b->mesh, Surface{v, nv, uvs, f, xform}, lift[0], lift[1], cap, out, err);
+
+	if (r < 0) {
+		return false;
+	}
+
+	out.capped = r == 0;
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------------- slug-baked
+//
+// The complete baseline: every key, every surface, within its budget, never handed to the
+// slug-runtime shader. bake::bakeFinal() folds every alpha source into the layer stack and judges
+// only the final composite (Opaque / Transparent / AlphaTest, see bake.hpp), and LOD levels
+// (bake::lodLevel) trade detail for triangles: each level doubles the flattening / outline
+// tolerance and the feature size folded into the faces' local means. A level over the cap is
+// first offered to meshoptimizer (simplified toward the cap, colour boundaries kept as seams,
+// error at most the next level's tolerance); past every level comes the mean colour. Nothing
+// falls back.
+
+namespace {
+
+void paintsWire(const std::vector<slughorn::bake::Paint> &paints, std::vector<float> &out) {
+	using PT = slughorn::bake::Paint::Type;
+
+	out.push_back(float(paints.size()));
+
+	for (const slughorn::bake::Paint &p : paints) {
+		out.push_back(p.type == PT::Solid ? 0.0f : p.type == PT::Linear ? 1.0f : 2.0f);
+
+		if (p.type == PT::Solid) {
+			out.push_back(1.0f);
+			out.push_back(0.0f);
+			pushLinear(out, p.color);
+			continue;
+		}
+
+		out.push_back(float(p.stops.size()));
+
+		// Radial: the wire has no inner radius, and t = length(param) - inner; shifting every
+		// stop by +inner is exact (pad clamps at the first / last stop either way).
+		const float shift = p.type == PT::Radial ? p.innerRadius : 0.0f;
+
+		for (const slughorn::GradientStop &st : p.stops) {
+			out.push_back(st.t + shift);
+			pushLinear(out, st.color);
+		}
+	}
+}
+
+void toMesh(const slughorn::bake::BakedMesh &m, Mesh &out) {
+	out = Mesh{};
+
+	const size_t n = m.paintIds.size();
+
+	out.vertices.reserve(n * 3);
+
+	for (size_t i = 0; i < n; ++i) {
+		out.vertices.push_back(m.positions[i * 2]);
+		out.vertices.push_back(m.positions[i * 2 + 1]);
+		out.vertices.push_back(0.0f);
+		out.paint.push_back(int32_t(m.paintIds[i]));
+	}
+
+	out.param = m.params;
+	out.triangles.assign(m.indices.begin(), m.indices.end());
+	out.overlay_first = int32_t(m.opaqueIndexCount);
+	out.overlay_count = int32_t(m.overlayIndexCount);
+	paintsWire(m.paints, out.paints);
+}
+
+// A key spec resolved against the built atlas.
+struct FinalSource {
+	const KeyData *kc = nullptr; // colour key (nullptr: none, white)
+	const Built *bc = nullptr;
+	const KeyData *ka = nullptr; // alpha-map key (nullptr: none)
+	const Built *ba = nullptr;
+	float width = 1, height = 1; // the canvas the bake lives on (the colour key's, else the alpha key's)
+	double tolerancePx = 0.25;
+};
+
+bool resolveSpec(const std::string &spec, FinalSource &src, std::string &err) {
+	State &s = state();
+
+	if (!ensureAtlas(err)) {
+		return false;
+	}
+
+	const size_t bar = spec.find('|');
+	const std::string ck = spec.substr(0, bar);
+	const std::string ak = bar == std::string::npos ? std::string() : spec.substr(bar + 1);
+
+	std::function<bool(const std::string &, const KeyData *&, const Built *&)> get = [&](const std::string &k, const KeyData *&kd, const Built *&b) {
+		std::unordered_map<std::string, size_t>::iterator it = s.index.find(k);
+
+		if (it == s.index.end()) {
+			err = "unknown key '" + k + "'";
+			return false;
+		}
+
+		kd = &s.keys[it->second];
+		b = &s.built[it->second];
+
+		return true;
+	};
+
+	if (!ck.empty() && !get(ck, src.kc, src.bc)) {
+		return false;
+	}
+
+	if (!ak.empty() && !get(ak, src.ka, src.ba)) {
+		return false;
+	}
+
+	if (!src.kc && !src.ka) {
+		err = "empty key spec";
+		return false;
+	}
+
+	const KeyData *frame = src.kc ? src.kc : src.ka;
+
+	src.width = frame->width;
+	src.height = frame->height;
+	src.tolerancePx = frame->tolerancePx;
+
+	return true;
+}
+
+std::map<std::string, slughorn::bake::BakedMesh> &finalCache() {
+	static std::map<std::string, slughorn::bake::BakedMesh> c;
+	return c;
+}
+
+std::vector<std::string> &finalOrder() {
+	static std::vector<std::string> o;
+	return o;
+}
+
+// One LOD level of the spec's final bake over a canvas window (px), cached (a few at a time: the
+// sandbox counts live allocations).
+const slughorn::bake::BakedMesh *finalLevel(const std::string &spec, const FinalSource &src, const BakeParams &p, int level,
+		const double window[4], size_t maxTriangles, std::string &err) {
+	char key[256];
+
+	std::snprintf(key, sizeof key, "%s#%d|%.4f|%.4f|%.4f|%d|%.2f,%.2f,%.2f,%.2f|%zu", spec.c_str(), p.mode, p.alpha_test, p.opacity,
+			p.feature_floor_px, level, window[0], window[1], window[2], window[3], maxTriangles);
+
+	std::map<std::string, slughorn::bake::BakedMesh> &cache = finalCache();
+	std::vector<std::string> &order = finalOrder();
+
+	order.erase(std::remove(order.begin(), order.end(), std::string(key)), order.end());
+	order.push_back(key);
+
+	if (std::map<std::string, slughorn::bake::BakedMesh>::iterator it = cache.find(key); it != cache.end()) {
+		return &it->second;
+	}
+
+	while (cache.size() >= State::BAKE_CACHE && order.size() > 1) {
+		cache.erase(order.front());
+		order.erase(order.begin());
+	}
+
+	State &s = state();
+	slughorn::bake::BakeConfig bc;
+
+	bc.width = src.width;
+	bc.height = src.height;
+	bc.vUp = true;
+	bc.alphaMode = slughorn::bake::AlphaMode(std::clamp(p.mode, 0, 2));
+	bc.alphaTest = slug_t(p.alpha_test);
+	bc.opacity = slug_t(p.opacity);
+	bc.windowX0 = slug_t(window[0]);
+	bc.windowY0 = slug_t(window[1]);
+	bc.windowX1 = slug_t(window[2]);
+	bc.windowY1 = slug_t(window[3]);
+	bc.maxTriangles = maxTriangles;
+	slughorn::bake::applyLod(bc, slughorn::bake::lodLevel(level, slug_t(src.tolerancePx), slug_t(p.feature_floor_px)));
+
+	slughorn::bake::AlphaSource as;
+
+	if (src.ka) {
+		as.atlas = s.atlas.get();
+		as.composite = &src.ba->comp;
+		as.meta = &src.ba->sources;
+		as.stamps = &src.ba->stamps;
+		as.width = src.ka->width;
+		as.height = src.ka->height;
+	}
+
+	static const std::vector<slughorn::bake::LayerSource> noMeta;
+
+	try {
+		cache[key] = slughorn::bake::bakeFinal(*s.atlas, src.bc ? &src.bc->comp : nullptr, src.bc ? src.bc->sources : noMeta, bc,
+				src.bc ? &src.bc->stamps : nullptr, src.ka ? &as : nullptr);
+	} catch (const std::exception &e) {
+		err = std::string("bake failed: ") + e.what();
+		cache.erase(key);
+		return nullptr;
+	}
+
+	return &cache[key];
+}
+
+// The area-weighted mean of a final bake over its window, as one solid paint: Opaque shows the
+// straight colour; Transparent the premultiplied mean; AlphaTest the covered parts' colour, kept
+// only when the covered fraction reaches the test. @p keep: whether anything is drawn.
+slughorn::bake::Paint meanPaint(const slughorn::bake::BakedMesh &m, const FinalSource &src, const BakeParams &p, bool &keep) {
+	double r = 0, g = 0, b = 0, a = 0, covered = 0;
+
+	std::function<slughorn::Color(const slughorn::bake::Paint &, float, float)> colourAt = [&](const slughorn::bake::Paint &pt, float p0, float p1) {
+		using PT = slughorn::bake::Paint::Type;
+
+		if (pt.type == PT::Solid) {
+			return pt.color;
+		}
+
+		slughorn::GradientInfo gi;
+
+		gi.stops = pt.stops;
+
+		const slug_t t = pt.type == PT::Linear ? slug_t(p0) : slug_t(std::sqrt(p0 * p0 + p1 * p1)) - pt.innerRadius;
+
+		return slughorn::render::gradientColor(gi, t);
+	};
+
+	for (size_t t = 0; t + 2 < m.indices.size(); t += 3) {
+		const uint32_t i0 = m.indices[t], i1 = m.indices[t + 1], i2 = m.indices[t + 2];
+		const double ax = m.positions[i0 * 2], ay = m.positions[i0 * 2 + 1];
+		const double bx = m.positions[i1 * 2], by = m.positions[i1 * 2 + 1];
+		const double cx = m.positions[i2 * 2], cy = m.positions[i2 * 2 + 1];
+		const double area = std::abs((bx - ax) * (cy - ay) - (cx - ax) * (by - ay)) * 0.5 * double(src.width) * double(src.height);
+		const float p0 = (m.params[i0 * 2] + m.params[i1 * 2] + m.params[i2 * 2]) / 3.0f;
+		const float p1 = (m.params[i0 * 2 + 1] + m.params[i1 * 2 + 1] + m.params[i2 * 2 + 1]) / 3.0f;
+		const slughorn::Color c = colourAt(m.paints[m.paintIds[i0]], p0, p1);
+
+		r += area * c.r * c.a;
+		g += area * c.g * c.a;
+		b += area * c.b * c.a;
+		a += area * c.a;
+		covered += area;
+	}
+
+	const double total = m.canvasArea > 0 ? m.canvasArea : covered;
+	slughorn::bake::Paint out;
+
+	out.opaque = true;
+	keep = total > 0 && covered > 0;
+
+	if (!keep) {
+		return out;
+	}
+
+	switch (slughorn::bake::AlphaMode(std::clamp(p.mode, 0, 2))) {
+		case slughorn::bake::AlphaMode::Opaque:
+		case slughorn::bake::AlphaMode::AlphaTest:
+			// Straight colour of what is drawn; AlphaTest keeps it when enough of the window is.
+			out.color = {slug_t(a > 0 ? r / a : 0), slug_t(a > 0 ? g / a : 0), slug_t(a > 0 ? b / a : 0), 1};
+			keep = p.mode == int(slughorn::bake::AlphaMode::Opaque) || covered / total >= p.alpha_test;
+			break;
+
+		case slughorn::bake::AlphaMode::Transparent: {
+			const double ma = a / total;
+
+			out.color = {slug_t(a > 0 ? r / a : 0), slug_t(a > 0 ? g / a : 0), slug_t(a > 0 ? b / a : 0), slug_t(ma)};
+			out.opaque = ma >= slughorn::bake::FINAL_OPAQUE_ALPHA;
+			keep = ma > 0;
+			break;
+		}
+	}
+
+	return out;
+}
+
+// The mean as a mesh over the window (2 triangles, UV, v up).
+slughorn::bake::BakedMesh meanMesh(const slughorn::bake::Paint &paint, const FinalSource &src, const double window[4]) {
+	slughorn::bake::BakedMesh m;
+	const double W = src.width, H = src.height;
+	const double u0 = window[0] / W, u1 = window[2] / W, v0 = 1.0 - window[3] / H, v1 = 1.0 - window[1] / H;
+
+	m.positions = {float(u0), float(v0), float(u1), float(v0), float(u1), float(v1), float(u0), float(v1)};
+	m.paintIds = {0, 0, 0, 0};
+	m.params.assign(8, 0.0f);
+	m.indices = {0, 1, 2, 0, 2, 3};
+	m.paints = {paint};
+	m.opaqueIndexCount = 6;
+	m.trianglesAfter = 2;
+
+	return m;
+}
+
+void fillWindow(const BakeParams &p, const FinalSource &src, double window[4]) {
+	const bool given = p.window[2] > p.window[0] && p.window[3] > p.window[1];
+
+	window[0] = given ? std::max(0.0, p.window[0]) : 0.0;
+	window[1] = given ? std::max(0.0, p.window[1]) : 0.0;
+	window[2] = given ? std::min(double(src.width), p.window[2]) : double(src.width);
+	window[3] = given ? std::min(double(src.height), p.window[3]) : double(src.height);
+}
+
+// meshoptimizer is the last resort inside a level, tried when the level is within this factor of
+// the cap (its error stays under the next level's tolerance, so a level it cannot bring down
+// falls through to the next).
+constexpr double SIMPLIFY_REACH = 8.0;
+
+static_assert(LOD_MEAN == slughorn::bake::LOD_LEVELS, "slug_api.h LOD_MEAN follows bake::LOD_LEVELS");
+
+// The finest level whose probe fits: level 0 first (where most keys land), then a binary search
+// over the rest (a coarser level of a key never needs more triangles, near enough) - a handful
+// of bakes instead of up to LOD_LEVELS. -1: none fits.
+int searchLevels(const std::function<bool(int)> &probe) {
+	if (probe(0)) {
+		return 0;
+	}
+
+	int lo = 1, hi = slughorn::bake::LOD_LEVELS - 1, best = -1;
+
+	while (lo <= hi) {
+		const int mid = (lo + hi) / 2;
+
+		if (probe(mid)) {
+			best = mid;
+			hi = mid - 1;
+		} else {
+			lo = mid + 1;
+		}
+	}
+
+	return best;
+}
+
+} // namespace
+
+bool bake(const std::string &key_spec, const BakeParams &p, FinalBake &out, std::string &err) {
+	out = FinalBake{};
+
+	FinalSource src;
+
+	if (!resolveSpec(key_spec, src, err)) {
+		return false;
+	}
+
+	double window[4];
+
+	fillWindow(p, src, window);
+
+	const size_t budget = p.cap > 0 ? size_t(p.cap) * 8 : 0;
+	FinalBake best;
+	std::vector<Lod> rows;
+	bool failed = false;
+
+	std::function<bool(int)> probe = [&](int level) {
+		const slughorn::bake::BakedMesh *m = finalLevel(key_spec, src, p, level, window, budget, err);
+
+		if (!m) {
+			failed = true;
+			return true; // stop the search
+		}
+
+		Lod lod;
+
+		lod.level = level;
+		lod.triangles = int64_t(m->trianglesAfter);
+		lod.surface_triangles = lod.triangles;
+		lod.feature_px = m->featurePx;
+		lod.tolerance_px = slughorn::bake::lodLevel(level, slug_t(src.tolerancePx)).tolerancePx;
+		lod.aborted = m->aborted;
+
+		std::function<bool(const slughorn::bake::BakedMesh &)> accept = [&](const slughorn::bake::BakedMesh &mesh) {
+			best = FinalBake{};
+			toMesh(mesh, best.mesh);
+			best.lod = level;
+			best.transparent_area = mesh.transparentArea;
+			best.canvas_area = mesh.canvasArea;
+			best.folded_features = int64_t(mesh.foldedFeatures);
+			best.feature_px = mesh.featurePx;
+			rows.push_back(lod);
+			return true;
+		};
+
+		if (!m->aborted && (p.cap <= 0 || lod.triangles <= p.cap)) {
+			return accept(*m);
+		}
+
+#ifdef SLUGHORN_HAS_MESHOPT
+		if (!m->aborted && double(lod.triangles) <= double(p.cap) * SIMPLIFY_REACH) {
+			slughorn::bake::BakedMesh simple = *m;
+			const double maxErr = slughorn::bake::lodLevel(level + 1, slug_t(src.tolerancePx)).tolerancePx;
+
+			lod.simplify_error_px = slughorn::bake::simplifyBaked(simple, src.width, src.height, size_t(p.cap), maxErr);
+			lod.surface_triangles = int64_t(simple.trianglesAfter);
+
+			if (lod.surface_triangles <= p.cap) {
+				return accept(simple);
+			}
+		}
+#endif
+
+		rows.push_back(lod);
+		return false;
+	};
+
+	const int level = searchLevels(probe);
+
+	if (failed) {
+		return false;
+	}
+
+	std::sort(rows.begin(), rows.end(), [](const Lod &a, const Lod &b) { return a.level < b.level; });
+
+	if (level >= 0) {
+		out = std::move(best);
+		out.lods = std::move(rows);
+		return true;
+	}
+
+	out.lods = std::move(rows);
+
+	const slughorn::bake::BakedMesh *coarsest = finalLevel(key_spec, src, p, slughorn::bake::LOD_LEVELS - 1, window, budget, err);
+
+	if (!coarsest) {
+		return false;
+	}
+
+	// The mean.
+	bool keep = false;
+	const slughorn::bake::Paint paint = meanPaint(*coarsest, src, p, keep);
+	const slughorn::bake::BakedMesh mean = keep ? meanMesh(paint, src, window) : slughorn::bake::BakedMesh{};
+
+	Lod lod;
+
+	lod.level = LOD_MEAN;
+	lod.triangles = lod.surface_triangles = int64_t(mean.trianglesAfter);
+	out.lods.push_back(lod);
+
+	toMesh(mean, out.mesh);
+	out.lod = LOD_MEAN;
+	out.canvas_area = coarsest->canvasArea;
+	out.transparent_area = coarsest->transparentArea;
+
+	return true;
+}
+
+bool decal_final(const std::string &key_spec, const std::vector<float> &v, const std::vector<float> &nv,
+		const std::vector<float> &uvs, const std::vector<int32_t> &f, const std::vector<float> &xform,
+		const std::vector<float> &lift, const BakeParams &params, double feature_floor_world, Decal &out, std::string &err) {
+	out = Decal{};
+
+	FinalSource src;
+
+	if (!resolveSpec(key_spec, src, err)) {
+		return false;
+	}
+
+	if (xform.size() < 5 || lift.size() < 2) {
+		err = "decal: uv_xform wants 5 floats, lift 2";
+		return false;
+	}
+
+	const size_t nverts = v.size() / 3;
+
+	if (v.size() % 3 || f.size() % 3 || uvs.size() < nverts * 2) {
+		err = "decal: vertices 3N, uvs 2N, triangles 3F";
+		return false;
+	}
+
+	// The surface's UV footprint (after uv_xform; with wrap, every whole-unit shift folded into
+	// [0,1]^2) as a canvas window, and its texel density (world units per UV unit).
+	const V2 rep{xform[0], xform[1]}, off{xform[2], xform[3]};
+	const bool wrap = xform[4] > 0.5f;
+	double u0 = 1e300, v0 = 1e300, u1 = -1e300, v1 = -1e300, area3 = 0, areaUv = 0;
+
+	for (size_t sf = 0; sf + 2 < f.size(); sf += 3) {
+		V2 t[3];
+		V3 q[3];
+
+		for (int k = 0; k < 3; ++k) {
+			const int32_t i = f[sf + size_t(k)];
+
+			if (i < 0 || size_t(i) >= nverts) {
+				err = "decal: triangle index out of range";
+				return false;
+			}
+
+			t[k] = {uvs[size_t(i) * 2] * rep.x + off.x, uvs[size_t(i) * 2 + 1] * rep.y + off.y};
+			q[k] = {v[size_t(i) * 3], v[size_t(i) * 3 + 1], v[size_t(i) * 3 + 2]};
+		}
+
+		const double a2 = std::abs(cross(t[1] - t[0], t[2] - t[0]));
+
+		if (a2 < 1e-14) {
+			continue;
+		}
+
+		const V3 c3 = cross3(q[1] - q[0], q[2] - q[0]);
+
+		area3 += std::sqrt(dot3(c3, c3));
+		areaUv += a2;
+
+		const double fx0 = std::min({t[0].x, t[1].x, t[2].x}), fx1 = std::max({t[0].x, t[1].x, t[2].x});
+		const double fy0 = std::min({t[0].y, t[1].y, t[2].y}), fy1 = std::max({t[0].y, t[1].y, t[2].y});
+
+		if (wrap && (std::floor(fx0) != std::floor(fx1 - 1e-9) || std::floor(fy0) != std::floor(fy1 - 1e-9))) {
+			u0 = v0 = 0;
+			u1 = v1 = 1;
+			continue;
+		}
+
+		const double sx = wrap ? std::floor(fx0) : 0.0, sy = wrap ? std::floor(fy0) : 0.0;
+
+		u0 = std::min(u0, fx0 - sx);
+		u1 = std::max(u1, fx1 - sx);
+		v0 = std::min(v0, fy0 - sy);
+		v1 = std::max(v1, fy1 - sy);
+	}
+
+	out.world_per_uv = areaUv > 0 ? std::sqrt(area3 / areaUv) : 0.0;
+
+	if (!(u1 > u0 && v1 > v0)) {
+		out.overlay_from = 0;
+		return true; // nothing of the surface samples the key
+	}
+
+	// UV (v up) -> canvas px (y down), padded by two px.
+	const double W = src.width, H = src.height;
+
+	BakeParams p = params;
+
+	p.window[0] = std::clamp(u0, 0.0, 1.0) * W - 2.0;
+	p.window[2] = std::clamp(u1, 0.0, 1.0) * W + 2.0;
+	p.window[1] = (1.0 - std::clamp(v1, 0.0, 1.0)) * H - 2.0;
+	p.window[3] = (1.0 - std::clamp(v0, 0.0, 1.0)) * H + 2.0;
+
+	if (feature_floor_world > 0 && out.world_per_uv > 0) {
+		p.feature_floor_px = std::max(p.feature_floor_px, feature_floor_world / out.world_per_uv * W);
+	}
+
+	double window[4];
+
+	fillWindow(p, src, window);
+	out.canvas_area = (window[2] - window[0]) * (window[3] - window[1]);
+
+	const Surface surf{v, nv, uvs, f, xform};
+	const int64_t cap = p.cap > 0 ? p.cap : INT64_MAX;
+	const size_t budget = p.cap > 0 ? size_t(p.cap) * 8 : 0;
+	Decal best;
+	std::vector<Lod> rows;
+	bool failed = false;
+
+	std::function<bool(int)> probe = [&](int level) {
+		const slughorn::bake::BakedMesh *m = finalLevel(key_spec, src, p, level, window, budget, err);
+
+		if (!m) {
+			failed = true;
+			return true; // stop the search
+		}
+
+		Lod lod;
+
+		lod.level = level;
+		lod.triangles = int64_t(m->trianglesAfter);
+		lod.feature_px = m->featurePx;
+		lod.tolerance_px = slughorn::bake::lodLevel(level, slug_t(src.tolerancePx)).tolerancePx;
+		lod.aborted = m->aborted;
+
+		if (m->aborted) {
+			rows.push_back(lod);
+			return false;
+		}
+
+		Decal tmp;
+
+		std::function<bool(const slughorn::bake::BakedMesh &)> accept = [&](const slughorn::bake::BakedMesh &mesh) {
+			tmp.lod = level;
+			tmp.transparent_area = mesh.transparentArea;
+			tmp.feature_px = mesh.featurePx;
+			paintsWire(mesh.paints, tmp.paints);
+			best = std::move(tmp);
+			rows.push_back(lod);
+			return true;
+		};
+
+		// Clipped without a cap first: the count tells meshoptimizer how far to go.
+		const int r = clipToSurface(*m, surf, lift[0], lift[1], INT64_MAX, tmp, err);
+
+		if (r < 0) {
+			failed = true;
+			return true;
+		}
+
+		const int64_t clipped = int64_t(tmp.paint.size());
+
+		lod.surface_triangles = clipped;
+
+		if (clipped <= cap) {
+			return accept(*m);
+		}
+
+#ifdef SLUGHORN_HAS_MESHOPT
+		// Within reach of the cap: simplify the window bake toward the cap's share of it (the clip
+		// splits triangles, so the window target is the cap scaled by bake / clipped).
+		if (double(clipped) <= double(cap) * SIMPLIFY_REACH) {
+			const double maxErr = slughorn::bake::lodLevel(level + 1, slug_t(src.tolerancePx)).tolerancePx;
+			double share = double(m->trianglesAfter) / double(clipped);
+
+			for (int attempt = 0; attempt < 2; ++attempt, share *= 0.8) {
+				slughorn::bake::BakedMesh simple = *m;
+
+				lod.simplify_error_px = slughorn::bake::simplifyBaked(simple, W, H, size_t(std::max(1.0, double(cap) * share * 0.95)), maxErr);
+
+				const int r2 = clipToSurface(simple, surf, lift[0], lift[1], cap, tmp, err);
+
+				if (r2 < 0) {
+					failed = true;
+					return true;
+				}
+
+				if (r2 == 1) {
+					lod.surface_triangles = int64_t(tmp.paint.size());
+					return accept(simple);
+				}
+			}
+		}
+#endif
+
+		rows.push_back(lod);
+		return false;
+	};
+
+	const int found = searchLevels(probe);
+
+	if (failed) {
+		return false;
+	}
+
+	std::sort(rows.begin(), rows.end(), [](const Lod &a, const Lod &b) { return a.level < b.level; });
+
+	if (found >= 0) {
+		const double worldPerUv = out.world_per_uv, canvasArea = out.canvas_area;
+
+		out = std::move(best);
+		out.lods = std::move(rows);
+		out.world_per_uv = worldPerUv;
+		out.canvas_area = canvasArea;
+		return true;
+	}
+
+	out.lods = std::move(rows);
+
+	const slughorn::bake::BakedMesh *coarsest = finalLevel(key_spec, src, p, slughorn::bake::LOD_LEVELS - 1, window, budget, err);
+
+	if (!coarsest) {
+		return false;
+	}
+
+	// The mean: the surface's own faces in the window's mean colour (one triangle a face).
+	bool keep = false;
+	const slughorn::bake::Paint paint = meanPaint(*coarsest, src, p, keep);
+	Lod lod;
+
+	lod.level = LOD_MEAN;
+	out.lod = LOD_MEAN;
+	out.transparent_area = coarsest->transparentArea;
+	out.vertices.clear();
+	out.normals.clear();
+	out.paint.clear();
+	out.param.clear();
+
+	if (keep) {
+		const bool haveNormals = nv.size() == v.size();
+
+		for (size_t sf = 0; sf + 2 < f.size(); sf += 3) {
+			V3 q[3], n[3];
+
+			for (int k = 0; k < 3; ++k) {
+				const size_t i = size_t(f[sf + size_t(k)]);
+
+				q[k] = {v[i * 3], v[i * 3 + 1], v[i * 3 + 2]};
+				n[k] = haveNormals ? V3{nv[i * 3], nv[i * 3 + 1], nv[i * 3 + 2]} : V3{};
+			}
+
+			const V3 fn = normalized(cross3(q[1] - q[0], q[2] - q[0]));
+
+			for (int k = 0; k < 3; ++k) {
+				const V3 nn = haveNormals ? normalized(n[k]) : fn;
+				const V3 pt = q[k] + nn * lift[0];
+
+				out.vertices.insert(out.vertices.end(), {float(pt.x), float(pt.y), float(pt.z)});
+				out.normals.insert(out.normals.end(), {float(nn.x), float(nn.y), float(nn.z)});
+				out.param.insert(out.param.end(), {0.0f, 0.0f});
+			}
+
+			out.paint.push_back(0);
+		}
+
+		paintsWire({paint}, out.paints);
+	} else {
+		paintsWire({}, out.paints);
+	}
+
+	out.overlay_from = int32_t(out.paint.size());
+	lod.surface_triangles = int64_t(out.paint.size());
+	out.lods.push_back(lod);
 
 	return true;
 }
