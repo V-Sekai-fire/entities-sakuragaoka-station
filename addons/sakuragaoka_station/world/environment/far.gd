@@ -480,7 +480,7 @@ class Far extends RefCounted:
 		ks.cyl(1.2, 1.2, 0.2, ctx.mat.toon("#fbfaf6"), [0, 14.4, 4.05], [PI / 2.0, 0, 0], 16)
 		drape(sx, -298, sx, -258, 30, ctx.mat.toon("#d3c09c", {"map": tx.ground, "paint": 0.06, "name": "env-schoolground"}), 5)
 		# ============================================================ trees on the hills
-		var hill_tree_mat = Shaders.distant_material(ctx, {})
+		var hill_tree_mat = Shaders.distant_material(ctx, {"mistY0": 0.0, "mistY1": 26.0, "mistAmt": 0.25, "fogMul": 0.5, "hazeK": 0.0008, "hazeMax": 0.5, "haze": "#c3d3e6"})
 		var blob0 := Geo.icosahedron(1, 0)
 		var pa: T.Attr = blob0.attributes.position
 		var na: T.Attr = blob0.attributes.normal
@@ -543,15 +543,15 @@ class Far extends RefCounted:
 	func rings() -> void:
 		var W: Dictionary = L.WORLD.visual
 		var specs := [
-			{"ax": 745.0, "azN": 705.0, "azS": 760.0, "H0": 48.0, "H1": 150.0, "W": 75.0, "col": "#6f9483", "col2": "#7c9d88", "crown": 15.0, "seed": 401},
-			{"ax": 900.0, "azN": 880.0, "azS": 905.0, "H0": 70.0, "H1": 230.0, "W": 95.0, "col": "#7d97b2", "col2": "#86a0b9", "crown": 24.0, "seed": 402},
-			{"ax": 1120.0, "azN": 1140.0, "azS": 1130.0, "H0": 95.0, "H1": 330.0, "W": 130.0, "col": "#94a8c8", "col2": "#9aadcc", "crown": 30.0, "seed": 403},
+			{"ax": 745.0, "azN": 705.0, "azS": 760.0, "H0": 48.0, "H1": 150.0, "W": 75.0, "col": "#6f9483", "col2": "#7c9d88", "haze": "#b4c6dc", "hazeMin": 0.06, "crown": 15.0, "crownAmt": 0.75, "pink": 0.0, "young": 0.35, "dark": 0.45, "seed": 401, "mist": 0.22, "fogMul": 0.36},
+			{"ax": 900.0, "azN": 880.0, "azS": 905.0, "H0": 70.0, "H1": 230.0, "W": 95.0, "col": "#7d97b2", "col2": "#86a0b9", "haze": "#aabfd8", "hazeMin": 0.12, "crown": 24.0, "crownAmt": 0.35, "pink": 0.0, "young": 0.15, "dark": 0.25, "seed": 402, "mist": 0.18, "fogMul": 0.3},
+			{"ax": 1120.0, "azN": 1140.0, "azS": 1130.0, "H0": 95.0, "H1": 330.0, "W": 130.0, "col": "#94a8c8", "col2": "#9aadcc", "haze": "#adbfdb", "hazeMin": 0.2, "crown": 30.0, "crownAmt": 0.0, "pink": 0.0, "young": 0.0, "dark": 0.0, "seed": 403, "mist": 0.15, "fogMul": 0.26},
 		]
 		var rows_f := [-1.0, -0.62, -0.3, -0.08, 0.1, 0.45, 1.0]
 		var shape := [-0.18, 0.3, 0.72, 0.97, 1.0, 0.7, 0.15]
 		for R in specs:
 			var K := T.js_round(PI * 2.0 * R.ax / R.crown)
-			var mat = Shaders.distant_material(ctx, {"vertexColors": true})
+			var mat = Shaders.distant_material(ctx, {"arc": true, "wrap": float(K), "vertexColors": true, "crown": R.crown, "crownAmt": R.crownAmt, "pinkAmt": R.pink, "youngAmt": R.young, "darkAmt": R.dark, "patch": 160.0, "haze": R.haze, "hazeMin": R.hazeMin, "hazeMax": 0.72, "hazeK": 0.0009, "mist": "#dfe8f2", "mistY0": 0.0, "mistY1": 60.0 + R.H0, "mistAmt": R.mist, "fogMul": R.fogMul, "rim": 1.0})
 			var N := 420
 			var pos := PackedFloat32Array()
 			var col := PackedFloat32Array()
