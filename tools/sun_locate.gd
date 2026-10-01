@@ -16,6 +16,8 @@
 #       [--hammersley=8@-1,-11.4 | --cams="x,z,yaw,pitch;..."] [--q=high|medium|low]
 #       [--sun-yaw=<deg>]   turn the port's sun (light, sky disc and light leak) about +Y first: the
 #                           control a sun locator has to detect
+#       [--ramp-control=<name>] [--shadow="key=value;..."]   tools/engine_floor.gd's ramp controls,
+#                           and the station's shadow_overrides
 # Analyze (--analyze): measures the sun in the original's images and the port's from those buffers,
 # on the GPU (tools/sun_locate_gpu.gd, tools/sun_locate_fit.gd); see the --analyze section below.
 extends SceneTree
@@ -25,6 +27,7 @@ const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
 const RealizeCheck = preload("res://tools/realize_check.gd")
 const SunFit = preload("res://tools/sun_locate_fit.gd")
+const EngineFloor = preload("res://tools/engine_floor.gd")
 const Gpu = preload("res://tools/sun_locate_gpu.gd")
 const EYE := 1.52
 const SETTLE := 8
@@ -66,6 +69,7 @@ void fragment() {
 """
 
 var _out := ""
+var _control := ""
 var _cams := []
 var _quality := "high"
 var _sun_yaw := 0.0
@@ -81,6 +85,7 @@ var _env_sun: Environment
 var _env_albedo: Environment
 var _toon := []
 var _toon_k := {}
+var _overrides := {}
 var _steps := []
 var _step := -1
 var _wait := -1
@@ -99,6 +104,12 @@ func _initialize() -> void:
 			_quality = a.substr(4)
 		elif a.begins_with("--sun-yaw="):
 			_sun_yaw = float(a.substr(10))
+		elif a.begins_with("--ramp-control="):
+			_control = a.substr(15)
+		elif a.begins_with("--shadow="):
+			for kv in a.substr(9).split(";", false):
+				var p := kv.split("=")
+				_overrides[p[0]] = int(p[1]) if p[1].is_valid_int() else float(p[1])
 		elif a.begins_with("--hammersley="):
 			_cams = RealizeCheck._hammersley(a.substr(13))
 		elif a.begins_with("--cams="):
@@ -111,6 +122,8 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(_out)
 	_st = load("res://addons/sakuragaoka_station/station.tscn").instantiate()
 	_st.quality = _quality
+	if "shadow_overrides" in _st:
+		_st.shadow_overrides = _overrides
 	_st.built.connect(_on_built)
 	get_root().add_child(_st)
 
@@ -130,6 +143,8 @@ func _on_built(s: Dictionary) -> void:
 			if "sun_dir" in fx:
 				fx.sun_dir = turned
 	_meta["sun_yaw_deg"] = _sun_yaw
+	if _control != "":
+		_meta["ramp_control"] = [_control, EngineFloor.ramp_control(_st, _control)]
 	# Godot lights shine along their -Z: the light travels along -basis.z, so +basis.z points at the sun
 	_meta["sun_to_light"] = _v(_sun.global_transform.basis.z.normalized())
 	_meta["sun_shadow"] = _shadow_settings()
@@ -306,7 +321,13 @@ func _capture(step: Array) -> void:
 	if p == "beauty":
 		var img := get_root().get_texture().get_image()
 		img.save_png(_out.path_join("port-view_%d.png" % v))
-		_meta.views.append(_view_meta(v))
+		var vm := _view_meta(v)
+		for t in [["visible", Viewport.RENDER_INFO_TYPE_VISIBLE], ["shadow", Viewport.RENDER_INFO_TYPE_SHADOW]]:
+			vm["render_" + t[0]] = {"objects": get_root().get_render_info(t[1], Viewport.RENDER_INFO_OBJECTS_IN_FRAME),
+				"primitives": get_root().get_render_info(t[1], Viewport.RENDER_INFO_PRIMITIVES_IN_FRAME),
+				"draw_calls": get_root().get_render_info(t[1], Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME)}
+		vm["shadow_setup"] = _st.get("shadow_setup")
+		_meta.views.append(vm)
 		print("sun_locate: view %d %s at %s" % [v, str(_cams[v]), str(_cam.global_position)])
 		return
 	var img := _sub.get_texture().get_image()
@@ -358,6 +379,7 @@ func _shadow_settings() -> Dictionary:
 			"light_angular_distance", "light_energy", "light_color", "sky_mode"]:
 		var val = _sun.get(k)
 		d[k] = str(val) if val is Color else val
+	d["station_fit"] = _st.get("shadow_setup")
 	for k in ["rendering/lights_and_shadows/directional_shadow/size",
 			"rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality",
 			"rendering/lights_and_shadows/directional_shadow/16_bits"]:
@@ -409,15 +431,16 @@ func _analyze() -> void:
 			int(sh["rendering/lights_and_shadows/directional_shadow/size"]))
 	fit.gpu.split_far = sp.far
 	fit.gpu.split_texel = sp.texel
+	var pssm := int(sh.directional_shadow_mode) != DirectionalLight3D.SHADOW_ORTHOGONAL
 	var nboot := int(opt.boot)
 	var engines := [{"name": "oracle", "images": opt.oracle, "buffers": opt.port, "num": 0, "den": 0}]
-	engines.append({"name": "port", "images": opt.port.path_join("port-view_%d.png"), "buffers": opt.port, "num": 0, "den": 0, "godot_edges": true})
+	engines.append({"name": "port", "images": opt.port.path_join("port-view_%d.png"), "buffers": opt.port, "num": 0, "den": 0, "godot_edges": pssm})
 	if opt.has("control"):
-		engines.append({"name": "control", "images": opt.control.path_join("port-view_%d.png"), "buffers": opt.control, "num": 0, "den": 0, "godot_edges": true})
+		engines.append({"name": "control", "images": opt.control.path_join("port-view_%d.png"), "buffers": opt.control, "num": 0, "den": 0, "godot_edges": pssm})
 	if opt.has("orig"):
 		engines.append({"name": "original_rerender", "images": opt.orig.path_join("beauty_%d.png"), "buffers": opt.port, "num": 0, "den": 0})
 	if opt.has("masks"):
-		engines.append({"name": "port_true_mask", "images": "", "buffers": opt.port, "num": 1, "den": 2, "sun_passes": true, "godot_edges": true})
+		engines.append({"name": "port_true_mask", "images": "", "buffers": opt.port, "num": 1, "den": 2, "sun_passes": true, "godot_edges": pssm})
 		if opt.has("orig"):
 			engines.append({"name": "original_true_mask", "images": opt.oracle, "buffers": opt.port, "num": 0, "den": 1,
 				"den_images": opt.orig.path_join("noshadow_%d.png")})
