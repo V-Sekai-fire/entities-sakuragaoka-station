@@ -67,6 +67,7 @@ var tri_objects := {}
 ## Instanced bakes: [object, texture key, triangles an instance, instances].
 var tri_instanced := []
 var _mult := 1
+var _no_outline := false
 
 
 func realize(ctx, root: Node3D) -> void:
@@ -169,6 +170,7 @@ func _walk(o, alone: bool) -> void:
 	if not o.visible:
 		return
 	var nb: bool = alone or o.user_data.get("noBatch", false)
+	_no_outline = o.layer != 0
 	if o.is_instanced:
 		_instanced(o)
 	elif o.is_mesh:
@@ -472,9 +474,9 @@ func _mat_key(m) -> String:
 	if m.user_data.has("distant"):
 		return m.key
 	var s: Dictionary = m.user_data.get("sakura", {})
-	return "%s|%s|%s|%.3f|%.3f|%s|%.2f|%s%s%s" % [m.type, m.side, m.transparent, m.opacity, m.alpha_test,
+	return "%s|%s|%s|%.3f|%.3f|%s|%.2f|%s%s%s%s" % [m.type, m.side, m.transparent, m.opacity, m.alpha_test,
 			m.emissive.to_html(false), m.emissive_intensity, s.get("rim", 0), "|ov" if m.user_data.get("overlay", false) else "",
-			_ramp_key(m)]
+			_ramp_key(m), "|no" if _no_outline else ""]
 
 
 ## materials.js toon()'s paint (0.05 unless given); other toon materials have no paint patch, so 0.
@@ -592,6 +594,7 @@ func _toon_params(sm: ShaderMaterial, m) -> void:
 	sm.set_shader_parameter("_ShadeColor", SHADE)
 	sm.set_shader_parameter("_ShadeToony", 0.9)
 	sm.set_shader_parameter("_ShadeShift", 0.0)
+	sm.set_shader_parameter("ramp_outline", not _no_outline)
 	if m.alpha_test > 0.0:
 		sm.set_shader_parameter("_AlphaCutoutEnable", 1.0)
 		sm.set_shader_parameter("_Cutoff", m.alpha_test)

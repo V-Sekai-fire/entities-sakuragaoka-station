@@ -58,18 +58,14 @@ int nd_sample(ivec2 c) {
 }
 #endif
 
-float lin_depth(ivec2 c) {
-	c = clamp(c, ivec2(0), ivec2(p.raster) - 1);
-	return p.depth_b / (texelFetch(depth_tex, c, nd_sample(c)).r + p.depth_a);
-}
-
-vec3 nrm(ivec2 c) {
+vec4 nd(ivec2 c, out bool tagged) {
 	c = clamp(c, ivec2(0), ivec2(p.raster) - 1);
 	int s = nd_sample(c);
-	if (texelFetch(depth_tex, c, s).r == 0.0) {
-		return vec3(0.0, 0.0, 1.0);
-	}
-	return normalize(texelFetch(normal_tex, c, s).xyz * 2.0 - 1.0);
+	float d = texelFetch(depth_tex, c, s).r;
+	vec4 nr = texelFetch(normal_tex, c, s);
+	int r = int(round(nr.a * 255.0));
+	tagged = d != 0.0 && (r == 95 || r == 160);
+	return vec4(d == 0.0 ? vec3(0.0, 0.0, 1.0) : normalize(nr.xyz * 2.0 - 1.0), p.depth_b / (d + p.depth_a));
 }
 
 float lum(vec3 c) {
@@ -92,23 +88,43 @@ void main() {
 	int px = int(round(max(1.0, p.raster.y / 1100.0)));
 	ivec2 dx = ivec2(px, 0);
 	ivec2 dy = ivec2(0, px);
-	float d0 = lin_depth(c);
-	float dl = lin_depth(c - dx);
-	float dr = lin_depth(c + dx);
-	float du = lin_depth(c - dy);
-	float dd = lin_depth(c + dy);
+	bool t0;
+	bool tl;
+	bool tr;
+	bool tu;
+	bool td;
+	vec4 c0 = nd(c, t0);
+	vec4 cl = nd(c - dx, tl);
+	vec4 cr = nd(c + dx, tr);
+	vec4 cu = nd(c - dy, tu);
+	vec4 cd = nd(c + dy, td);
+	vec4 h = vec4(0.0, 0.0, 1.0, -1.0);
+	h = !t0 && c0.w > h.w ? c0 : h;
+	h = !tl && cl.w > h.w ? cl : h;
+	h = !tr && cr.w > h.w ? cr : h;
+	h = !tu && cu.w > h.w ? cu : h;
+	h = !td && cd.w > h.w ? cd : h;
+	c0 = t0 ? h : c0;
+	cl = tl ? h : cl;
+	cr = tr ? h : cr;
+	cu = tu ? h : cu;
+	cd = td ? h : cd;
+	float d0 = c0.w;
+	float dl = cl.w;
+	float dr = cr.w;
+	float du = cu.w;
+	float dd = cd.w;
 	float i0 = 1.0 / max(d0, 0.05);
 	float lap_x = abs(1.0 / max(dl, 0.05) + 1.0 / max(dr, 0.05) - 2.0 * i0) / i0;
 	float lap_y = abs(1.0 / max(du, 0.05) + 1.0 / max(dd, 0.05) - 2.0 * i0) / i0;
 	float d_edge = smoothstep(0.06, 0.18, max(lap_x, lap_y));
 	float dmin = min(min(dl, dr), min(du, dd));
 	d_edge = max(d_edge, smoothstep(0.10, 0.25, (d0 - dmin) / max(dmin, 0.05)));
-	vec3 n0 = nrm(c);
-	float n_edge = max(max(1.0 - dot(n0, nrm(c - dx)), 1.0 - dot(n0, nrm(c + dx))),
-			max(1.0 - dot(n0, nrm(c - dy)), 1.0 - dot(n0, nrm(c + dy))));
+	vec3 n0 = c0.xyz;
+	float n_edge = max(max(1.0 - dot(n0, cl.xyz), 1.0 - dot(n0, cr.xyz)), max(1.0 - dot(n0, cu.xyz), 1.0 - dot(n0, cd.xyz)));
 	n_edge = smoothstep(0.30, 0.65, n_edge);
 	float fade = 1.0 - smoothstep(35.0, 190.0, min(d0, dmin));
-	float edge = max(d_edge, n_edge * 0.85) * fade * p.outline;
+	float edge = h.w < 0.0 ? 0.0 : max(d_edge, n_edge * 0.85) * fade * p.outline;
 	col = mix(col, mix(col * vec3(0.42, 0.38, 0.5), LINE, 0.35), edge * 0.82);
 	vec2 tuv = (vec2(c) + 0.5) / p.raster;
 	col += texture(bloom_tex, tuv).rgb * p.bloom + texture(glow_tex, tuv).rgb * p.glow;
