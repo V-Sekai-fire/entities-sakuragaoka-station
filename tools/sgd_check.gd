@@ -10,6 +10,7 @@
 #   realize                        the whole station realized twice (gd, then sgd): every mesh,
 #                                  MultiMesh and the palette image hashed and compared, which also
 #                                  covers blob_cols and split_coloured on the real geometry
+#   frame_diff                     two seeded 1920x1080 frames and a mask, with the mask, without it and frame against itself
 #   load_svgs (--load)             every key's SVG through slug_load_svg in two fresh slug.elf
 #                                  Sandboxes, then slug_atlas() compared
 # Needs the godot_sandbox addon and slug.elf (or a cached pack).
@@ -151,6 +152,24 @@ func _run() -> void:
 		Kernels.write_cache(tmp, {"format": 1, "atlas": at, "costs": pack.costs, "meshes": pack.meshes, "decals": pack.decals})
 		return FileAccess.get_sha256(tmp))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp))
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	var frames := []
+	for f in 3:
+		var d := PackedByteArray()
+		d.resize(1920 * 1080 * 3)
+		for i in range(0, d.size(), 997):
+			d[i] = rng.randi_range(0, 255)
+		frames.append(d)
+	var mask: PackedByteArray = frames[2].duplicate()
+	for i in range(0, mask.size(), 6):
+		mask[i] = 255
+		mask[i + 1] = 0
+		mask[i + 2] = 255
+	_both("frame_diff (3 frame pairs)", func():
+		return [Kernels.frame_diff(frames[0], frames[1], PackedByteArray(), 0), Kernels.frame_diff(frames[0], frames[1], mask, 0xff00ff),
+				Kernels.frame_diff(frames[0], frames[0], mask, 0xff00ff)], 3)
 
 	if "--load" in args:
 		_load_svgs()
