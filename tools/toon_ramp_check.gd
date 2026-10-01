@@ -204,13 +204,15 @@ func _sakura_formula() -> Dictionary:
 	var worst := 0
 	var n_cases := 0
 	var edge := []
+	RenderingServer.global_shader_parameter_set("ramp_sun_dir", sun_dir)
+	RenderingServer.global_shader_parameter_set("ramp_sun_color", _lin(Color(SUN)) * SUN_I)
 	for opts in [{"v": "mtoon_ramp_sakura", "rim": 0.7, "sheen": 0.0, "shade": 0.28, "env_rim": false, "edge": false},
 			{"v": "mtoon_ramp_sakura_cull_off", "rim": 1.0, "sheen": 0.05, "shade": 0.22, "env_rim": false, "edge": false},
 			{"v": "mtoon_ramp_sakura_cull_off", "rim": 1.0, "sheen": 0.05, "shade": 0.22, "env_rim": false, "edge": true}]:
 		var sm := ShaderMaterial.new()
 		sm.shader = load(RAMP + opts.v + ".gdshader")
 		var params := {"_MainTex": tex, "_ShadeTexture": tex, "ramp_paint": 0.0, "ramp_rim_k": opts.rim, "ramp_sheen_k": opts.sheen,
-				"ramp_shade_k": opts.shade, "ramp_env_rim": opts.env_rim, "ramp_edge_fade": opts.edge, "ramp_sun_dir": sun_dir}
+				"ramp_shade_k": opts.shade, "ramp_env_rim": opts.env_rim, "ramp_edge_fade": opts.edge}
 		for k in params:
 			sm.set_shader_parameter(k, params[k])
 		var mi := MeshInstance3D.new()

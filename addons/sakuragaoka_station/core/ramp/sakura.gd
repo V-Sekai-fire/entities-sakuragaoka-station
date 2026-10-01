@@ -40,9 +40,8 @@ static func arrays(g, gd: Dictionary, idx: PackedInt32Array, white: Vector2) -> 
 	return a
 
 
-static func params(sm: ShaderMaterial, m, sun_dir: Vector3, slug) -> void:
+static func params(sm: ShaderMaterial, m, slug) -> void:
 	var s: Dictionary = m.user_data["sakura"]
-	sm.set_shader_parameter("ramp_sun_dir", sun_dir)
 	sm.set_shader_parameter("ramp_rim_k", float(s.get("rim", 0.0)))
 	sm.set_shader_parameter("ramp_sheen_k", float(s.get("sheen", 0.0)))
 	sm.set_shader_parameter("ramp_shade_k", float(s.get("shade", 0.0)))

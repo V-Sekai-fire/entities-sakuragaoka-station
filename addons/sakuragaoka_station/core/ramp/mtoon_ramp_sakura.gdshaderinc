@@ -1,5 +1,5 @@
 // sakura/materials.js's extend() on the toon ramp (after mtoon_ramp.gdshaderinc), each option a material
-// parameter; lit in the fragment from ramp_sun_dir, as the sakura masses and cards receive no shadow.
+// parameter; lit in the fragment from the sun globals, as the sakura masses and cards receive no shadow.
 #include "res://addons/sakuragaoka_station/core/slug/slug.gdshaderinc"
 
 uniform ivec2 slug_speck_key = ivec2(0, 0);
@@ -17,7 +17,8 @@ uniform bool ramp_sway = false;
 uniform bool ramp_edge_fade = false;
 uniform float ramp_edge_cutoff = 0.5;
 uniform bool ramp_dapple = false;
-uniform vec3 ramp_sun_dir = vec3(-0.7758026, 0.5168685, 0.3619079);
+global uniform vec3 ramp_sun_dir;    // toward the station's DirectionalLight3D (station.gd)
+global uniform vec3 ramp_sun_color;  // its linear colour times energy times pi, Godot's LIGHT_COLOR
 uniform float ramp_time = 0.0;
 uniform vec2 ramp_wind = vec2(0.9, 0.35);
 uniform float ramp_gust = 0.66998654;  // main.js's gust at the shots' t = 0
@@ -25,7 +26,6 @@ uniform float ramp_gust = 0.66998654;  // main.js's gust at the shots' t = 0
 varying vec2 ramp_tone;     // colour.r tone, colour.g peach + 2 * palette
 varying vec3 ramp_shading;  // world shading normal
 
-const vec3 RAMP_SUN = vec3(2.75, 2.396259578, 1.968157126);  // sky.js sun #fff0dc at 2.75, linear
 const vec3 RAMP_BAND_N0 = vec3(0.783537792, 0.309468923, 0.445201195);
 const vec3 RAMP_BAND_N1 = vec3(0.896269353, 0.502886458, 0.610495571);
 const vec3 RAMP_BAND_N2 = vec3(0.947306537, 0.686685312, 0.760524505);
@@ -103,11 +103,11 @@ vec3 ramp_sakura(vec3 dc, vec3 n, vec3 ne, vec3 v, vec3 emissive) {
 		em += dc * vec3(0.11, 0.055, 0.075) * clamp(-dot(n, s) + 0.2, 0.0, 1.0);
 	}
 #endif
-	vec3 direct = ramp_gradient(dot(n, s)) * RAMP_SUN * (dc / PI);
+	vec3 direct = ramp_gradient(dot(n, s)) * ramp_sun_color * (dc / PI);
 	vec3 col = direct + ramp_hemisphere(n.y) * dc + em;
 #ifndef RAMP_CONTROL_SAKURA_NO_SHADE
 	if (ramp_shade_k > 0.0) {
-		float full = dot(dc * RAMP_SUN, vec3(1.0)) / PI;
+		float full = dot(dc * ramp_sun_color, vec3(1.0)) / PI;
 		float lt = clamp(dot(direct, vec3(1.0)) / max(full, 1e-4), 0.0, 1.0);
 		col = mix(col, dot(col, vec3(0.3, 0.52, 0.18)) * vec3(0.97, 0.9, 1.1), (1.0 - lt) * ramp_shade_k);
 	}

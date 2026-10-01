@@ -22,6 +22,8 @@ const Composite := preload("res://addons/sakuragaoka_station/core/composite.gd")
 
 var stats := {}
 var sun_dir := Vector3.UP
+var _sun: DirectionalLight3D
+var _fed := []
 
 
 ## The canvas-texture Sandboxes (slug.elf, slug_kernels.elf) go with the station.
@@ -54,6 +56,29 @@ func _ready() -> void:
 	built.emit(stats)
 
 
+## The light's direction and LIGHT_COLOR (linear, in float64 as three.js forms it) as the shader globals
+## core/ramp/mtoon_ramp_sakura.gdshaderinc lights from.
+func _feed_sun() -> void:
+	var z := _sun.global_transform.basis.z.normalized()
+	var lc := _sun.light_color
+	var c := Vector3(_lin(lc.r), _lin(lc.g), _lin(lc.b)) * (_sun.light_energy * PI)
+	var now := [z, c]
+	if now == _fed:
+		return
+	_fed = now
+	RenderingServer.global_shader_parameter_set("ramp_sun_dir", z)
+	RenderingServer.global_shader_parameter_set("ramp_sun_color", c)
+
+
+static func _lin(x: float) -> float:
+	return x / 12.92 if x <= 0.04045 else pow((x + 0.055) / 1.055, 2.4)
+
+
+func _process(_delta: float) -> void:
+	if _sun != null:
+		_feed_sun()
+
+
 ## three.js divides a light's irradiance by pi where Godot folds pi into the light, so the original's
 ## intensities 2.75 (sun) and 1.62 (hemisphere) become 2.75 / pi and 1.62 / pi here. Its FogExp2 is
 ## core/fog.gd in the compositor, since Godot's own fog has no squared exponential.
@@ -82,3 +107,5 @@ func _environment() -> void:
 	sun.shadow_enabled = true
 	add_child(sun)
 	sun.look_at_from_position(Vector3.ZERO, -sun_dir, Vector3.UP)
+	_sun = sun
+	_feed_sun()

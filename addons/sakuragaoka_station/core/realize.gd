@@ -59,7 +59,6 @@ var _slug = null
 var _baked = null
 var _ramps := {}
 var _twins := {}
-var _sun_dir := Vector3(-0.776, 0.517, 0.362).normalized()
 ## Triangles drawn, by where they come from (instanced ones times their instance count), and per
 ## object for the Slug and baked categories; in stats as "tris" and "tri_objects" after finish()
 ## (tools/tri_budget.gd prints them).
@@ -72,7 +71,6 @@ var _mult := 1
 
 func realize(ctx, root: Node3D) -> void:
 	_root = root
-	_sun_dir = ctx.sun_dir
 	_palette_img = Image.create(PALETTE, PALETTE, false, Image.FORMAT_RGBA8)
 	_palette_img.fill(Color(1, 0, 1))
 	_palette_tex = ImageTexture.create_from_image(_palette_img)
@@ -549,7 +547,7 @@ func _mtoon(m) -> ShaderMaterial:
 	sm.set_shader_parameter("_ShadeTexture", _palette_tex)
 	_toon_params(sm, m)
 	if RampSakura.wants(m):
-		RampSakura.params(sm, m, _sun_dir, _slug)
+		RampSakura.params(sm, m, _slug)
 	if m.type == "basic":
 		sm.set_shader_parameter("_EmissionMap", _palette_tex)
 	_materials[k] = sm
