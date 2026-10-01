@@ -1,11 +1,13 @@
 # A synthetic lighting lab: CSG solids under the original's toon lighting (lighting_lab/truth.gdshader)
 # rendered at sphere-Hammersley orbit views, then once per planted defect. Each defect's residual against
 # the truth is summed on the GPU; the truth rendered twice is the floor, and a defect counts as seen when
-# it moves more pixels than the floor does.
-#   godot --path . --resolution 512x512 --script tools/lighting_lab.gd -- --out=<dir> [--views=8]
+# it moves more pixels than the floor does. --aov also writes each view's reference passes, the inputs
+# the toon model reads (aov_albedo_<i>.png, aov_light_<i>.png).
+#   godot --path . --resolution 512x512 --script tools/lighting_lab.gd -- --out=<dir> [--views=8] [--aov]
 extends SceneTree
 
 const TRUTH := preload("res://tools/lighting_lab/truth.gdshader")
+const AOV := preload("res://tools/lighting_lab/aov.gdshader")
 const SUN := Vector3(0.5, 0.45, 0.35)
 const MAD_GLSL := """
 #version 450
@@ -32,7 +34,9 @@ void main() {
 
 var _out := "user://lighting_lab"
 var _views := 8
+var _aov := false
 var _mat := ShaderMaterial.new()
+var _env := Environment.new()
 var _sun := DirectionalLight3D.new()
 var _cam := Camera3D.new()
 var _rd: RenderingDevice
@@ -46,6 +50,8 @@ func _initialize() -> void:
 			_out = a.substr(6)
 		elif a.begins_with("--views="):
 			_views = int(a.substr(8))
+		elif a == "--aov":
+			_aov = true
 	_mat.shader = TRUTH
 	_scene()
 	_gpu()
@@ -53,12 +59,11 @@ func _initialize() -> void:
 
 
 func _scene() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.82, 0.86, 0.92)
-	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	_env.background_mode = Environment.BG_COLOR
+	_env.background_color = Color(0.82, 0.86, 0.92)
+	_env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	var we := WorldEnvironment.new()
-	we.environment = env
+	we.environment = _env
 	root.add_child(we)
 	_sun.light_energy = 2.75 / PI
 	_sun.shadow_enabled = true
@@ -106,17 +111,38 @@ func _orbit() -> Array:
 	return out
 
 
+## One image per view, drawn synchronously after the camera moves so no stale frame is read.
 func _render(views: Array) -> Array:
 	var shots := []
 	for a in views:
-		var az := deg_to_rad(a.x)
-		var el := deg_to_rad(a.y)
-		var eye := Vector3(cos(el) * sin(az), sin(el), cos(el) * cos(az)) * 9.0 + Vector3(0, 0.8, 0)
-		_cam.look_at_from_position(eye, Vector3(0, 0.8, 0), Vector3.UP)
-		for _f in 3:
-			await process_frame
+		_cam.global_transform = _orbit_transform(a)
+		await process_frame
+		RenderingServer.force_draw(true)
+		RenderingServer.force_draw(true)
 		shots.append(root.get_texture().get_image())
 	return shots
+
+
+## The reference passes through the same viewport as the renders, as 8-bit sRGB PNGs: albedo, then
+## 0.5 dotNL + 0.5 / shadow / 0.5 normal y + 0.5 in red, green and blue, black where there is sky.
+func _passes(views: Array) -> void:
+	_mat.shader = AOV
+	var bg: Color = _env.background_color
+	_env.background_color = Color(0, 0, 0)
+	for mode in 2:
+		_mat.set_shader_parameter("mode", mode)
+		var shots: Array = await _render(views)
+		for i in shots.size():
+			shots[i].save_png(_out.path_join("aov_%s_%d.png" % [["albedo", "light"][mode], i]))
+	_env.background_color = bg
+	_mat.shader = TRUTH
+
+
+func _orbit_transform(a: Vector2) -> Transform3D:
+	var az := deg_to_rad(a.x)
+	var el := deg_to_rad(a.y)
+	var eye := Vector3(cos(el) * sin(az), sin(el), cos(el) * cos(az)) * 9.0 + Vector3(0, 0.8, 0)
+	return Transform3D.IDENTITY.translated(eye).looking_at(Vector3(0, 0.8, 0), Vector3.UP)
 
 
 func _apply(defect: Dictionary) -> void:
@@ -148,6 +174,8 @@ func _run() -> void:
 	var truth: Array = await _render(views)
 	for i in truth.size():
 		truth[i].save_png(_out.path_join("truth_%d.png" % i))
+	if _aov:
+		await _passes(views)
 	var summary := []
 	var failed := 0
 	var floor_moved := 0
