@@ -4,6 +4,7 @@
 //   node tools/oracle/shot.mjs --chrome <path> --hammersley 8@-1,-11.4 --out shots/original [--only environment,plaza]
 //   --root   the original's checkout, with npm ci run (default: the workspace's 3-interactor/sakuragaoka-station-upstream)
 //   --chrome path to a Chrome, chrome-headless-shell or Edge binary (default: the Windows install paths)
+//   --angle  ANGLE backend: vulkan (default; metal on macOS), d3d11, warp (on the CPU), gl; the renderer must name it (--self-test)
 //   --only   comma list of world modules to build (omit = full scene)
 //   --cams   ';'-separated cameras. 4 numbers = walking eye at ground (x,z,yawDeg,pitchDeg);
 //            5 numbers = free camera (x,y,z,yawDeg,pitchDeg). yaw 0 = north(-Z), 90 = west, 180 = south, -90 = east.
@@ -19,6 +20,25 @@ import { fileURLToPath } from 'node:url';
 
 const args = {};
 for (let i = 2; i < process.argv.length; i++) { const a = process.argv[i]; if (a.startsWith('--')) { const k = a.slice(2); const v = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[++i] : '1'; args[k] = v; } }
+const ANGLE = args.angle || (process.platform === 'darwin' ? 'metal' : 'vulkan');
+const RENDERER = { vulkan: /Vulkan/, d3d11: /Direct3D11/, warp: /Basic Render Driver.*Direct3D11/, d3d9: /Direct3D9/, metal: /Metal/, gl: /OpenGL/, swiftshader: /SwiftShader/ };
+const USE_ANGLE = { warp: 'd3d11-warp' }[ANGLE] || ANGLE;
+const backendFault = (angle, gl) => !RENDERER[angle] ? `no renderer name is known for --angle ${angle}`
+  : !RENDERER[angle].test(gl) ? `asked for ANGLE ${angle}, the page got ${gl}`
+  : angle !== 'swiftshader' && angle !== 'warp' && /SwiftShader|Basic Render Driver|llvmpipe/.test(gl) ? `asked for ANGLE ${angle} on the GPU, the page got a software rasterizer: ${gl}` : '';
+if (args['self-test']) {
+  const VK = 'ANGLE (Vendor, Vulkan 1.4.351 (Vendor GPU (0x00002684)), Vendor)';
+  const D3D = 'ANGLE (Vendor, Vendor GPU (0x00002684) Direct3D11 vs_5_0 ps_5_0, D3D11)';
+  const WARP = 'ANGLE (Vendor, Basic Render Driver (0x0000008C) Direct3D11 vs_5_0 ps_5_0, D3D11)';
+  const SWVK = 'ANGLE (Vendor, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)';
+  const cases = [['vulkan', VK, 1], ['d3d11', D3D, 1], ['warp', WARP, 1], ['vulkan', D3D, 0], ['d3d11', VK, 0], ['d3d11', WARP, 0],
+    ['warp', D3D, 0], ['warp', VK, 0], ['warp', SWVK, 0], ['gl', WARP, 0], ['metal', WARP, 0], ['vulkan', SWVK, 0], ['vulkan', 'unknown', 0],
+    ['vulkan', 'n/a', 0], ['warp', 'unknown', 0], ['bogus', VK, 0]];
+  let bad = 0;
+  for (const [a, g, ok] of cases) { const right = !backendFault(a, g) === !!ok; bad += right ? 0 : 1; console.log(`${right ? 'ok  ' : 'FAIL'} --angle ${a} ${ok ? 'accepts' : 'refuses'} ${g}`); }
+  console.log(`${cases.length} controls, ${bad} failed`);
+  process.exit(bad ? 1 : 0);
+}
 const root = path.resolve(args.root || path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../../3-interactor/sakuragaoka-station-upstream'));
 const puppeteer = createRequire(path.join(root, 'package.json'))('puppeteer-core');
 const W = Number(args.w || 1280), H = Number(args.h || 720);
@@ -47,10 +67,9 @@ await new Promise(r => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
 
 const CHROME = args.chrome || ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(p => fs.existsSync(p));
-const ANGLE = { darwin: 'metal', win32: 'd3d11' }[process.platform] || 'vulkan';
 const browser = await puppeteer.launch({
   executablePath: CHROME, headless: true,
-  args: [`--use-angle=${ANGLE}`, '--enable-gpu', '--ignore-gpu-blocklist', '--enable-webgl', '--disable-gpu-sandbox', '--no-first-run', '--disable-extensions', `--window-size=${W},${H}`],
+  args: [`--use-angle=${USE_ANGLE}`, '--enable-gpu', '--ignore-gpu-blocklist', '--enable-webgl', '--disable-gpu-sandbox', '--no-first-run', '--disable-extensions', `--window-size=${W},${H}`],
   defaultViewport: { width: W, height: H, deviceScaleFactor: 1 },
   protocolTimeout: 300000,
 });
@@ -73,6 +92,8 @@ try {
     console.log('patch:', JSON.stringify(res));
   }
   const info = await page.evaluate(() => ({ errors: window.__errors, stats: window.__stats, gl: (() => { try { const gl = document.getElementById('scene').getContext('webgl2'); const d = gl.getExtension('WEBGL_debug_renderer_info'); return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : 'unknown'; } catch (e) { return 'n/a'; } })() }));
+  const fault = backendFault(ANGLE, info.gl);
+  if (fault) throw new Error(fault);
   for (let i = 0; i < cams.length; i++) {
     const v = cams[i].split(',').map(Number);
     await page.evaluate((v) => { if (v.length === 4) window.__setCam(v[0], null, v[1], v[2], v[3]); else window.__setCam(v[0], v[1], v[2], v[3], v[4]); }, v);
