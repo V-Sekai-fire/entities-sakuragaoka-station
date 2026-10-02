@@ -1,5 +1,6 @@
 # The station's GPU-free checks (tools/cloud_check.exs): headless gates, the godot-sandbox guests and a
-# CPU Mitsuba contact sheet, saved as the run's artifact. godot_sandbox comes from the pinned meshing-pen commit.
+# CPU Mitsuba contact sheet, saved as the run's artifact. godot_sandbox's tree comes from the pinned meshing-pen
+# commit and its binaries from the addon release cloud_check.exs pins.
 name: check
 on:
   push:

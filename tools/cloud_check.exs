@@ -4,8 +4,11 @@
 #   GODOT=<godot 4.7 binary> PEN=<transport-meshing-pen checkout> elixir tools/cloud_check.exs [out_dir]
 
 defmodule CloudCheck do
+  @addon_tag "v20261002-addon.1"
+  @addon_base "https://github.com/V-Sekai-fire/service-godot-build/releases/download/"
   @sandbox_bins ~w(libgodot_riscv.linux.template_release.x86_64.so
                    libgodot_riscv.linux.template_release.double.x86_64.so)
+  @sandbox_elfs ~w(gdscript.elf gdscript.double.elf)
 
   def main(args) do
     root = File.cwd!()
@@ -25,10 +28,10 @@ defmodule CloudCheck do
         {"precision_check", fn -> script(godot, "tools/precision_check.gd", []) end},
         {"precision_check swap (must FAIL)", fn -> negate(script(godot, "tools/precision_check.gd", ["--control=swap"])) end},
         {"sgd_check", fn -> script(godot, "tools/sgd_check.gd", []) end},
-        {"slug elf_check", fn -> script(godot, "guest/slug/tests/elf_check.gd", []) end},
         {"export town.usda", fn -> script(godot, "tools/export_usda.gd", ["--out=#{out}/town.usda", "--modules=station,plaza,sakura"]) end},
         {"export station.usda", fn -> script(godot, "tools/export_usda.gd", ["--out=#{out}/station.usda"]) end},
-        {"contact sheet", fn -> sheet(out) end}
+        {"contact sheet", fn -> sheet(out) end},
+        {"slug elf_check", fn -> script(godot, "guest/slug/tests/elf_check.gd", []) end}
       ]
       |> Enum.map(fn {name, step} -> {name, run_step(name, step)} end)
 
@@ -48,7 +51,8 @@ defmodule CloudCheck do
     if File.exists?(godot), do: :pass, else: {:missing, "GODOT #{godot}"}
   end
 
-  # The addon tree comes from the pen, which tracks it; Linux binaries only.
+  # The addon tree comes from the pen; its Linux binaries and compiler ELFs from the pinned
+  # release, which refuses a guest built for the other real_t.
   defp vendor(root) do
     pen = System.get_env("PEN")
     src = pen && Path.join(pen, "addons/godot_sandbox")
@@ -65,8 +69,42 @@ defmodule CloudCheck do
         Path.wildcard(Path.join(dst, "bin/*.{dll,framework}"))
         |> Enum.each(&File.rm_rf!/1)
 
-        absent = Enum.reject(@sandbox_bins, &File.exists?(Path.join(dst, "bin/" <> &1)))
-        if absent == [], do: :pass, else: {:missing, absent}
+        tag = System.get_env("ADDON_TAG", @addon_tag)
+        files = Enum.map(@sandbox_bins, &{&1, Path.join(dst, "bin/" <> &1)}) ++
+                Enum.map(@sandbox_elfs, &{&1, Path.join(dst, &1)})
+
+        with {:ok, sums} <- fetch(tag, "SHA256SUMS") do
+          bad =
+            for {name, path} <- files,
+                result = install(tag, name, path, sums),
+                result != :ok,
+                do: {name, result}
+
+          if bad == [], do: :pass, else: {:addon, tag, bad}
+        end
+    end
+  end
+
+  defp install(tag, name, path, sums) do
+    want = Regex.run(~r/^([0-9a-f]{64}) +\*?#{Regex.escape(name)}$/m, sums, capture: :all_but_first)
+
+    with [hex] <- want || :not_in_sums,
+         {:ok, bin} <- fetch(tag, name),
+         ^hex <- Base.encode16(:crypto.hash(:sha256, bin), case: :lower) do
+      File.write!(path, bin)
+      :ok
+    else
+      {:error, _} = e -> e
+      :not_in_sums -> :not_in_sums
+      _ -> :sha256_mismatch
+    end
+  end
+
+  defp fetch(tag, name) do
+    tmp = Path.join(System.tmp_dir!(), "addon-" <> name)
+    case System.cmd("curl", ["-fsSL", "-o", tmp, @addon_base <> tag <> "/" <> name], stderr_to_stdout: true) do
+      {_, 0} -> {:ok, File.read!(tmp)}
+      {out, code} -> {:error, {code, String.trim(out)}}
     end
   end
 
