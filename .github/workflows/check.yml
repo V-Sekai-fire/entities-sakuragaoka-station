@@ -1,0 +1,51 @@
+# The station's GPU-free checks (tools/cloud_check.exs): headless gates, the godot-sandbox guests and a
+# CPU Mitsuba contact sheet, saved as the run's artifact. godot_sandbox's tree comes from the pinned meshing-pen
+# commit and its binaries from the addon release cloud_check.exs pins.
+name: check
+on:
+  push:
+    branches: [main/main]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  GODOT_VERSION: 4.7.2
+  PEN_COMMIT: 0b5b11e4144fcbd998ded7ff2d59f6b7479d8518
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: V-Sekai-fire/transport-meshing-pen
+          ref: ${{ env.PEN_COMMIT }}
+          path: .pen
+          sparse-checkout: addons/godot_sandbox
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "29"
+          elixir-version: "1.20.4"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Mitsuba
+        run: python -m pip install mitsuba usd-core numpy pillow
+      - name: Godot
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/godot.zip" "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -oq "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP"
+          echo "GODOT=$RUNNER_TEMP/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+      - name: Cloud check
+        run: PEN="$PWD/.pen" timeout 2400 elixir tools/cloud_check.exs cloud-check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contact-sheets
+          path: |
+            cloud-check/*.png
+            cloud-check/*.json
+          if-no-files-found: error
