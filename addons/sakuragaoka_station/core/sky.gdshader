@@ -20,7 +20,8 @@ float vn(vec2 p) {
 	vec2 i = floor(p);
 	vec2 f = fract(p);
 	f = f * f * (3.0 - 2.0 * f);
-	return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
+	ivec2 c = ivec2(i);
+	return mix(mix(h21(vec2(c)), h21(vec2(c + ivec2(1, 0))), f.x), mix(h21(vec2(c + ivec2(0, 1))), h21(vec2(c + ivec2(1, 1))), f.x), f.y);
 }
 
 float fbm(vec2 p) {

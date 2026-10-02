@@ -31,6 +31,8 @@ const SHADOW_BLUR := 0.866
 var stats := {}
 var sun_dir := Vector3.UP
 var shadow_setup := {}
+## The build context, kept so a walker can read ctx.physics's colliders after `built`.
+var ctx
 var _sun: DirectionalLight3D
 var _fed := []
 var _fit := []
@@ -45,7 +47,7 @@ func _exit_tree() -> void:
 func _ready() -> void:
 	Quality.apply(get_viewport(), quality)
 	var t0 := Time.get_ticks_msec()
-	var ctx = Ctx.new(world_seed)
+	ctx = Ctx.new(world_seed)
 	sun_dir = ctx.sun_dir
 	if with_environment:
 		_environment()

@@ -81,18 +81,96 @@ func kit(parent) -> Geo.Kit:
 	return Geo.Kit.new(parent, cache)
 
 
-## src/core/physics.js as far as building uses it: colliders are counted, not simulated.
+## src/core/physics.js's colliders, kept as primitives for the MuJoCo guest (station coordinates,
+## y up). A row is [type, cx, cy, cz, sx, sy, sz, qw, qx, qy, qz, mocap]: boxes are half extents,
+## cylinders are radius and half height about local y. Walk tops and ramps keep their walkable top.
 class Physics extends RefCounted:
-	var count := 0
+	const STEP_HEIGHT := 0.45
+	const STRIDE := 12
+	enum { BOX, CYLINDER, WALK, RAMP }
+	## The guest's primitive types: walkable boxes (walk tops, ramps) are ground, in geom group 1.
+	enum { GUEST_BOX, GUEST_CYLINDER, GUEST_WALK }
+	const WALK_DEPTH := 0.5
+	const HF_CELL := 0.25
 
-	func addBox(_cx = 0, _cz = 0, _w = 0, _d = 0, _r = 0, _y0 = 0, _y1 = 0): count += 1
-	func addAABB(_a = 0, _b = 0, _c = 0, _d = 0, _y0 = 0, _y1 = 0): count += 1
-	func addCylinder(_cx = 0, _cz = 0, _r = 0, _y0 = 0, _y1 = 0): count += 1
-	func addWalkBox(_cx = 0, _cz = 0, _w = 0, _d = 0, _r = 0, _t = 0, _b = 0): count += 1
-	func addWalkRamp(_cx = 0, _cz = 0, _w = 0, _d = 0, _r = 0, _a = 0, _b = 0): count += 1
-	func addStairs(_cx = 0, _cz = 0, _w = 0, _d = 0, _r = 0, _a = 0, _b = 0, _n = 0): count += 1
-	func addFromObject(_o = null, _p = 0): count += 1
-	func addDynamic(_f = null): pass
+	var prims := PackedFloat64Array()
+	var items: Array = []
+	var dynamic: Array = []
+	var count: int:
+		get:
+			return prims.size() / STRIDE
+
+	## item is physics.js's own record: [type, cx, cz, hw, hd, rotY, r, y0, y1, top, yA, yB].
+	func _row(type: int, c: Vector3, half: Vector3, q: Quaternion, item: Array):
+		var shape: int = GUEST_CYLINDER if type == CYLINDER else (GUEST_WALK if type == WALK or type == RAMP else GUEST_BOX)
+		prims.append_array([shape, c.x, c.y, c.z, half.x, half.y, half.z, q.w, q.x, q.y, q.z, 0.0])
+		items.append(item)
+		return count - 1
+
+	func addBox(cx = 0.0, cz = 0.0, w = 0.0, d = 0.0, rotY = 0.0, y0 = -50.0, y1 = 200.0):
+		return _row(BOX, Vector3(cx, (y0 + y1) / 2.0, cz), Vector3(w / 2.0, (y1 - y0) / 2.0, d / 2.0),
+				Quaternion(Vector3.UP, rotY), ["box", cx, cz, w / 2.0, d / 2.0, rotY, null, y0, y1, null, null, null])
+
+	func addAABB(minx = 0.0, minz = 0.0, maxx = 0.0, maxz = 0.0, y0 = -50.0, y1 = 200.0):
+		return addBox((minx + maxx) / 2.0, (minz + maxz) / 2.0, maxx - minx, maxz - minz, 0.0, y0, y1)
+
+	func addCylinder(cx = 0.0, cz = 0.0, r = 0.0, y0 = -50.0, y1 = 200.0):
+		return _row(CYLINDER, Vector3(cx, (y0 + y1) / 2.0, cz), Vector3(r, (y1 - y0) / 2.0, 0.0), Quaternion.IDENTITY,
+				["cyl", cx, cz, null, null, null, r, y0, y1, null, null, null])
+
+	## Solid from bottom to its walkable top, as in physics.js; the walker's band starts at the step
+	## height, so a top within a step never blocks.
+	func addWalkBox(cx = 0.0, cz = 0.0, w = 0.0, d = 0.0, rotY = 0.0, topY = 0.0, bottom = -50.0):
+		var depth: float = topY - bottom
+		return _row(WALK, Vector3(cx, topY - depth / 2.0, cz), Vector3(w / 2.0, depth / 2.0, d / 2.0),
+				Quaternion(Vector3.UP, rotY), ["walk", cx, cz, w / 2.0, d / 2.0, rotY, null, bottom, null, topY, null, null])
+
+	## Local z runs from yA at -d/2 to yB at +d/2: a slab pitched about its local x axis.
+	func addWalkRamp(cx = 0.0, cz = 0.0, w = 0.0, d = 0.0, rotY = 0.0, yA = 0.0, yB = 0.0):
+		var pitch: float = atan2(yB - yA, d)
+		var length: float = sqrt(d * d + (yB - yA) * (yB - yA))
+		var q := Quaternion(Vector3.UP, rotY) * Quaternion(Vector3.RIGHT, -pitch)
+		var down: Vector3 = q * Vector3(0.0, -WALK_DEPTH / 2.0, 0.0)
+		return _row(RAMP, Vector3(cx, (yA + yB) / 2.0, cz) + down, Vector3(w / 2.0, WALK_DEPTH / 2.0, length / 2.0), q,
+				["ramp", cx, cz, w / 2.0, d / 2.0, rotY, null, minf(yA, yB) - 50.0, null, null, yA, yB])
+
+	func addStairs(cx = 0.0, cz = 0.0, w = 0.0, d = 0.0, rotY = 0.0, y0 = 0.0, y1 = 0.0, n = 1):
+		var c: float = cos(rotY)
+		var s: float = sin(rotY)
+		for i in n:
+			var lz: float = -d / 2.0 + d * (i + 0.5) / n
+			addWalkBox(cx + lz * s, cz + lz * c, w, d / n, rotY, y0 + (y1 - y0) * (i + 1) / n)
+
+	func addFromObject(o = null, pad = 0.0):
+		if o == null or not o.has_method("world_aabb"):
+			return null
+		var b: AABB = o.world_aabb()
+		if b.size == Vector3.ZERO:
+			return null
+		return addAABB(b.position.x - pad, b.position.z - pad, b.end.x + pad, b.end.z + pad, b.position.y, b.end.y)
+
+	func addDynamic(fn = null):
+		if fn != null:
+			dynamic.append(fn)
+
+	## Each dynamic collider becomes a mocap box; its slot count is fixed by the first call.
+	func dynamic_boxes() -> Array:
+		var out: Array = []
+		for fn in dynamic:
+			out.append_array(fn.call())
+		return out
+
+	## The terrain as metres, rows along z and columns along x over [x0, z0, x1, z1].
+	func height_field(height_at: Callable, rect: Array, cell: float) -> Dictionary:
+		var ncol: int = int(ceil((rect[2] - rect[0]) / cell)) + 1
+		var nrow: int = int(ceil((rect[3] - rect[1]) / cell)) + 1
+		var h := PackedFloat64Array()
+		h.resize(nrow * ncol)
+		for r in nrow:
+			for c in ncol:
+				h[r * ncol + c] = height_at.call(rect[0] + c * cell, rect[1] + r * cell)
+		return {"heights": h, "nrow": nrow, "ncol": ncol,
+				"rect": [rect[0], rect[1], rect[0] + (ncol - 1) * cell, rect[1] + (nrow - 1) * cell]}
 
 
 ## src/core/textures.js stand-in: the port draws no canvases (textured signs are blank), so a map
