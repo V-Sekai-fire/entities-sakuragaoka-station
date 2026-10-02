@@ -17,11 +17,13 @@ const Composite := preload("res://addons/sakuragaoka_station/core/composite.gd")
 
 var stats := {}
 var sun_dir := Vector3.UP
+## The build context, kept so a walker can read ctx.physics's colliders after `built`.
+var ctx
 
 
 func _ready() -> void:
 	var t0 := Time.get_ticks_msec()
-	var ctx = Ctx.new(world_seed)
+	ctx = Ctx.new(world_seed)
 	sun_dir = ctx.sun_dir
 	if with_environment:
 		_environment()
