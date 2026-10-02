@@ -1,13 +1,16 @@
-# GPU-free checks for a cloud session: the headless gates and the godot-sandbox guests, with no
-# GPU emulator (lavapipe, WARP, SwiftShader). Exits 1 if any step fails or is skipped.
-#   GODOT=<godot 4.7 binary> PEN=<transport-meshing-pen checkout> elixir tools/cloud_check.exs
+# GPU-free checks for a cloud session: the headless gates, the godot-sandbox guests and a CPU Mitsuba
+# contact sheet, with no GPU emulator (lavapipe, WARP, SwiftShader). Exits 1 if any step fails.
+#   pip install mitsuba usd-core numpy pillow
+#   GODOT=<godot 4.7 binary> PEN=<transport-meshing-pen checkout> elixir tools/cloud_check.exs [out_dir]
 
 defmodule CloudCheck do
   @sandbox_bins ~w(libgodot_riscv.linux.template_release.x86_64.so
                    libgodot_riscv.linux.template_release.double.x86_64.so)
 
-  def main(_args) do
+  def main(args) do
     root = File.cwd!()
+    out = Path.expand(List.first(args) || "cloud-check", root)
+    File.mkdir_p!(out)
     godot = System.get_env("GODOT") || fail_now("GODOT is not set")
 
     results =
@@ -22,13 +25,17 @@ defmodule CloudCheck do
         {"precision_check", fn -> script(godot, "tools/precision_check.gd", []) end},
         {"precision_check swap (must FAIL)", fn -> negate(script(godot, "tools/precision_check.gd", ["--control=swap"])) end},
         {"sgd_check", fn -> script(godot, "tools/sgd_check.gd", []) end},
-        {"slug elf_check", fn -> script(godot, "guest/slug/tests/elf_check.gd", []) end}
+        {"slug elf_check", fn -> script(godot, "guest/slug/tests/elf_check.gd", []) end},
+        {"export town.usda", fn -> script(godot, "tools/export_usda.gd", ["--out=#{out}/town.usda", "--modules=station,plaza,sakura"]) end},
+        {"export station.usda", fn -> script(godot, "tools/export_usda.gd", ["--out=#{out}/station.usda"]) end},
+        {"contact sheet", fn -> sheet(out) end}
       ]
       |> Enum.map(fn {name, step} -> {name, run_step(name, step)} end)
 
     failed = Enum.reject(results, fn {_, r} -> r == :pass end)
     IO.puts("\nRESULT #{if failed == [], do: "PASS", else: "FAIL"}  #{length(results) - length(failed)}/#{length(results)} steps pass")
     Enum.each(failed, fn {name, r} -> IO.puts("  #{name}: #{inspect(r)}") end)
+    IO.puts("contact sheet: #{Path.join(out, "station-sheet.png")}")
     System.halt(if failed == [], do: 0, else: 1)
   end
 
@@ -66,6 +73,19 @@ defmodule CloudCheck do
   defp script(godot, path, user_args) do
     args = ["--headless", "--script", path] ++ if(user_args == [], do: [], else: ["--" | user_args])
     godot(godot, args)
+  end
+
+  defp sheet(out) do
+    png = Path.join(out, "station-sheet.png")
+    {_, code} =
+      System.cmd("elixir", ["tools/contact_sheet/contact_sheet.exs", "tools/contact_sheet/station.exs", png],
+        env: [{"SHEET_OUT", out}], into: IO.stream(:stdio, :line), stderr_to_stdout: true)
+
+    cond do
+      code != 0 -> {:exit, code}
+      not File.exists?(png) -> {:missing, png}
+      true -> :pass
+    end
   end
 
   defp godot(godot, args) do
