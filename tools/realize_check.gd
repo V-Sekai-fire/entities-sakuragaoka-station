@@ -4,12 +4,22 @@
 # above the ground, "x,y,z,yaw,pitch" a free camera, yaw 0 north (-Z), Euler YXZ, 58 degree vertical
 # field of view. --hammersley n@x,z puts n eyes at (x,z) at the sphere Hammersley sequence's angles,
 # as shot.mjs does. --original=<prefix> sets each render beside <prefix>_<i>.png and prints the mean
-# absolute difference of the two.
+# absolute difference of the two over every pixel and channel at full resolution (0..255).
 #   godot --path . --resolution 1920x1080 --script tools/realize_check.gd -- --shots=<dir>
 #       [--hammersley=8@-1,-11.4 | --cams="x,z,yaw,pitch;..."] [--original=<prefix>] [--modules=...]
+#       [--q=high|medium|low] [--ramp-control=<engine_floor.gd RAMP_CONTROLS name>]   ?q= level (core/quality.gd), default high
 extends SceneTree
 
 const Layout = preload("res://addons/sakuragaoka_station/world/layout.gd")
+const Sheet = preload("res://tools/sheet.gd")
+const SlugAtlas = preload("res://addons/sakuragaoka_station/core/slug/atlas.gd")
+const Baked = preload("res://addons/sakuragaoka_station/core/slug/baked.gd")
+const Pack = preload("res://addons/sakuragaoka_station/core/slug/pack.gd")
+const Realize = preload("res://addons/sakuragaoka_station/core/realize.gd")
+const SandboxUtil = preload("res://addons/sakuragaoka_station/core/slug/sandbox_util.gd")
+const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
+const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
+const EngineFloor = preload("res://tools/engine_floor.gd")
 const EYE := 1.52
 
 var _out := ""
@@ -22,6 +32,8 @@ var _view := 0
 var _last := PackedByteArray()
 var _t0 := Time.get_ticks_msec()
 var _layout = Layout.new("")
+var _quality := "high"
+var _control := ""
 
 
 func _initialize() -> void:
@@ -33,6 +45,10 @@ func _initialize() -> void:
 			_original = a.substr(11)
 		elif a.begins_with("--modules="):
 			mods = a.substr(10)
+		elif a.begins_with("--q="):
+			_quality = a.substr(4)
+		elif a.begins_with("--ramp-control="):
+			_control = a.substr(15)
 		elif a.begins_with("--hammersley="):
 			_cams = _hammersley(a.substr(13))
 		elif a.begins_with("--cams="):
@@ -41,6 +57,7 @@ func _initialize() -> void:
 	_st = load("res://addons/sakuragaoka_station/station.tscn").instantiate()
 	if mods != "":
 		_st.modules = PackedStringArray(mods.split(","))
+	_st.quality = _quality
 	_st.built.connect(_on_built)
 	get_root().add_child(_st)
 
@@ -58,11 +75,29 @@ func _on_built(s: Dictionary) -> void:
 			",".join(s.modules), s.meshes, s.solids, s.surfaces, s.single, s.instanced, s.skipped])
 	print("realize: geometries %d manifold, %d open; CSG %d triangles in, %d out; %d cells kept raw, %d combiners failed" % [
 			s.manifold, s.open, s.csg_in, s.csg_out, s.csg_raw, s.csg_failed])
-	print("realize: %d palette colours; %d blossom masses; %d alpha-cut cards held for Slug; %d instance tints dropped" % [
+	print("realize: %d palette colours; %d blossom masses; %d alpha-cut cards held (no Slug or mesh form); %d instance tints dropped" % [
 			s.colours, s.blob, s.held, s.instance_tints_dropped])
+	var atlas = SlugAtlas.shared()
+	print("realize: canvas textures: %d surfaces drawn by Slug, %d on the mean-colour fallback; modes mesh %d, slug %d, mean %d" % [
+			s.slugged, s.fallback, s.mode_mesh, s.mode_slug, s.mode_mean])
+	print("realize: baked %d cards, %d decals, %d triangles, %d palette ramps; %d bakes over budget (%d a decal, %d an object with its instances) went to Slug or the mean; atlas %s; pack %s" % [
+			s.baked_cards, s.baked_decals, s.baked_tris, s.ramps, s.decal_capped, Baked.DECAL_TRI_CAP, Realize.BAKE_TRI_BUDGET,
+			"%d keys, %d layers" % [atlas.keys.size(), atlas.layer_count] if atlas != null else "none",
+			"%s in %d ms %s, binary translation %s" % [Pack.info.get("source", "?"), Pack.info.get("ms", 0), str(Pack.info.get("build", "")),
+			"on" if SandboxUtil.translated else "off (no res://bintr/ library)"] if Pack.shared() != null else "none (%s)" % Pack.reason])
 	print("realize: %d batches; %d draws, %d triangles; build %d ms, realize %d ms" % [
 			s.batches, draws, tris, s.build_ms, s.realize_ms])
+	print("realize: quality %s (MSAA %s)" % [_quality, ["off", "2x", "4x", "8x"][get_root().msaa_3d]])
+	if _control != "":
+		var n: int = EngineFloor.ramp_control(_st, _control)
+		print("realize: CONTROL %s on %d toon-ramp materials" % [_control, n])
+		if n <= 0:
+			print("realize: FAIL the control switched nothing")
+			_teardown()
+			quit(1)
+			return
 	if _out == "" or _cams.is_empty():
+		_teardown()
 		quit()
 		return
 	DirAccess.make_dir_recursive_absolute(_out)
@@ -78,12 +113,14 @@ func _on_built(s: Dictionary) -> void:
 func _process(_dt: float) -> bool:
 	if Time.get_ticks_msec() - _t0 > 600000:
 		print("realize: FAIL (no result in 600 s)")
+		_teardown()
 		quit(1)
 	if _frames < 0:
 		return false
 	_frames += 1
 	if _frames == 1:
 		if _view >= _cams.size():
+			_teardown()
 			quit()
 			return false
 		_place(_cams[_view])
@@ -102,6 +139,13 @@ func _process(_dt: float) -> bool:
 		_view += 1
 		_frames = 0
 	return false
+
+
+## The station frees its Sandboxes as it leaves the tree; the run frees them first, so nothing is left
+## loaded at exit.
+func _teardown() -> void:
+	Kernels.shutdown()
+	Guest.shutdown()
 
 
 ## The original's walking eye or free camera, as player.js sets it.
@@ -142,11 +186,15 @@ static func _hammersley(spec: String) -> Array:
 	return out
 
 
-## The two renders side by side at half size, and their mean absolute difference over RGB in [0, 255].
+## The two renders side by side (a half-size picture only), and their mean absolute difference over
+## every pixel and RGB channel at full resolution, 0..255 (Sheet.mad); the legacy half-size, 1/7
+## sampled figure follows, labelled, for comparison with older reports.
 func _compare(port: Image, original_path: String) -> String:
 	var orig := Image.load_from_file(original_path)
 	if orig == null:
 		return "; FAIL (no original at %s)" % original_path
+	var mad := Sheet.mad(port, orig)
+	var legacy := Sheet.mad_legacy(port, orig)
 	var w := port.get_width() / 2
 	var h := port.get_height() / 2
 	var a: Image = port.duplicate()
@@ -155,17 +203,11 @@ func _compare(port: Image, original_path: String) -> String:
 	b.convert(Image.FORMAT_RGB8)
 	a.resize(w, h)
 	b.resize(w, h)
-	var da: PackedByteArray = a.get_data()
-	var db: PackedByteArray = b.get_data()
-	var sum := 0
-	for i in range(0, da.size(), 7):
-		sum += absi(da[i] - db[i])
-	var mad := float(sum) / float(ceili(da.size() / 7.0))
 	var pair := Image.create(w * 2, h, false, Image.FORMAT_RGB8)
 	pair.blit_rect(b, Rect2i(0, 0, w, h), Vector2i(0, 0))
 	pair.blit_rect(a, Rect2i(0, 0, w, h), Vector2i(w, 0))
 	pair.save_png(_out.path_join("compare_%d.png" % _view))
-	return "; original | port in compare_%d.png, mean abs diff %.1f" % [_view, mad]
+	return "; original | port in compare_%d.png, mean abs diff (full res) %.2f, legacy (half-size, 1/7 sample) %.1f" % [_view, mad, legacy]
 
 
 static func _mesh_tris(m: Mesh) -> int:

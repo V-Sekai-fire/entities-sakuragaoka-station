@@ -1,0 +1,32 @@
+# Reproducer (performance, not correctness): every element read or write of a packed array in a
+# compiled script is a host call (codegen.cpp: packed arrays take the VCALL get()/set() path;
+# ECALL_ARRAY_AT/ARRAY_GET are Array-only), so an array-bound loop runs 2-3x slower than the same
+# GDScript interpreted, while a scalar loop runs ~8.6x faster (interpreted RISC-V, no binary
+# translation). run_packed_get_cost.gd prints the numbers. Plain GDScript, no --extensions.
+extends Node
+
+func scalar(n: int) -> int:
+	var s := 0
+	for i in n:
+		s += (i * i) % 7
+	return s
+
+func sum(v: PackedFloat32Array) -> float:
+	var s := 0.0
+	for i in v.size():
+		s += v[i]
+	return s
+
+func fill(n: int) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(n)
+	for i in n:
+		out[i] = float(i)
+	return out
+
+func copy_vec2(v: PackedFloat32Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	out.resize(v.size() / 2)
+	for i in out.size():
+		out[i] = Vector2(v[i * 2], v[i * 2 + 1])
+	return out

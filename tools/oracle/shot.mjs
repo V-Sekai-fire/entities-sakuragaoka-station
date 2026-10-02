@@ -10,6 +10,7 @@
 //   --hammersley n@x,z  n walking eyes at (x,z) at the sphere Hammersley sequence's angles (remapped); replaces --cams
 //   --t      simulation time in seconds (animations are fast-forwarded deterministically)
 //   --out    output path prefix, relative to the working directory; files are <out>_0.png, <out>_1.png, ...
+//   --patch  a page script `(arg) => result` run on the built scene before the shots, with --patch-arg
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -65,6 +66,12 @@ try {
   q.set('cam', cams[0]);
   await page.goto(`http://127.0.0.1:${port}/index.html?${q}`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction('window.__ready === true', { timeout: 280000, polling: 250 });
+  if (args.patch) {
+    const src = fs.readFileSync(path.resolve(args.patch), 'utf8');
+    const arg = JSON.stringify(args['patch-arg'] || '');
+    const res = await page.evaluate(`(${src})(${arg})`);
+    console.log('patch:', JSON.stringify(res));
+  }
   const info = await page.evaluate(() => ({ errors: window.__errors, stats: window.__stats, gl: (() => { try { const gl = document.getElementById('scene').getContext('webgl2'); const d = gl.getExtension('WEBGL_debug_renderer_info'); return d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : 'unknown'; } catch (e) { return 'n/a'; } })() }));
   for (let i = 0; i < cams.length; i++) {
     const v = cams[i].split(',').map(Number);
@@ -76,6 +83,7 @@ try {
     console.log(`saved ${path.relative(process.cwd(), file)}  cam=[${cams[i]}]  calls=${st.calls} tris=${st.triangles}`);
   }
   console.log('gpu:', info.gl);
+  if (args.patch) console.log('patch report:', JSON.stringify(await page.evaluate(() => (window.__patchReport ? window.__patchReport() : null))));
   console.log('module stats:', JSON.stringify(info.stats.modules), 'batch:', JSON.stringify(info.stats.batch));
   if (info.errors && info.errors.length) { console.log('MODULE ERRORS:'); for (const e of info.errors) console.log(` - [${e.module}] ${e.message.split('\n').slice(0, 6).join('\n   ')}`); process.exitCode = 1; }
 } catch (e) {

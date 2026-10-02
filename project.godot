@@ -10,3 +10,14 @@ run/main_scene="res://addons/sakuragaoka_station/station.tscn"
 [rendering]
 
 renderer/rendering_method="forward_plus"
+
+[shader_globals]
+
+ramp_sun_dir={
+"type": "vec3",
+"value": Vector3(-0.7758026, 0.5168685, 0.3619079)
+}
+ramp_sun_color={
+"type": "vec3",
+"value": Vector3(2.75, 2.3962595, 1.9681572)
+}

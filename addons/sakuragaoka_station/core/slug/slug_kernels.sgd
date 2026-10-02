@@ -1,0 +1,603 @@
+# The port's own canvas-texture compute, as SafeGDScript (plain GDScript, no --extensions), compiled
+# ahead of time to slug_kernels.elf by the godot-sandbox GDScript compiler
+# (4-entities/godot-sandbox-gdscript-compiler, unidot-compat branch):
+#   gdscript_to_riscv -o addons/sakuragaoka_station/core/slug/slug_kernels.elf addons/sakuragaoka_station/core/slug/slug_kernels.sgd
+# Each function is a port of a GDScript function the host also keeps (core/slug/kernels.gd chooses
+# which runs; tools/sgd_check.gd checks the two agree bit for bit):
+#   load_svgs       pack.gd _build's slug_load_svg loop (the guest reads the SVGs and calls slug.elf
+#                   through the Sandbox object the host passes: Object.call("vmcall", ...))
+#   read_cache      pack.gd _read (FileAccess.get_var)
+#   write_cache     pack.gd _write (FileAccess.store_var)
+#   pack_layers     atlas.gd _data_texture's float payload (stamp layers marked: texel 3.zw = (-2, index))
+#   gradient_stops  where each gradient's stops sit in the data texture
+#   pack_stamps     stamps.gd _build's arrays (the stamps texture's floats, the cells texture's bytes)
+#   parse_mesh      baked.gd _parse's arrays (positions, params, per-vertex paint colours)
+#   unpack_tris     baked.gd map_decal's conversion of slug_decal's answer (winding swapped)
+#   ramp_row        realize.gd _ramp_row's colours (linear gradient times tint, sRGB)
+#   blob_cols       realize.gd _blob_cols (a blossom mass's band colours)
+#   split_coloured  realize.gd _coloured's per-vertex-colour branch (faces split, per-face colour)
+#   frame_diff      the tools' frame comparisons (sum |a - b| inside and outside a mask, pixels that differ)
+#   probe_scan      chart_in_view.gd's shadow probe read (pixels inside a screen quad, hidden ones, red range)
+#   score_rgba      tools/oracle/score_renders.gd's image metric (guest only, no GDScript twin)
+#   diff_rgba       tools/oracle/score_renders.gd's contact-sheet difference images (guest only, no GDScript twin)
+extends Node
+
+const DATA_WIDTH := 1024
+const LAYER_STRIDE := 24
+const LAYER_TEXELS := 8
+
+
+func load_svgs(slug: Object, svg_dir: String, keys: PackedStringArray, tolerance_px: float) -> PackedStringArray:
+	var out := PackedStringArray()
+	for key in keys:
+		var text := FileAccess.get_file_as_string(svg_dir.path_join(key + ".svg"))
+		out.append(str(slug.call("vmcall", "slug_load_svg", key, text, tolerance_px)))
+	return out
+
+
+func read_cache(path: String) -> Variant:
+	if not FileAccess.file_exists(path):
+		return null
+	var f: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return null
+	var d = f.get_var()
+	f.close()
+	return d
+
+
+func write_cache(path: String, data: Dictionary) -> bool:
+	var f: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_var(data)
+	f.close()
+	return true
+
+
+func pack_layers(layers: PackedFloat32Array, grads: PackedFloat32Array) -> PackedFloat32Array:
+	var layer_count := layers.size() / LAYER_STRIDE
+	var g_at := PackedInt32Array()
+	var g_k := PackedInt32Array()
+	var at := 1
+	var ng := 0
+	if grads.size() > 0:
+		ng = int(grads[0])
+	for g in ng:
+		var k := int(grads[at + 10])
+		g_at.append(at)
+		g_k.append(k)
+		at += 11 + k * 5
+	var stop_at := PackedInt32Array()
+	var n := layer_count * LAYER_TEXELS
+	for g in ng:
+		stop_at.append(n)
+		n += 2 * g_k[g]
+	var rows := maxi(1, ceili(float(maxi(n, 1)) / DATA_WIDTH))
+	var px := PackedFloat32Array()
+	px.resize(DATA_WIDTH * rows * 4)
+	for li in layer_count:
+		var s := li * LAYER_STRIDE
+		var d := li * LAYER_TEXELS * 4
+		for c in 8:
+			px[d + c] = layers[s + c]
+		for c in 4:
+			px[d + 8 + c] = layers[s + 16 + c]
+		var gid := int(layers[s + 14])
+		var stamp := int(layers[s + 15]) == STAMP_BLEND
+		px[d + 12] = layers[s + 12]
+		px[d + 13] = layers[s + 13]
+		px[d + 14] = -1.0
+		px[d + 16] = 1.0
+		px[d + 19] = 1.0
+		if stamp:
+			# a stamp layer: texel 3.zw = (-2, stamp layer index); slot 14 is that index, not a gradient
+			px[d + 14] = -2.0
+			px[d + 15] = layers[s + 14]
+		elif gid > 0 and gid <= ng:
+			var ga := g_at[gid - 1]
+			px[d + 14] = grads[ga]
+			px[d + 15] = stop_at[gid - 1]
+			for c in 4:
+				px[d + 16 + c] = grads[ga + 1 + c]
+			px[d + 20] = grads[ga + 5]
+			px[d + 21] = grads[ga + 6]
+			px[d + 22] = grads[ga + 7]
+			px[d + 23] = g_k[gid - 1]
+		px[d + 24] = layers[s + 15]
+		var bx := layers[s + 8]
+		var by := layers[s + 9]
+		px[d + 28] = bx
+		px[d + 29] = by - layers[s + 11]
+		px[d + 30] = bx + layers[s + 10]
+		px[d + 31] = by
+	for gi in ng:
+		var ga := g_at[gi]
+		for si in g_k[gi]:
+			var o := (stop_at[gi] + si * 2) * 4
+			var src := ga + 11 + si * 5
+			px[o] = grads[src]
+			for c in 4:
+				px[o + 4 + c] = grads[src + 1 + c]
+	return px
+
+
+## A paint's colour at linear-gradient parameter t; paints flat as slug_mesh's (see baked.gd).
+func _paint_colour(paints: PackedFloat32Array, at: int, t: float) -> Color:
+	var type := int(paints[at])
+	var k := int(paints[at + 1])
+	if k == 0:
+		return Color(1, 1, 1)
+	if type == 0:
+		return Color(paints[at + 3], paints[at + 4], paints[at + 5], paints[at + 6])
+	t = clampf(t, 0.0, 1.0)
+	if t <= float(paints[at + 2]):
+		return Color(paints[at + 3], paints[at + 4], paints[at + 5], paints[at + 6])
+	for i in range(1, k):
+		var o0 := at + 2 + (i - 1) * 5
+		var o1 := at + 2 + i * 5
+		var a: float = paints[o0]
+		var b: float = paints[o1]
+		if t <= b:
+			var w := 0.0
+			if b - a > 1e-9:
+				w = (t - a) / (b - a)
+			var c0 := Color(paints[o0 + 1], paints[o0 + 2], paints[o0 + 3], paints[o0 + 4])
+			return c0.lerp(Color(paints[o1 + 1], paints[o1 + 2], paints[o1 + 3], paints[o1 + 4]), w)
+	var ol := at + 2 + (k - 1) * 5
+	return Color(paints[ol + 1], paints[ol + 2], paints[ol + 3], paints[ol + 4])
+
+
+func parse_mesh(vertices: PackedFloat32Array, paint: PackedInt32Array, param: PackedFloat32Array, paints: PackedFloat32Array) -> Dictionary:
+	var n := vertices.size() / 3
+	var pos := PackedVector2Array()
+	pos.resize(n)
+	for i in n:
+		pos[i] = Vector2(vertices[i * 3], vertices[i * 3 + 1])
+	var pid: PackedInt32Array = paint.duplicate()
+	pid.resize(n)
+	var prm := PackedVector2Array()
+	prm.resize(n)
+	for i in mini(n, param.size() / 2):
+		prm[i] = Vector2(param[i * 2], param[i * 2 + 1])
+	# paint table offsets
+	var starts := PackedInt32Array()
+	var types := PackedInt32Array()
+	var at := 1
+	var np := 0
+	if paints.size() > 0:
+		np = int(paints[0])
+	for p in np:
+		starts.append(at)
+		types.append(clampi(int(paints[at]), 0, 2))
+		at += 2 + int(paints[at + 1]) * 5
+	var radial := false
+	var cols := PackedColorArray()
+	cols.resize(n)
+	for i in n:
+		if np == 0:
+			cols[i] = Color(1, 1, 1)
+			continue
+		var p := clampi(pid[i], 0, np - 1)
+		radial = radial or types[p] == 2
+		cols[i] = _paint_colour(paints, starts[p], prm[i].x)
+	return {"positions": pos, "paint": pid, "param": prm, "colours": cols, "radial": radial}
+
+
+func unpack_tris(ov: PackedFloat32Array, on: PackedFloat32Array, op: PackedFloat32Array) -> Array:
+	var m := ov.size() / 3
+	var out_pos := PackedVector3Array()
+	var out_nor := PackedVector3Array()
+	var out_prm := PackedVector2Array()
+	out_pos.resize(m)
+	out_nor.resize(m)
+	out_prm.resize(m)
+	var has_n := on.size() >= m * 3
+	var has_p := op.size() >= m * 2
+	var t := 0
+	while t < m - m % 3:
+		for k in 3:
+			var s := t
+			if k == 1:
+				s = t + 2
+			elif k == 2:
+				s = t + 1
+			out_pos[t + k] = Vector3(ov[s * 3], ov[s * 3 + 1], ov[s * 3 + 2])
+			if has_n:
+				out_nor[t + k] = Vector3(on[s * 3], on[s * 3 + 1], on[s * 3 + 2])
+			else:
+				out_nor[t + k] = Vector3.UP
+			if has_p:
+				out_prm[t + k] = Vector2(op[s * 2], op[s * 2 + 1])
+			else:
+				out_prm[t + k] = Vector2.ZERO
+		t += 3
+	return [out_pos, out_nor, out_prm]
+
+
+## stops_t ascending, stops_c their linear colours; width texels for t = x / (width - 1).
+func ramp_row(stops_t: PackedFloat64Array, stops_c: PackedColorArray, tint: Color, overlay: bool, width: int) -> PackedColorArray:
+	var out := PackedColorArray()
+	out.resize(width)
+	var k := stops_t.size()
+	for x in width:
+		var t := float(x) / (width - 1)
+		var c := Color(1, 1, 1)
+		if k > 0:
+			t = clampf(t, 0.0, 1.0)
+			if t <= float(stops_t[0]):
+				c = stops_c[0]
+			else:
+				c = stops_c[k - 1]
+				for i in range(1, k):
+					var a: float = stops_t[i - 1]
+					var b: float = stops_t[i]
+					if t <= b:
+						var w := 0.0
+						if b - a > 1e-9:
+							w = (t - a) / (b - a)
+						c = stops_c[i - 1].lerp(stops_c[i], w)
+						break
+		var s: Color = Color(c.r * tint.r, c.g * tint.g, c.b * tint.b).linear_to_srgb()
+		var alpha := 1.0
+		if overlay:
+			alpha = c.a
+		out[x] = Color(s.r, s.g, s.b, alpha)
+	return out
+
+
+## A blossom mass's colours from its colour attribute (flat, item_size floats a vertex: tone in x,
+## peach + 2 x palette in y); normal, weeping: the 4 band colours each; peach.
+func blob_cols(attr: PackedFloat32Array, item_size: int, normal: PackedColorArray, weeping: PackedColorArray, peach: Color) -> PackedColorArray:
+	var n := attr.size() / item_size
+	var out := PackedColorArray()
+	out.resize(n)
+	for i in n:
+		var tn: float = attr[i * item_size]
+		var g: float = attr[i * item_size + 1]
+		var pal := 0
+		if g >= 1.5:
+			pal = 1
+		var bi := 0
+		if tn >= 0.75:
+			bi = 3
+		elif tn >= 0.5:
+			bi = 2
+		elif tn >= 0.25:
+			bi = 1
+		var b: Color
+		if pal == 1:
+			b = weeping[bi]
+		else:
+			b = normal[bi]
+		out[i] = b.lerp(peach, clampf(g - 2.0 * pal, 0.0, 1.0))
+	return out
+
+
+## realize.gd _coloured's per-vertex-colour branch without the palette: the faces split, and each
+## face's colour (the mean of its three vertex colours, times colour).
+func split_coloured(pos: PackedVector3Array, nor: PackedVector3Array, idx: PackedInt32Array, cols: PackedColorArray, colour: Color) -> Array:
+	var n := idx.size() - idx.size() % 3
+	var has_n := nor.size() == pos.size() and nor.size() > 0
+	var p2 := PackedVector3Array()
+	p2.resize(n)
+	var n2 := PackedVector3Array()
+	if has_n:
+		n2.resize(n)
+	var fc := PackedColorArray()
+	fc.resize(n / 3)
+	var t := 0
+	while t < n:
+		var ia := idx[t]
+		var ib := idx[t + 1]
+		var ic := idx[t + 2]
+		fc[t / 3] = (cols[ia] + cols[ib] + cols[ic]) / 3.0 * colour
+		p2[t] = pos[ia]
+		p2[t + 1] = pos[ib]
+		p2[t + 2] = pos[ic]
+		if has_n:
+			n2[t] = nor[ia]
+			n2[t + 1] = nor[ib]
+			n2[t + 2] = nor[ic]
+		t += 3
+	return [p2, n2, fc]
+
+
+## Where each gradient's stops start in the data texture (texel index), as pack_layers lays them out.
+func gradient_stops(layer_count: int, grads: PackedFloat32Array) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var at := 1
+	var n := layer_count * LAYER_TEXELS
+	var ng := 0
+	if grads.size() > 0:
+		ng = int(grads[0])
+	for g in ng:
+		var k := int(grads[at + 10])
+		out.append(n)
+		n += 2 * k
+		at += 11 + k * 5
+	return out
+
+
+const STAMP_BLEND := 100
+const MAX_PER_CELL := 32
+const STAMP_WIDTH := 1024
+const KIND_CURVE := 0
+const KIND_ELLIPSE := 1
+const KIND_RECT := 2
+
+
+## stamps.gd's arrays from a slug_atlas() Dictionary and the atlas's gradient stop texels
+## (gradient_stops): the stamps texture's floats and the cells texture's bytes, or {"error": ...}.
+func pack_stamps(r: Dictionary, stops: PackedInt32Array) -> Dictionary:
+	var layers: PackedFloat32Array = r.get("layers", PackedFloat32Array())
+	var sl: PackedInt32Array = r.get("stamp_layers", PackedInt32Array())
+	var protos: PackedFloat32Array = r.get("stamp_protos", PackedFloat32Array())
+	var inst: PackedFloat32Array = r.get("stamp_instances", PackedFloat32Array())
+	var cb: PackedByteArray = r.get("stamp_cells", PackedByteArray())
+	var means: PackedByteArray = r.get("stamp_means", PackedByteArray())
+	var grads: PackedFloat32Array = r.get("gradients", PackedFloat32Array([0]))
+	var stamp_layer_count := sl.size() / 5
+	var instance_count := inst.size() / 12
+	var nproto := protos.size() / 2
+	var ncell_tex := cb.size() / 4
+	var mean_at := ncell_tex
+	var hdr := PackedFloat32Array()
+	hdr.resize(stamp_layer_count * 8)
+	for si in stamp_layer_count:
+		var g := sl[si * 5]
+		var cbase := sl[si * 5 + 1]
+		var first := sl[si * 5 + 2]
+		var count := sl[si * 5 + 3]
+		var maxc := sl[si * 5 + 4]
+		if g <= 0 or cbase < 0 or cbase + g * g > ncell_tex or first < 0 or count < 0 or first + count > instance_count \
+				or maxc > MAX_PER_CELL or means.size() < (mean_at - ncell_tex + g * g) * 4:
+			return {"error": "stamp layer %d: grid %d, cells at %d (+%d of %d), instances %d+%d of %d, max %d, means %d bytes" % [
+					si, g, cbase, g * g, ncell_tex, first, count, instance_count, maxc, means.size()]}
+		for c in g * g:
+			var fx := cb.decode_u16((cbase + c) * 4)
+			var fy := cb.decode_u16((cbase + c) * 4 + 2)
+			var last := 2 * cbase + fx + fy
+			if fy > MAX_PER_CELL or (fy > 0 and (last + 1) / 2 > ncell_tex):
+				return {"error": "stamp layer %d cell %d: %d instances at element %d" % [si, c, fy, fx]}
+		hdr[si * 8] = g
+		hdr[si * 8 + 1] = cbase
+		hdr[si * 8 + 2] = stamp_layer_count * 2 + first * 3
+		hdr[si * 8 + 3] = count
+		hdr[si * 8 + 4] = maxc
+		hdr[si * 8 + 5] = mean_at
+		mean_at += g * g
+	var layer_count := layers.size() / LAYER_STRIDE
+	var grec := PackedFloat32Array()
+	var at := 1
+	var ng := 0
+	if grads.size() > 0:
+		ng = int(grads[0])
+	for gi in ng:
+		var k := int(grads[at + 10])
+		grec.append_array(PackedFloat32Array([grads[at + 1], grads[at + 2], grads[at + 3], grads[at + 4],
+				grads[at + 5], grads[at + 6], grads[at + 7], k, grads[at], stops[gi], 0, 0]))
+		at += 11 + k * 5
+	var ngrad := grec.size() / 12
+	var grad_base := stamp_layer_count * 2 + instance_count * 3
+	var n := grad_base + ngrad * 3
+	var rows := maxi(1, ceili(float(maxi(n, 1)) / STAMP_WIDTH))
+	var px := PackedFloat32Array()
+	px.resize(STAMP_WIDTH * rows * 4)
+	for i in hdr.size():
+		px[i] = hdr[i]
+	for i in grec.size():
+		px[grad_base * 4 + i] = grec[i]
+	for i in instance_count:
+		var s := i * 12
+		var d := (stamp_layer_count * 2 + i * 3) * 4
+		var pid := int(inst[s + 6])
+		if pid < 0 or pid >= nproto:
+			return {"error": "instance %d: prototype %d of %d" % [i, pid, nproto]}
+		var kind := int(protos[pid * 2])
+		var lref := int(protos[pid * 2 + 1])
+		var paint := int(inst[s + 7])
+		if (kind == KIND_CURVE and (lref < 0 or lref >= layer_count)) or kind < 0 or kind > KIND_RECT or paint < 0 or paint > ngrad:
+			return {"error": "instance %d: prototype %d (kind %d, layer %d of %d), paint %d of %d" % [
+					i, pid, kind, lref, layer_count, paint, ngrad]}
+		for c in 6:
+			px[d + c] = inst[s + c]
+		if kind == KIND_CURVE:
+			px[d + 6] = lref
+		elif kind == KIND_ELLIPSE:
+			px[d + 6] = -1
+		else:
+			px[d + 6] = -2
+		if paint > 0:
+			px[d + 7] = grad_base + (paint - 1) * 3
+		else:
+			px[d + 7] = -1
+		for c in 4:
+			px[d + 8 + c] = inst[s + 8 + c]
+	var cells: PackedByteArray = cb.duplicate()
+	cells.append_array(means.slice(0, (mean_at - ncell_tex) * 4))
+	var cell_rows := maxi(1, ceili(float(maxi(cells.size() / 4, 1)) / STAMP_WIDTH))
+	cells.resize(STAMP_WIDTH * cell_rows * 4)
+	var sol := PackedInt32Array()
+	for li in layer_count:
+		if int(layers[li * LAYER_STRIDE + 15]) != STAMP_BLEND:
+			continue
+		var si := int(layers[li * LAYER_STRIDE + 14])
+		if si < 0 or si >= stamp_layer_count:
+			return {"error": "layer %d: stamp layer %d of %d" % [li, si, stamp_layer_count]}
+		sol.append(li)
+		sol.append(si)
+	return {"error": "", "px": px, "rows": rows, "cells": cells, "cell_rows": cell_rows, "stamp_of_layer": sol,
+			"stamp_layer_count": stamp_layer_count, "instance_count": instance_count}
+
+
+func frame_diff(a: PackedByteArray, b: PackedByteArray, m: PackedByteArray, key: int) -> PackedInt64Array:
+	var out := PackedInt64Array()
+	out.resize(8)
+	var count := mini(a.size(), b.size())
+	var masked := m.size() >= count
+	var i := 0
+	while i < count:
+		var d0 := absi(a[i] - b[i])
+		var d1 := absi(a[i + 1] - b[i + 1])
+		var d2 := absi(a[i + 2] - b[i + 2])
+		var dd := maxi(d0, maxi(d1, d2))
+		var o := 0
+		if masked and ((m[i] << 16) | (m[i + 1] << 8) | m[i + 2]) != key:
+			o = 2
+		if dd > 0:
+			out[4] += 1
+			out[5] = maxi(out[5], dd)
+			out[6 + o / 2] += 1
+		out[o] += d0 + d1 + d2
+		out[o + 1] += 3
+		i += 3
+	return out
+
+
+func probe_scan(d: PackedByteArray, w: int, h: int, q: PackedVector2Array, inset: float) -> PackedInt32Array:
+	var centre := (q[0] + q[1] + q[2] + q[3]) / 4.0
+	var ea := PackedVector2Array()
+	var en := PackedVector2Array()
+	for k in 4:
+		var a := q[k]
+		var e := (q[(k + 1) % 4] - a).normalized()
+		var n := Vector2(-e.y, e.x)
+		if (centre - a).dot(n) < 0.0:
+			n = -n
+		ea.append(a)
+		en.append(n)
+	var lo_v := q[0]
+	var hi_v := q[0]
+	for p in q:
+		lo_v = lo_v.min(p)
+		hi_v = hi_v.max(p)
+	var box := Rect2(lo_v, hi_v - lo_v)
+	var out := PackedInt32Array()
+	out.resize(4)
+	out[2] = 255
+	for y in range(maxi(int(box.position.y), 0), mini(int(box.end.y) + 1, h)):
+		var yc := y + 0.5
+		var x0 := -INF
+		var x1 := INF
+		var row_ok := true
+		for k in 4:
+			var a := ea[k]
+			var n := en[k]
+			var rhs := inset + a.dot(n) - n.y * yc
+			if absf(n.x) < 1e-6:
+				if rhs > 0.0:
+					row_ok = false
+			elif n.x > 0.0:
+				x0 = maxf(x0, rhs / n.x)
+			else:
+				x1 = minf(x1, rhs / n.x)
+		if not row_ok:
+			continue
+		for x in range(maxi(ceili(x0 - 0.5), 0), mini(floori(x1 - 0.5), w - 1) + 1):
+			var i := (y * w + x) * 3
+			out[0] += 1
+			if d[i + 1] < 250 or d[i + 2] > 5:
+				out[1] += 1
+				continue
+			out[2] = mini(out[2], d[i])
+			out[3] = maxi(out[3], d[i])
+	return out
+
+
+## [mae (alpha-weighted mean |linear RGB| difference), alpha_mae, iou, cov_1px (alpha >= 128 pixels with one
+## within 1 px in the other image), weight_sum, weighted_error_sum] of two w x h RGBA8 images.
+func score_rgba(a: PackedByteArray, b: PackedByteArray, w: int, h: int) -> PackedFloat64Array:
+	var lin := PackedFloat32Array()
+	lin.resize(256)
+	for i in 256:
+		var c := float(i) / 255.0
+		if c <= 0.04045:
+			lin[i] = c / 12.92
+		else:
+			lin[i] = pow((c + 0.055) / 1.055, 2.4)
+	var n := w * h
+	var ca := PackedByteArray()
+	var cb := PackedByteArray()
+	ca.resize(n)
+	cb.resize(n)
+	var sw := 0.0
+	var se := 0.0
+	var ae := 0.0
+	var inter := 0
+	var uni := 0
+	for i in n:
+		var p := i * 4
+		var a3: int = a[p + 3]
+		var b3: int = b[p + 3]
+		var aa := float(a3) / 255.0
+		var ab := float(b3) / 255.0
+		ae += absf(aa - ab)
+		var ia := a3 >= 128
+		var ib := b3 >= 128
+		if ia or ib:
+			uni += 1
+			if ia and ib:
+				inter += 1
+		ca[i] = 1 if ia else 0
+		cb[i] = 1 if ib else 0
+		var wgt := maxf(aa, ab)
+		if wgt == 0.0:
+			continue
+		var e := (absf(lin[a[p]] - lin[b[p]]) + absf(lin[a[p + 1]] - lin[b[p + 1]]) + absf(lin[a[p + 2]] - lin[b[p + 2]])) / 3.0
+		sw += wgt
+		se += wgt * e
+	var na := 0
+	var nb := 0
+	var ma := 0
+	var mb := 0
+	for y in h:
+		for x in w:
+			var i := y * w + x
+			if ca[i] == 1:
+				na += 1
+				if cb[i] == 1 or _near(cb, x, y, w, h):
+					ma += 1
+			if cb[i] == 1:
+				nb += 1
+				if ca[i] == 1 or _near(ca, x, y, w, h):
+					mb += 1
+	var out := PackedFloat64Array()
+	out.resize(6)
+	out[0] = se / sw if sw > 0.0 else 0.0
+	out[1] = ae / float(n) if n > 0 else 0.0
+	out[2] = float(inter) / float(uni) if uni > 0 else 1.0
+	out[3] = float(ma + mb) / float(na + nb) if na + nb > 0 else 1.0
+	out[4] = sw
+	out[5] = se
+	return out
+
+
+func _near(m: PackedByteArray, x: int, y: int, w: int, h: int) -> bool:
+	for dy in range(-1, 2):
+		var yy := y + dy
+		if yy < 0 or yy >= h:
+			continue
+		for dx in range(-1, 2):
+			var xx := x + dx
+			if xx >= 0 and xx < w and m[yy * w + xx] == 1:
+				return true
+	return false
+
+
+## The largest channel difference of two RGBA8 images, times 4, as (v, 0.4 v, 0, 255).
+func diff_rgba(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(a.size())
+	for p in range(0, a.size() - 3, 4):
+		var m := 0
+		for k in 4:
+			var d: int = absi(int(a[p + k]) - int(b[p + k]))
+			if d > m:
+				m = d
+		var v := mini(255, m * 4)
+		out[p] = v
+		out[p + 1] = int(float(v) * 0.4 + 0.5)
+		out[p + 2] = 0
+		out[p + 3] = 255
+	return out
