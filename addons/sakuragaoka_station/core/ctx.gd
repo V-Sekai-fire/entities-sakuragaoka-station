@@ -100,7 +100,8 @@ class Physics extends RefCounted:
 
 	## item is physics.js's own record: [type, cx, cz, hw, hd, rotY, r, y0, y1, top, yA, yB].
 	func _row(type: int, c: Vector3, half: Vector3, q: Quaternion, item: Array):
-		prims.append_array([type, c.x, c.y, c.z, half.x, half.y, half.z, q.w, q.x, q.y, q.z, -1.0])
+		var shape: int = CYLINDER if type == CYLINDER else BOX
+		prims.append_array([shape, c.x, c.y, c.z, half.x, half.y, half.z, q.w, q.x, q.y, q.z, 0.0])
 		items.append(item)
 		return count - 1
 
