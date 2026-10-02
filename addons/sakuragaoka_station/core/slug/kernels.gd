@@ -10,7 +10,8 @@
 extends RefCounted
 
 const SandboxUtil = preload("res://addons/sakuragaoka_station/core/slug/sandbox_util.gd")
-const ELF := "res://addons/sakuragaoka_station/core/slug/slug_kernels.elf"
+const SINGLE_ELF := "res://addons/sakuragaoka_station/core/slug/slug_kernels.elf"
+static var ELF := SandboxUtil.for_precision(SINGLE_ELF)
 const DATA_WIDTH := 1024
 const LAYER_STRIDE := 24
 const LAYER_TEXELS := 8

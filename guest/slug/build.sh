@@ -5,10 +5,11 @@
 #   ./build.sh                      # configure (once) + build slug.elf
 #   RISCV64_SYSROOT=... ./build.sh
 #   NATIVE=1 ./build.sh             # the host harness instead (build-native/slug_native)
+#   DOUBLE=1 ./build.sh             # slug.double.elf for real_t = double hosts (build-double/)
 #
 # Needs: cmake, ninja, a clang++ with a riscv64 target (auto-located if the bare clang++ is
 # mingw-only), the riscv64 glibc sysroot (5-repository/riscv64-sysroot: toolchain.cmake +
-# sysroot/), and slughorn at 3-interactor/slughorn on branch feat/thorvg with its submodules.
+# sysroot/), and slughorn at 3-interactor/slughorn (main) with its submodules.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,7 +30,15 @@ if [ "${NATIVE:-0}" = 1 ]; then
 	exit 0
 fi
 
+# DOUBLE=1: the double-precision host's guest, slug.double.elf (its own build tree).
+PRECISION=OFF
+ELF_NAME=slug.elf
 BUILD="${BUILD_DIR:-$HERE/build}"
+if [ "${DOUBLE:-0}" = 1 ]; then
+	PRECISION=ON
+	ELF_NAME=slug.double.elf
+	BUILD="${BUILD_DIR:-$HERE/build-double}"
+fi
 
 if [ ! -f "$SYSROOT/toolchain.cmake" ]; then
 	echo "error: no toolchain.cmake under RISCV64_SYSROOT=$SYSROOT" >&2
@@ -60,7 +69,8 @@ if [ ! -f "$BUILD/build.ninja" ]; then
 		-DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DSANDBOX_RISCV_EXT_V=OFF \
-		-DSANDBOX_RISCV_EXT_C=ON
+		-DSANDBOX_RISCV_EXT_C=ON \
+		-DDOUBLE_PRECISION=$PRECISION
 fi
 cmake --build "$BUILD" --target slug -- -j "${BUILD_JOBS:-8}"
-ls -la "$HERE/../../slug.elf"
+ls -la "$HERE/../../$ELF_NAME"

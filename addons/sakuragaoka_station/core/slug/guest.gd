@@ -12,7 +12,8 @@ extends RefCounted
 
 const SandboxUtil = preload("res://addons/sakuragaoka_station/core/slug/sandbox_util.gd")
 
-const ELF := "res://slug.elf"
+const SINGLE_ELF := "res://slug.elf"
+static var ELF := SandboxUtil.for_precision(SINGLE_ELF)
 const MEM_MB := 1024
 const REFS := 4096
 ## execution_timeout in 2^20-instruction units; a whole station's decals run long.
