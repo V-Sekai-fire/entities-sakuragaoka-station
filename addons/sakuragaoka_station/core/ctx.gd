@@ -88,6 +88,8 @@ class Physics extends RefCounted:
 	const STEP_HEIGHT := 0.45
 	const STRIDE := 12
 	enum { BOX, CYLINDER, WALK, RAMP }
+	## The guest's primitive types: walkable boxes (walk tops, ramps) are ground, in geom group 1.
+	enum { GUEST_BOX, GUEST_CYLINDER, GUEST_WALK }
 	const WALK_DEPTH := 0.5
 	const HF_CELL := 0.25
 
@@ -100,7 +102,7 @@ class Physics extends RefCounted:
 
 	## item is physics.js's own record: [type, cx, cz, hw, hd, rotY, r, y0, y1, top, yA, yB].
 	func _row(type: int, c: Vector3, half: Vector3, q: Quaternion, item: Array):
-		var shape: int = CYLINDER if type == CYLINDER else BOX
+		var shape: int = GUEST_CYLINDER if type == CYLINDER else (GUEST_WALK if type == WALK or type == RAMP else GUEST_BOX)
 		prims.append_array([shape, c.x, c.y, c.z, half.x, half.y, half.z, q.w, q.x, q.y, q.z, 0.0])
 		items.append(item)
 		return count - 1
@@ -116,9 +118,10 @@ class Physics extends RefCounted:
 		return _row(CYLINDER, Vector3(cx, (y0 + y1) / 2.0, cz), Vector3(r, (y1 - y0) / 2.0, 0.0), Quaternion.IDENTITY,
 				["cyl", cx, cz, null, null, null, r, y0, y1, null, null, null])
 
-	## The walkable top is the box's upper face; it blocks only above the step height, as in physics.js.
+	## Solid from bottom to its walkable top, as in physics.js; the walker's band starts at the step
+	## height, so a top within a step never blocks.
 	func addWalkBox(cx = 0.0, cz = 0.0, w = 0.0, d = 0.0, rotY = 0.0, topY = 0.0, bottom = -50.0):
-		var depth: float = minf(WALK_DEPTH, topY - bottom)
+		var depth: float = topY - bottom
 		return _row(WALK, Vector3(cx, topY - depth / 2.0, cz), Vector3(w / 2.0, depth / 2.0, d / 2.0),
 				Quaternion(Vector3.UP, rotY), ["walk", cx, cz, w / 2.0, d / 2.0, rotY, null, bottom, null, topY, null, null])
 
