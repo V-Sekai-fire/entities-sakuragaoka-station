@@ -5,6 +5,5 @@
 # QA contact sheets the oracle writes beside its SVGs; they are not station data
 addons/sakuragaoka_station/slug/svg/*.png
 
-# Vendored by tools/cloud_check.exs from a meshing-pen checkout, and its output
+# Vendored by tools/cloud_check.exs from a meshing-pen checkout
 addons/godot_sandbox/
-cloud-check/
