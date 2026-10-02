@@ -2,6 +2,8 @@
 # contact sheet, with no GPU emulator (lavapipe, WARP, SwiftShader). Exits 1 if any step fails.
 #   pip install mitsuba usd-core numpy pillow
 #   GODOT=<godot 4.7 binary> PEN=<transport-meshing-pen checkout> elixir tools/cloud_check.exs [out_dir]
+# --compile runs only the compile check (tools/compile_check.gd): parse errors and GDScript warnings, no gates.
+#   GODOT=... PEN=... elixir tools/cloud_check.exs --compile
 
 defmodule CloudCheck do
   @addon_tag "v20261002-addon.1"
@@ -12,34 +14,66 @@ defmodule CloudCheck do
 
   def main(args) do
     root = File.cwd!()
+    {compile, args} = {"--compile" in args, args -- ["--compile"]}
     out = Path.expand(List.first(args) || "cloud-check", root)
     File.mkdir_p!(out)
     godot = System.get_env("GODOT") || fail_now("GODOT is not set")
 
-    results =
-      [
-        {"preflight", fn -> preflight(godot) end},
-        {"vendor godot_sandbox", fn -> vendor(root) end},
-        {"import", fn -> godot(godot, ["--headless", "--import"]) end},
-        {"gate_colliders", fn -> script(godot, "tools/gate_colliders.gd", []) end},
-        {"gate_colliders drop_one (must FAIL)", fn -> negate(script(godot, "tools/gate_colliders.gd", ["--control=drop_one"])) end},
-        {"gate_station", fn -> script(godot, "tools/gate_station.gd", []) end},
-        {"gate_station drop_lot (must FAIL)", fn -> negate(script(godot, "tools/gate_station.gd", ["--control=drop_lot"])) end},
-        {"precision_check", fn -> script(godot, "tools/precision_check.gd", []) end},
-        {"precision_check swap (must FAIL)", fn -> negate(script(godot, "tools/precision_check.gd", ["--control=swap"])) end},
-        {"sgd_check", fn -> script(godot, "tools/sgd_check.gd", []) end},
-        {"export town.usda", fn -> script(godot, "tools/export_usda.gd", ["--out=#{out}/town.usda", "--modules=station,plaza,sakura"]) end},
-        {"export station.usda", fn -> script(godot, "tools/export_usda.gd", ["--out=#{out}/station.usda"]) end},
-        {"contact sheet", fn -> sheet(out) end},
-        {"slug elf_check", fn -> script(godot, "guest/slug/tests/elf_check.gd", []) end}
-      ]
-      |> Enum.map(fn {name, step} -> {name, run_step(name, step)} end)
+    setup = [
+      {"preflight", fn -> preflight(godot) end},
+      {"vendor godot_sandbox", fn -> vendor(root) end},
+      {"import", fn -> godot(godot, ["--headless", "--import"]) end}
+    ]
+
+    steps = if compile, do: setup ++ compile_steps(godot, root), else: setup ++ check_steps(godot, out)
+
+    results = Enum.map(steps, fn {name, step} -> {name, run_step(name, step)} end)
 
     failed = Enum.reject(results, fn {_, r} -> r == :pass end)
     IO.puts("\nRESULT #{if failed == [], do: "PASS", else: "FAIL"}  #{length(results) - length(failed)}/#{length(results)} steps pass")
     Enum.each(failed, fn {name, r} -> IO.puts("  #{name}: #{inspect(r)}") end)
-    IO.puts("contact sheet: #{Path.join(out, "station-sheet.png")}")
+    unless compile, do: IO.puts("contact sheet: #{Path.join(out, "station-sheet.png")}")
     System.halt(if failed == [], do: 0, else: 1)
+  end
+
+  # Each control plants one script the check must refuse: a parse error, then a warning kind
+  # compile_check.gd does not allow (unreachable code).
+  defp compile_steps(godot, root) do
+    planted = Path.join(root, "tools/zz_compile_control.gd")
+    override = Path.join(root, "override.cfg")
+    File.rm_rf!(override)
+
+    control = fn body ->
+      File.write!(planted, body)
+      result = negate(script(godot, "tools/compile_check.gd", []))
+      File.rm!(planted)
+      result
+    end
+
+    [
+      {"compile_check without override (must FAIL)", fn -> negate(script(godot, "tools/compile_check.gd", [])) end},
+      {"write override.cfg", fn -> script(godot, "tools/compile_check.gd", ["--write-override"]) end},
+      {"compile_check", fn -> script(godot, "tools/compile_check.gd", []) end},
+      {"compile_check parse error (must FAIL)", fn -> control.("extends RefCounted\nfunc f(:\n\treturn 1\n") end},
+      {"compile_check warning (must FAIL)", fn -> control.("extends RefCounted\nfunc f() -> int:\n\treturn 1\n\tprint(2)\n") end},
+      {"remove override.cfg", fn -> File.rm!(override) && :pass end}
+    ]
+  end
+
+  defp check_steps(godot, out) do
+    [
+      {"gate_colliders", fn -> script(godot, "tools/gate_colliders.gd", []) end},
+      {"gate_colliders drop_one (must FAIL)", fn -> negate(script(godot, "tools/gate_colliders.gd", ["--control=drop_one"])) end},
+      {"gate_station", fn -> script(godot, "tools/gate_station.gd", []) end},
+      {"gate_station drop_lot (must FAIL)", fn -> negate(script(godot, "tools/gate_station.gd", ["--control=drop_lot"])) end},
+      {"precision_check", fn -> script(godot, "tools/precision_check.gd", []) end},
+      {"precision_check swap (must FAIL)", fn -> negate(script(godot, "tools/precision_check.gd", ["--control=swap"])) end},
+      {"sgd_check", fn -> script(godot, "tools/sgd_check.gd", []) end},
+      {"export town.usda", fn -> script(godot, "tools/export_usda.gd", ["--out=#{out}/town.usda", "--modules=station,plaza,sakura"]) end},
+      {"export station.usda", fn -> script(godot, "tools/export_usda.gd", ["--out=#{out}/station.usda"]) end},
+      {"contact sheet", fn -> sheet(out) end},
+      {"slug elf_check", fn -> script(godot, "guest/slug/tests/elf_check.gd", []) end}
+    ]
   end
 
   defp run_step(name, step) do
