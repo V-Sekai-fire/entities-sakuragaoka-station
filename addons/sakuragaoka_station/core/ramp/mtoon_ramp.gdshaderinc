@@ -46,6 +46,7 @@ vec3 ramp_hemisphere(float up) {
 	return mix(RAMP_GROUND, RAMP_SKY, 0.5 * up + 0.5) * (1.62 / PI);
 }
 
+#define MODELVIEW_MATRIX (VIEW_MATRIX * MODEL_MATRIX)
 #define BINORMAL vec3(0.0); RAMP_VERTEX vec3 ramp_unused_bitangent = vec3(0.0)
 #define RAMP_VERTEX ramp_world = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz; ramp_normal = normalize(transpose(inverse(mat3(MODEL_MATRIX))) * NORMAL); RAMP_VERTEX_EXTRA
 
