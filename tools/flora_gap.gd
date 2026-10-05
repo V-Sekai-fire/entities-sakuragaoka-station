@@ -76,8 +76,6 @@ func _run() -> void:
 		n.visible = false
 		var probe := _probe(n)
 		if probe == null:
-			var mesh: Mesh = n.multimesh.mesh
-			print("DEBUG ", n.name, " ", kinds[String(n.name)], " surfaces ", mesh.get_surface_count() if mesh else -1, " override ", n.material_override, " s0 ", mesh.surface_get_material(0) if mesh and mesh.get_surface_count() > 0 else null, " aabb ", mesh.get_aabb() if mesh else null)
 			continue
 		drawn[String(n.name)] = true
 		probe.visible = false
@@ -121,14 +119,15 @@ func _run() -> void:
 	var res := _verdict(items, ground, base)
 	print("plaza region %s: %d plant instances drawn, %d not drawn, %d on stems excluded" % [REGION, items.size(), held[0], res.stems])
 	print("calibration: paving at (6, -12) reads %s m against %.3f: %s" % [cal, PAVE_Y, "ok" if cal_ok else "MISS"])
-	print("max gap %.4f m (%s), over %.3f m: %d, nothing drawn at its place: %d" % [res.max, _house(res.max), _limit, res.over.size(), res.missing])
+	var mx: String = "none measured" if res.max == -INF else "%.4f m (%s)" % [res.max, _house(res.max)]
+	print("max gap %s, over %.3f m: %d, nothing drawn at its place: %d" % [mx, _limit, res.over.size(), res.missing])
 	for k in res.by_kind:
 		print("  %-22s %5d over %d missing %d" % [k, res.by_kind[k][0], res.by_kind[k][1], res.by_kind[k][2]])
 	res.over.sort_custom(func(x, y): return x[0] > y[0])
 	for e in res.over.slice(0, _list):
 		var it: Dictionary = items[e[1]]
 		print("  gap %.4f %s at %.2f, %.2f, %.2f" % [e[0], it.kind, it.p.x, it.p.y, it.p.z])
-	var ci := _isolated_tuft(items)
+	var ci := _isolated(items)
 	var control_failed := false
 	if ci >= 0:
 		var it: Dictionary = items[ci]
@@ -139,7 +138,8 @@ func _run() -> void:
 		lifted[it.probe] = await _pass_one(it.probe)
 		mm.set_instance_transform(it.i, t0)
 		control_failed = not _verdict(items, ground, lifted).ok
-	print("control one tuft +5 cm fails: %s" % control_failed)
+		print("control: %s at %.2f, %.2f lifted 5 cm, nearest same-kind neighbour %.3f m" % [it.kind, it.p.x, it.p.z, _near(items, ci)])
+	print("control one plant +5 cm fails: %s" % control_failed)
 	var ok: bool = res.ok and cal_ok and control_failed
 	print("PASS" if ok else "FAIL")
 	quit(0 if ok else 1)
@@ -168,7 +168,7 @@ func _probe(n: MultiMeshInstance3D) -> MultiMeshInstance3D:
 		return null
 	var mat := ShaderMaterial.new()
 	mat.shader = (src as ShaderMaterial).shader
-	var s := 0.25
+	var s := 0.05
 	var a := []
 	a.resize(Mesh.ARRAY_MAX)
 	a[Mesh.ARRAY_VERTEX] = PackedVector3Array([Vector3(-s, 0, -s), Vector3(s, 0, -s), Vector3(s, 0, s), Vector3(-s, 0, s)])
@@ -266,7 +266,15 @@ func _verdict(items: Array, ground: Image, base: Dictionary) -> Dictionary:
 			"ok": over.is_empty() and missing == 0 and by_kind.size() > 0}
 
 
-func _isolated_tuft(items: Array) -> int:
+func _near(items: Array, i: int) -> float:
+	var d := INF
+	for j in items.size():
+		if j != i and items[j].probe == items[i].probe:
+			d = minf(d, Vector2(items[i].p.x - items[j].p.x, items[i].p.z - items[j].p.z).length())
+	return d
+
+
+func _isolated(items: Array) -> int:
 	var cells := {}
 	for i in items.size():
 		var c := Vector2i(floori(items[i].p.x), floori(items[i].p.z))
@@ -274,14 +282,14 @@ func _isolated_tuft(items: Array) -> int:
 	var best := -1
 	var best_d := 0.0
 	for i in items.size():
-		if not String(items[i].kind).contains("grass"):
+		if ON_STEMS.has(items[i].kind):
 			continue
 		var d := 1.0
 		var c := Vector2i(floori(items[i].p.x), floori(items[i].p.z))
 		for dx in range(-1, 2):
 			for dz in range(-1, 2):
 				for j in cells.get(c + Vector2i(dx, dz), []):
-					if j != i:
+					if j != i and items[j].probe == items[i].probe:
 						d = minf(d, Vector2(items[i].p.x - items[j].p.x, items[i].p.z - items[j].p.z).length())
 		if d > best_d:
 			best_d = d
