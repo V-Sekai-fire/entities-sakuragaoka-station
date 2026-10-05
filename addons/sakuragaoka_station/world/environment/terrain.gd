@@ -4,6 +4,7 @@
 extends RefCounted
 
 const T = preload("res://addons/sakuragaoka_station/core/three.gd")
+const BuildKernels = preload("res://addons/sakuragaoka_station/core/build/build_kernels.gd")
 const Common = preload("res://addons/sakuragaoka_station/world/environment/common.gd")
 
 const CORE := {"x0": -117.0, "x1": 117.0, "z0": -122.0, "z1": 153.0}
@@ -311,7 +312,11 @@ class Builder extends RefCounted:
 		H.resize(nx * nz)
 		var NR := PackedFloat32Array()
 		NR.resize(nx * nz * 3)
-		for j in nz:
+		var grid = BuildKernels.terrain_grid(xs, zs)
+		if grid != null:
+			H = grid[0]
+			NR = grid[1]
+		for j in nz if grid == null else 0:
 			for i in nx:
 				var k := j * nx + i
 				var x: float = xs[i]
