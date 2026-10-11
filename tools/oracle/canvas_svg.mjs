@@ -709,10 +709,31 @@ try {
       return out;
     };
 
+    // A fill of one arc that falls short of a full turn by a gap whose filled region is within STAMP_EPS of the
+    // full ellipse (arc(.., 0, 6.28) leaves 0.0032 rad): the fill closes the gap with a chord, and the chord's
+    // sagitta, bounded with the CTM's Frobenius norm, is the most the two regions differ. Such a fill is recorded as
+    // the closed ellipse (the same rule the stamp fit applies to every point, STAMP_EPS device px). Fills only:
+    // a stroke shows the gap as caps.
+    const nearFullEllipse = (dx) => {
+      if (!dx) return null;
+      const arcs = dx.filter(x => x[0] !== 'M' && x[0] !== 'Z');
+      if (arcs.length !== 1 || arcs[0][0] !== 'A' || dx.filter(x => x[0] === 'M').length > 1) return null;
+      const [, cx, cy, rx, ry, rot, a0, sweep, ...m] = arcs[0];
+      const gap = 2 * Math.PI - Math.abs(sweep);
+      if (!(gap > 0)) return null;
+      const rDev = Math.hypot(m[0], m[1], m[2], m[3]) * Math.max(Math.abs(rx), Math.abs(ry));
+      if (!(rDev * (1 - Math.cos(gap / 2)) <= STAMP_EPS)) return null;
+      const full = ['A', cx, cy, rx, ry, rot, a0, Math.sign(sweep) * 2 * Math.PI, ...m];
+      const cr = Math.cos(rot), sr = Math.sin(rot), x = rx * Math.cos(a0), y = ry * Math.sin(a0);
+      const ux = cx + x * cr - y * sr, uy = cy + x * sr + y * cr;
+      const p0 = [m[0] * ux + m[2] * uy + m[4], m[1] * ux + m[3] * uy + m[5]];
+      return [['M', p0[0], p0[1]], ...expandArcs([full]), ['Z']];
+    };
+
     const fillInstance = (it) => {
       if (!live(it) || !paintOk(it.paint)) return null;
       if (!(opacityOf(it.paint, it.alpha) > 0)) return SKIP;
-      const segs = cleanSegs(it.d); if (!segs.some(drawing)) return SKIP;
+      const segs = nearFullEllipse(it.dx) || cleanSegs(it.d); if (!segs.some(drawing)) return SKIP;
       if (segs.length > 400) return null;
       const types = segs.map(x => x[0]).join(''), Q = flat(segs);
       let m = null, proto = null;
@@ -720,7 +741,7 @@ try {
       else if ((types === 'MCCCCZ' || types === 'MCCCC') && Math.hypot(Q[Q.length - 2] - Q[0], Q[Q.length - 1] - Q[1]) <= 1e-6 * (1 + Math.abs(Q[0]) + Math.abs(Q[1])) &&
         (m = fit(PFLAT.ellipse.slice(0, Q.length), Q, [0, 3, 6]))) proto = canonProto('ellipse');
       else {
-        // a full ellipse only when exactly closed: arc(.., 0, 6.28) leaves a gap and stays 'path' kind
+        // not a rect or a (near-)closed ellipse: a fitted prototype of its own (see nearFullEllipse for open arcs)
         const sig = 'f:' + it.rule + ':' + types;
         for (const pr of candidates(sig)) if ((m = fit(pr.P, Q, pr.anchors))) { proto = pr; break; }
         if (!proto) {
