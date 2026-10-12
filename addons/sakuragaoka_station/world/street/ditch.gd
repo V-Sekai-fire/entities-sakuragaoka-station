@@ -1,6 +1,9 @@
-# street/ditch.js: open and grated ditch spans as a flat quad at the rim level; the original's fragment
-# shader traces a virtual U-channel below it. The port keeps the geometry and its per-vertex channel
-# attributes (dLoc, dN, dSpan) and renders it with a plain shader material.
+# street/ditch.js: U-ditch interiors as "interior mapping". The open and grated ditch spans are a flat
+# quad at the rim level (so the terrain, which is at heightAt, never covers them). The original's
+# fragment shader (patched into a MeshToonMaterial with onBeforeCompile) traces the view ray into a
+# virtual U-channel: side walls, end walls, shallow water, a waterline ink line, ripples and drifting
+# petals. The port keeps the geometry with its per-vertex channel attributes (dLoc, dN, dSpan) and the
+# underlying white toon material; the GLSL patch is not ported.
 extends RefCounted
 
 const T = preload("res://addons/sakuragaoka_station/core/three.gd")
@@ -14,8 +17,8 @@ class DitchBuilder extends RefCounted:
 	var idx := []
 	var n := 0
 
-	## a: across offset (+n side), s: along, dp: plane depth below rim, n2: across unit (x, z),
-	## span: [s0, s1, wi, wl] (along range, inner half width, water depth below rim).
+	## a: across offset (m, +n side), s: along (m), dp: plane depth below rim, n2: across unit (x, z),
+	## sp: [s0, s1, wi, wl] (along range, inner half width, water depth below rim).
 	func vert(x: float, y: float, z: float, a: float, s: float, dp: float, n2: Array, sp: Array) -> int:
 		pos.append_array([x, y, z])
 		loc.append_array([a, s, dp])
@@ -24,6 +27,7 @@ class DitchBuilder extends RefCounted:
 		n += 1
 		return n - 1
 
+	## Keeps the face pointing up.
 	func quad(a: int, b: int, c: int, d: int) -> void:
 		var p := pos
 		var ux: float = p[b * 3] - p[a * 3]
@@ -51,6 +55,7 @@ class DitchBuilder extends RefCounted:
 		g.set_attribute("dN", T.Attr.new(PackedFloat32Array(dn), 2))
 		g.set_attribute("dSpan", T.Attr.new(PackedFloat32Array(span), 4))
 		g.set_index(PackedInt32Array(idx))
+		g.compute_bounding_box()
 		var m := T.MeshObj.new(g, material)
 		m.receive_shadow = true
 		m.cast_shadow = false
@@ -59,5 +64,7 @@ class DitchBuilder extends RefCounted:
 		return m
 
 
+## The original: new MeshToonMaterial({ color: 0xffffff, gradientMap, name: 'street-ditch' }) with the
+## channel shader patched in. A plain toon material carries no paint pass.
 static func ditch_material(ctx):
-	return ctx.mat.shader("street-ditch", "#b3b1a8", {"name": "street-ditch"})
+	return ctx.mat.toon("#ffffff", {"name": "street-ditch", "paint": 0.0})

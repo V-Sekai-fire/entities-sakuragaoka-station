@@ -156,7 +156,7 @@ func tint(geo: T.Geometry, hex: String) -> T.Geometry:
 		return _tint_cache[key]
 	var g := geo.clone()
 	var c := T.color(hex)
-	var n := g.attributes.position.count()
+	var n: int = g.attributes.position.count()
 	var a := PackedFloat32Array()
 	a.resize(n * 3)
 	for i in n:

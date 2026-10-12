@@ -436,10 +436,10 @@ func build(ctx):
 			var v2 := faceB.vert(b.ox, yb, b.oz, 0, 0, NZ)
 			var v3 := faceB.vert(a.ox, ya, a.oz, 0, 0, NZ)
 			faceB.quad(v0, v1, v2, v3, NZ)
-		var cbx0 := s * 4.6
-		var cbx1 := s * 4.95
+		var cbx0: float = s * 4.6
+		var cbx1: float = s * 4.95
 		var top: float = road_y.call(s * 4.8, 2.85) + CURB_H
-		var cbx := (cbx0 + cbx1) / 2
+		var cbx: float = (cbx0 + cbx1) / 2
 		F.box(0.35, top - H.call(cbx, 2.85) + 0.05, 0.8, "#b2b0a8", [cbx, (top + H.call(cbx, 2.85) - 0.05) / 2, 2.85])
 		quad.call(utilTopB, ST.UTIL.drain, cbx, 2.85, 0.3, 0.7, [0, -1], 0.003, null, func(_x, _z): return top)
 		physics.addWalkBox(cbx, 2.85, 0.4, 0.85, 0, top)
