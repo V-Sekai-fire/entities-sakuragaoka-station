@@ -1,7 +1,8 @@
 # One module against the oracle's build of the same module list (tools/reference.mjs --build=...):
 # triangles within 2% and every bounding-box coordinate within 0.1 m.
-#   godot --headless --path . --script tools/module_check.gd -- <reference.json> <build> [module ...]
+#   godot --path . --windowed --resolution 320x180 --xr-mode off --script tools/module_check.gd -- <reference.json> <build> [module ...]
 # Builds every module of the build in its order and checks the named ones (all, if none named).
+# A module with no script yet is skipped (SKIP); one whose script fails to load fails (FAIL).
 extends SceneTree
 
 const Ctx = preload("res://addons/sakuragaoka_station/core/ctx.gd")
@@ -19,9 +20,18 @@ func _initialize() -> void:
 	var ctx = Ctx.new(1, "")
 	var fails := 0
 	for n in b.modules:
+		var path := "res://addons/sakuragaoka_station/world/%s.gd" % n
+		if not ResourceLoader.exists(path):
+			print("%-11s SKIP  not ported" % n)
+			continue
+		var script = load(path)
+		if script == null or not script.can_instantiate():
+			print("%-11s FAIL  script does not load" % n)
+			fails += 1
+			continue
 		var before := Stats.snapshot(ctx.scene)
 		var t0 := Time.get_ticks_msec()
-		var err = load("res://addons/sakuragaoka_station/world/%s.gd" % n).new().build(ctx)
+		var err = script.new().build(ctx)
 		if not (err is String):
 			err = null
 		ctx.scene.update_matrix_world(true)
