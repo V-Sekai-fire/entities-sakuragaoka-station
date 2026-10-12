@@ -19,6 +19,9 @@ func _initialize() -> void:
 	var ctx = Ctx.new(1, "")
 	var fails := 0
 	for n in b.modules:
+		if not ResourceLoader.exists("res://addons/sakuragaoka_station/world/%s.gd" % n):
+			print("%-11s SKIP  not ported" % n)
+			continue
 		var before := Stats.snapshot(ctx.scene)
 		var t0 := Time.get_ticks_msec()
 		var err = load("res://addons/sakuragaoka_station/world/%s.gd" % n).new().build(ctx)
