@@ -1,0 +1,12 @@
+--- a/src/world/shopsA.js
++++ b/src/world/shopsA.js
+@@ -16,7 +16,9 @@
+   C.G = makeGoods(ctx, C); // instanced shop goods (products, books, cups, flowers, tiles…)
+   const out = {};
+   buildKonbini(ctx, C);
++  const ONLY = (globalThis.process && process.env.SHOPS_ONLY !== undefined) ? process.env.SHOPS_ONLY.split(',') : null;
+   for (const [name, load, fn] of OPTIONAL) {
++    if (ONLY && !ONLY.includes(name)) continue;
+     let mod = null;
+     try { mod = await load(); } catch (e) { if (!/Cannot find|Failed to fetch|ERR_MODULE_NOT_FOUND|404/.test(String(e))) throw e; }
+     if (mod && mod[fn]) out[name] = mod[fn](ctx, C);
