@@ -385,7 +385,9 @@ int main(int argc, char **argv) {
 
 		js << (firstKey ? "" : ", ") << "\"" << key << "\": {\"mode\": \"" << c.mode << "\", \"curves_after\": " << c.curves_after
 		   << ", \"layers_after\": " << c.layers_after << ", \"vertices\": " << n << ", \"triangles\": " << m.triangles.size() / 3
-		   << ", \"overlay\": " << m.overlay_count << ", \"opaque_area\": " << opaqueArea << "}";
+		   << ", \"overlay\": " << m.overlay_count << ", \"opaque_area\": " << opaqueArea << ", \"slug_work\": " << c.slug_work << ", \"slug_work_mean\": " << c.slug_work_mean
+		   << ", \"stamp_work\": " << c.stamp_work << ", \"stamp_layers\": " << c.stamp_layers << ", \"stamp_grid\": " << c.stamp_grid
+		   << ", \"triangles_after\": " << c.triangles_after << "}";
 		firstKey = false;
 
 		char line[512];
