@@ -1,6 +1,9 @@
 # src/core/renderer.js's composite pass, run in place on the colour buffer after transparents:
 # colour-aware outlines from depth and normals, bloom and glow, then exposure, soft clip, grading,
-# light leak and vignette.
+# light leak and vignette. The original draws its outlines from a pass without the no-outline layer
+# (ctx.noOutline); here a material on that layer writes roughness 0.7 (NO_OUTLINE_ROUGHNESS), which
+# the engine stores as 0.35 (static) or 0.65 (dynamic), and no edge is drawn where it shows. Roughness
+# 0 (a self-fogging material, core/fog.gd) and the default 1 still get edges.
 @tool
 extends CompositorEffect
 
@@ -34,6 +37,13 @@ const vec3 LINE = vec3(0.0272, 0.0203, 0.0513);
 float lin_depth(ivec2 c) {
 	c = clamp(c, ivec2(0), ivec2(p.raster) - 1);
 	return p.depth_b / (texelFetch(depth_tex, c, 0).r + p.depth_a);
+}
+
+// the no-outline layer: roughness 0.7 stored as 0.7 * 127 / 255, or 1 minus that for dynamic objects
+bool no_line(ivec2 c) {
+	c = clamp(c, ivec2(0), ivec2(p.raster) - 1);
+	float r = texelFetch(normal_tex, c, 0).a;
+	return (r >= 0.25 && r < 0.45) || (r > 0.55 && r <= 0.75);
 }
 
 vec3 nrm(ivec2 c) {
@@ -81,6 +91,9 @@ void main() {
 	n_edge = smoothstep(0.30, 0.65, n_edge);
 	float fade = 1.0 - smoothstep(35.0, 190.0, min(d0, dmin));
 	float edge = max(d_edge, n_edge * 0.85) * fade * p.outline;
+	if (no_line(c) || no_line(c - dx) || no_line(c + dx) || no_line(c - dy) || no_line(c + dy)) {
+		edge = 0.0;
+	}
 	col = mix(col, mix(col * vec3(0.42, 0.38, 0.5), LINE, 0.35), edge * 0.82);
 	vec2 tuv = (vec2(c) + 0.5) / p.raster;
 	col += texture(bloom_tex, tuv).rgb * p.bloom + texture(glow_tex, tuv).rgb * p.glow;
@@ -145,6 +158,8 @@ void main() {
 """
 
 const CONTEXT := &"sakuragaoka_composite"
+## The ROUGHNESS a no-outline material writes (see the header).
+const NO_OUTLINE_ROUGHNESS := 0.7
 
 @export_range(0.0, 1.0) var outline := 1.0
 @export_range(0.0, 1.0) var grade := 1.0
