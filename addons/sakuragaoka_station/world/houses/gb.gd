@@ -309,7 +309,7 @@ class Frame extends RefCounted:
 	func cyl(mat, c, r: float, h: float, x: float, y: float, z: float, o: Dictionary = {}) -> void:
 		var seg: int = o.seg if o.get("seg") else 8
 		var rt: float = o.rTop if o.get("rTop") != null else r
-		var open := bool(o.get("open", false))
+		var open: bool = (not not o.get("open", false))
 		var R := GBS.raw_of("cyl|%s|%s|%d|%d" % [rt, r, seg, 1 if open else 0], func(): return Geo.cylinder(rt, r, 1, seg, 1, open))
 		var oo := o.duplicate()
 		oo["sy"] = h

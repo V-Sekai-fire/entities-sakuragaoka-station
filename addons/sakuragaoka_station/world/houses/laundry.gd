@@ -87,7 +87,7 @@ func line(FF, x0: float, x1: float, y: float, z: float, r, mix: String = "balcon
 			tint = TINTS.tee[int(floor(r.f() * TINTS.tee.size()))]
 		elif name == "towel":
 			tint = TINTS.towel[int(floor(r.f() * TINTS.towel.size()))]
-		var dz := (r.f() - 0.5) * 0.06
+		var dz = (r.f() - 0.5) * 0.06
 		var hook := 0.0 if name == "towel" or name == "sheet" else 0.02
 		var corner: Vector3 = FF.w(x, y + 0.02 + hook, z + dz)
 		var amp := 0.16 if name == "sheet" else (0.1 if name == "pinch" else 0.12)

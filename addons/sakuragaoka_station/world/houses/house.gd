@@ -161,7 +161,7 @@ static func _place_windows(H, face: Dictionary, fl: int, S: Dictionary, r, lod: 
 		types.append_array(["small", "mid", "std", "high"])
 	var DIM := {"big": [1.69, 1.95, 0.08], "std": [1.69, 1.15, 0.85], "mid": [1.19, 1.12, 0.88], "small": [0.74, 0.9, 1.05], "high": [0.6, 0.48, 1.62],
 		"slit": [0.36, 1.35, 0.7], "bay": [1.69, 1.15, 0.85]}
-	var u := -L / 2.0 + 0.45 + r.f() * 0.4
+	var u = -L / 2.0 + 0.45 + r.f() * 0.4
 	var guard := 0
 	var count := 0
 	var max_n := maxi(1, int(floor(L / 2.2)))
@@ -173,8 +173,8 @@ static func _place_windows(H, face: Dictionary, fl: int, S: Dictionary, r, lod: 
 		var w: float = DIM[t][0]
 		var h: float = DIM[t][1]
 		var sill: float = DIM[t][2]
-		var u0 := u
-		var u1 := u + w
+		var u0 = u
+		var u1 = u + w
 		if u1 > L / 2.0 - 0.4:
 			u += 0.4
 			continue
@@ -746,8 +746,8 @@ static func _build_antenna(H, _F, _v: Dictionary, S: Dictionary, out: Dictionary
 	var r = S.rng
 	var RF = out.roofFrame
 	var yR: float = out.ridgeY
-	var ax := (r.f() - 0.5) * maxf(0.2, (out.roofHx - out.roofHz)) * 1.2
-	var h := 2.2 + r.f() * 1.2
+	var ax = (r.f() - 0.5) * maxf(0.2, (out.roofHx - out.roofHz)) * 1.2
+	var h = 2.2 + r.f() * 1.2
 	RF.cyl(M.plain, "#9aa1a8", 0.022, h + 0.3, ax, yR + h / 2.0 - 0.05, 0, {"seg": 6})
 	RF.box(M.plain, "#8b9199", 0.3, 0.05, 0.3, ax, yR + 0.12, 0)
 	var az: float = H.antenna_az - RF.ry

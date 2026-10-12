@@ -196,7 +196,9 @@ func bush(F, x: float, y: float, z: float, rad: float, r, o: Dictionary = {}) ->
 	var sx: float = 0.9 + R[2] * 0.2
 	var rot: float = R[3] * 6.283
 	var m := {"sx": k * sx, "sy": k, "sz": k * (2 - sx), "ry": rot}
-	F.raw(H.M.foliage, TINT[int(floor(R[4] * TINT.size())) % TINT.size()], shrub_raw(kind, rb, flat, variant, sp), x, y - 0.015, z, m)
+	# with n = 1 the original reads R[4] past the end: NaN picks no tint, so the colour stays white
+	var tint = TINT[int(floor(R[4] * TINT.size())) % TINT.size()] if R.size() > 4 else null
+	F.raw(H.M.foliage, tint, shrub_raw(kind, rb, flat, variant, sp), x, y - 0.015, z, m)
 	if not o.get("flowers"):
 		return
 	var fn0: float = o.fn if o.get("fn") else T.js_round(5 + rad * 12)
@@ -242,7 +244,7 @@ func hedge(F, x0: float, x1: float, z: float, h: float, d: float, r, pal: String
 
 ## A dwarf, cloud-pruned pine: trunk and flat-bottomed pads.
 func pine(F, x: float, y: float, z: float, s: float, r) -> void:
-	var lean := (r.f() - 0.5) * 0.5
+	var lean = (r.f() - 0.5) * 0.5
 	var hi := _hi()
 	F.cyl(M.plain, "#6b5244", 0.07 * s, 0.9 * s, x, y + 0.45 * s, z, {"rz": lean, "seg": 6, "rTop": 0.05 * s})
 	var tx := x - sin(lean) * 0.9 * s
@@ -265,11 +267,11 @@ func pine(F, x: float, y: float, z: float, s: float, r) -> void:
 ## Nandina: slender stems, reddish leaf tufts, red berries.
 func nandina(F, x: float, y: float, z: float, s: float, r) -> void:
 	for i in 5:
-		var a := r.f() * 6.28
-		var d := r.f() * 0.12 * s
-		var hh := (0.7 + r.f() * 0.6) * s
-		var px := x + cos(a) * d
-		var pz := z + sin(a) * d
+		var a = r.f() * 6.28
+		var d = r.f() * 0.12 * s
+		var hh = (0.7 + r.f() * 0.6) * s
+		var px = x + cos(a) * d
+		var pz = z + sin(a) * d
 		F.cyl(M.plain, "#7a6a4a", 0.012 * s, hh, px, y + hh / 2.0, pz, {"seg": 4})
 		var lc := "#b8584a" if r.f() < 0.35 else ("#8a9c5a" if r.f() < 0.5 else "#6f9458")
 		F.raw(M.foliage, lc, leaf_raw(i % 4, 1) if _hi() else blob_raw(i, 0), px, y + hh, pz, {"sx": 0.34 * s, "sy": 0.2 * s, "sz": 0.3 * s, "ry": r.f() * 6})
@@ -297,22 +299,22 @@ func tree(F, x: float, y: float, z: float, s: float, r, kind: String = "round") 
 	var pal: Array = sp[4]
 	var h := th * s
 	var R := cr * s
-	var lean := (r.f() - 0.5) * 0.16
+	var lean = (r.f() - 0.5) * 0.16
 	var lx := sin(lean) * h
 	var tx := x - lx
 	F.cyl(M.plain, tc, 0.085 * s, h + 0.2 * s, x - lx / 2.0, y + h / 2.0, z, {"seg": 6, "rTop": 0.055 * s, "rz": lean})
 	if hi and kind != "osmanthus" and kind != "camellia":
 		for sd in [-1, 1]:
-			var a := r.f() * 6.28
+			var a = r.f() * 6.28
 			F.beam(M.plain, tc, [tx, y + h * 0.9, z], [tx + cos(a) * R * 0.55, y + h + R * 0.25 * sd + 0.2 * s, z + sin(a) * R * 0.55], 0.05 * s, 0.05 * s)
 	var n := nb - (0 if hi else 2)
 	var cy := y + h + R * sq * 0.55
 	for i in n:
 		var top := i == 0
-		var a := i * 2.39996 + r.f() * 0.6
-		var d := 0.0 if top else R * (0.36 + r.f() * 0.18)
+		var a = i * 2.39996 + r.f() * 0.6
+		var d = 0.0 if top else R * (0.36 + r.f() * 0.18)
 		var tier: float = ((-0.2 if i % 2 else 0.08) * R) if kind == "maple" else (r.f() - 0.55) * R * sq * 0.6
-		var bs := (1.25 if top else 0.8 + r.f() * 0.3) * R
+		var bs = (1.25 if top else 0.8 + r.f() * 0.3) * R
 		pick(r, pal)
 		var v := int(floor(r.f() * 6))
 		var det := (3 if top else 2) if hi else (2 if top else 1)
@@ -320,8 +322,8 @@ func tree(F, x: float, y: float, z: float, s: float, r, kind: String = "round") 
 			tx + cos(a) * d, cy + (R * sq * 0.18 if top else tier), z + sin(a) * d, {"sx": bs, "sy": bs * sq, "sz": bs, "ry": r.f() * 6})
 	if kind == "camellia":
 		for k in 12:
-			var a := r.f() * 6.28
-			var e := r.f()
+			var a = r.f() * 6.28
+			var e = r.f()
 			F.raw(M.plain, "#d9485a" if r.f() < 0.5 else "#ef8fa6", leaf_raw(k % 3, 1), tx + cos(a) * R * 1.02, cy + (e - 0.5) * R * sq * 1.4, z + sin(a) * R * 1.02, {"sx": 0.1, "sy": 0.08, "sz": 0.1})
 
 
@@ -335,22 +337,22 @@ func pot(F, x: float, y: float, z: float, r, scale: float = 1.0, kind = null) ->
 		c = pick(r, ["#4f6f94", "#5f7c6a", "#3e5a78", "#7b5f86", "#e5dfcf"])
 	else:
 		c = pick(r, ["#6b6e73", "#e2ded2", "#5b7a5b"])
-	var pr := (0.13 + r.f() * 0.08) * scale
-	var ph := pr * (1.1 + r.f() * 0.4)
+	var pr = (0.13 + r.f() * 0.08) * scale
+	var ph = pr * (1.1 + r.f() * 0.4)
 	var hi := _hi()
 	F.cyl(M.plain, c, pr * 0.82, ph, x, y + ph / 2.0, z, {"rTop": pr, "seg": 7})
 	if hi:
 		F.cyl(M.plain, c, pr * 1.08, 0.04, x, y + ph - 0.02, z, {"seg": 7, "open": true})
 	F.cyl(M.soil, "#8a7058", pr * 0.95, 0.02, x, y + ph - 0.01, z, {"seg": 6})
-	var t := r.f()
+	var t = r.f()
 	var det := 2 if hi and pr > 0.17 else 1
 	if t < 0.35:
 		bush(F, x, y + ph * 0.8, z, pr * 1.2, r, {"pal": "green", "n": 2, "flowers": "flowers" if r.f() < 0.6 else null, "fn": 4, "detail": det})
 	elif t < 0.55:
 		for i in 4:
-			var a := i * 1.6 + r.f()
-			var d := pr * 0.5
-			var hh := 0.22 * scale + r.f() * 0.08
+			var a = i * 1.6 + r.f()
+			var d = pr * 0.5
+			var hh = 0.22 * scale + r.f() * 0.08
 			F.cyl(M.plain, "#6f9a5a", 0.008, hh, x + cos(a) * d, y + ph + hh / 2.0, z + sin(a) * d, {"seg": 3})
 			F.raw(M.plain, pick(r, PLANT.tulip), dot_raw(), x + cos(a) * d, y + ph + hh, z + sin(a) * d, {"sx": 0.05 * scale, "sy": 0.07 * scale, "sz": 0.05 * scale})
 		F.raw(M.plain, "#7aa564", leaf_raw(3, 1), x, y + ph + 0.04, z, {"sx": pr * 1.6, "sy": 0.08, "sz": pr * 1.6})
@@ -408,10 +410,10 @@ func stepping_stones(F, x0: float, z0: float, x1: float, z1: float, gy: Callable
 	var n := maxi(2, int(T.js_round(ln / 0.55)))
 	for i in n:
 		var t := (i + 0.5) / n
-		var x := x0 + (x1 - x0) * t + (r.f() - 0.5) * 0.12
-		var z := z0 + (z1 - z0) * t + (r.f() - 0.5) * 0.08
+		var x = x0 + (x1 - x0) * t + (r.f() - 0.5) * 0.12
+		var z = z0 + (z1 - z0) * t + (r.f() - 0.5) * 0.08
 		var c = pick(r, ["#a8a59c", "#9b988f", "#b3b0a6"])
-		var rad := 0.2 + r.f() * 0.06
+		var rad = 0.2 + r.f() * 0.06
 		F.cyl(M.concrete, c, rad, 0.06, x, gy.call(x, z) + 0.02, z, {"seg": 7, "ry": r.f() * 3, "uv": {"world": 2}})
 
 
@@ -498,10 +500,10 @@ func doorstep(F, du: float, dw: float, top: float, pw: float, pd: float, S: Dict
 	var r = S.rng
 	F.boxB(M.plain, pick(r, ["#6b5a4c", "#5b5f6a", "#7a6a50", "#4f5f58"]), 0.75, 0.015, 0.45, du, top, 0.45)
 	if r.f() < 0.55:
-		var sx0 := du + (r.f() - 0.5) * 0.4
+		var sx0 = du + (r.f() - 0.5) * 0.4
 		for s in [-0.07, 0.07]:
 			var c = pick(r, ["#3e5a78", "#8a6446", "#c9b6a0"])
-			var zz := 0.75 + (r.f() - 0.5) * 0.05
+			var zz = 0.75 + (r.f() - 0.5) * 0.05
 			F.boxB(M.plain, c, 0.1, 0.03, 0.26, sx0 + s, top, zz, {"ry": (r.f() - 0.5) * 0.4})
 	var side := -1 if du > 0 else 1
 	var sx := du + side * (pw / 2.0 - 0.25)
@@ -527,7 +529,7 @@ func doorstep(F, du: float, dw: float, top: float, pw: float, pd: float, S: Dict
 	var gf: float = S.groundFront if S.get("groundFront") != null else 0.0
 	var np := 1 + int(floor(r.f() * 3))
 	for i in np:
-		var px := du + (1 if i % 2 else -1) * (pw / 2.0 + 0.25 + r.f() * 0.2)
+		var px = du + (1 if i % 2 else -1) * (pw / 2.0 + 0.25 + r.f() * 0.2)
 		pot(F, px, gf, 0.35 + i * 0.35, r, 1.1)
 	if r.f() < 0.35:
 		watering_can(F, du + side * (pw / 2.0 + 0.5), gf, 1.0, r)
@@ -594,7 +596,7 @@ func faucet(F, x: float, y: float, z: float, r) -> void:
 func laundry_stand(F, x: float, z: float, gy: Callable, ln: float, r, with_laundry: bool = true) -> void:
 	var c := "#c9ccd1"
 	for s in [-1, 1]:
-		var px := x + s * ln / 2.0
+		var px = x + s * ln / 2.0
 		var g: float = gy.call(px, z)
 		F.boxB(M.concrete, "#b9b8b2", 0.45, 0.12, 0.45, px, g - 0.02, z, {"uv": {"world": 2}})
 		F.cyl(M.plain, c, 0.025, 1.7, px, g + 0.95, z, {"seg": 6})

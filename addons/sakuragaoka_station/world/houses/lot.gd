@@ -58,7 +58,7 @@ static func make_spec(r, o: Dictionary) -> Dictionary:
 			wall2 = wall.duplicate()
 			wall.kind = "tile"
 			wall.color = pick(r, PAL.tile)
-	var trad := bool(o.get("traditional"))
+	var trad: bool = (not not o.get("traditional"))
 	var roof_type: String
 	if o.get("roofType"):
 		roof_type = o.roofType
@@ -140,9 +140,9 @@ static func build_lot(H, D: Dictionary) -> Dictionary:
 	var hz0: float
 	var hz1: float
 	var park = null
-	var gapA := 0.9 + r.f() * 0.35
-	var gapB := 0.9 + r.f() * 0.35
-	var rear := 1.4 + r.f() * 1.0 if Dp > 12.5 else 1.0 + r.f() * 0.5
+	var gapA = 0.9 + r.f() * 0.35
+	var gapB = 0.9 + r.f() * 0.35
+	var rear = 1.4 + r.f() * 1.0 if Dp > 12.5 else 1.0 + r.f() * 0.5
 	var setback: float
 	if layout == "frontPark":
 		setback = 5.6 + r.f() * 0.5
@@ -172,7 +172,7 @@ static func build_lot(H, D: Dictionary) -> Dictionary:
 	if hz1 - hz0 > max_d:
 		hz0 = hz1 - max_d
 	if hx1 - hx0 > 8.8:
-		var cut := (hx1 - hx0) - 8.8 + r.f() * 0.8
+		var cut = (hx1 - hx0) - 8.8 + r.f() * 0.8
 		if r.f() < 0.5:
 			hx0 += cut
 		else:
@@ -215,7 +215,7 @@ static func build_lot(H, D: Dictionary) -> Dictionary:
 			S.wing = {"cx": sgn * (hw / 2.0 - ww / 2.0), "cz": hd / 2.0 + wd / 2.0, "w": ww, "d": wd, "floors": 1, "attach": "front"}
 	if floors >= 2 and r.f() < _nn(D.get("balconyP"), 0.72):
 		var bw := minf(hw - 0.4, 2.8 + r.f() * 1.8)
-		var bu := (r.f() - 0.5) * (hw - bw)
+		var bu = (r.f() - 0.5) * (hw - bw)
 		if S.get("wing"):
 			bu = -T.sign(S.wing.cx) * (hw / 2.0 - bw / 2.0 - 0.1)
 		var over_door := absf(bu - du) < bw / 2.0 + 0.7
@@ -327,18 +327,18 @@ static func build_lot(H, D: Dictionary) -> Dictionary:
 		if r.f() < 0.35:
 			F.box(M.plain, "#4b4d52", 0.16, 0.2, 0.16, gxL, gy.call(gxL, fz) + ph + 0.15, fz)
 			F.box(M.lampDim, null, 0.12, 0.14, 0.12, gxL, gy.call(gxL, fz) + ph + 0.17, fz, {"shadow": false})
-		var open := r.f() < 0.45
+		var open = r.f() < 0.45
 		var lw := gate_w / 2.0 - 0.02
 		for s in [-1, 1]:
-			var hinge := gate_x + s * gate_w / 2.0
-			var ang := s * 1.2 if open else 0.0
+			var hinge = gate_x + s * gate_w / 2.0
+			var ang = s * 1.2 if open else 0.0
 			var GF = F.sub(hinge, gy.call(hinge, fz), fz, -ang)
 			GF.box(M.atlasCut, "#ffffff", lw, 1.0, 0.03, -s * lw / 2.0, 0.55, 0, {"uv": {"rect": H.A.rects.gate_alu, "white": H.A.white, "faces": "front+back"}, "noOutline": true})
 			GF.box(M.plain, "#5c4a3e", 0.04, 1.0, 0.04, -s * 0.02, 0.55, 0)
 		if not open:
 			H.col(F, gate_x, fz, gate_w, 0.12, 0, gy.call(gate_x, fz) - 0.5, gy.call(gate_x, fz) + 1.05)
 	var side_style: String = D.sideStyle if D.get("sideStyle") else pick(r, ["block", "block", "mesh", "mesh", "block"])
-	var side_h := 0.9 + r.f() * 0.35 if side_style == "block" else 1.0
+	var side_h = 0.9 + r.f() * 0.35 if side_style == "block" else 1.0
 	var side_col: String = pick(r, ["#c9c7c0", "#bdbcb5", "#d8d2c4"])
 	var side_z0 := fz - 0.15
 	var side_z1 := -Dp + 0.08
@@ -406,15 +406,15 @@ static func build_lot(H, D: Dictionary) -> Dictionary:
 		return false
 	if lod >= 1:
 		_garden_planting(H, F, {"W": W, "Dp": Dp, "fz": fz, "hx0": hx0, "hx1": hx1, "hz0": hz0, "hz1": hz1, "park": park, "gateX": gate_x, "gateW": gate_w,
-			"frontStyle": front_style, "setback": setback, "traditional": bool(D.get("traditional")), "lod": lod, "du": du, "hcx": hcx}, r, gy, is_kept)
+			"frontStyle": front_style, "setback": setback, "traditional": (not not D.get("traditional")), "lod": lod, "du": du, "hcx": hcx}, r, gy, is_kept)
 	if lod >= 1:
 		var rear_depth := hz0 - (-Dp)
 		if rear_depth > 1.6 and r.f() < 0.4:
-			var lx := hcx + (r.f() - 0.5) * (hw - 3)
+			var lx = hcx + (r.f() - 0.5) * (hw - 3)
 			P.laundry_stand(F, lx, hz0 - rear_depth / 2.0, gy, 2.4, r, r.f() < 0.7)
 		if rear_depth > 1.3 and r.f() < 0.45:
 			var sx := hcx + (-1 if r.f() < 0.5 else 1) * (hw / 2.0 - 1.2)
-			var sw := 1.5 + r.f() * 0.4
+			var sw = 1.5 + r.f() * 0.4
 			P.shed(F.sub(sx, 0, -Dp + 0.62, 0), 0, gy.call(sx, -Dp + 0.6), 0, r, sw)
 			H.col(F, sx, -Dp + 0.62, 1.8, 0.95, 0, gy.call(sx, -Dp + 0.6) - 0.5, gy.call(sx, -Dp + 0.6) + 1.95)
 		if r.f() < 0.45:
@@ -459,7 +459,7 @@ static func boundary_seg(H, F, a: float, b: float, z: float, style: String, h: f
 			var n := maxi(1, int(T.js_round(L / 1.1)))
 			for i in n:
 				var x := a + (i + 0.5) * L / n
-				var rad := 0.32 + r.f() * 0.12
+				var rad = 0.32 + r.f() * 0.12
 				P.bush(F, x, gy.call(x, z - 0.45), z - 0.45, rad, r, {"pal": "green", "flowers": "azalea" if r.f() < 0.5 else null, "fn": 5})
 		if lod >= 2 and r.f() < 0.7 and style != "low":
 			H.decal(F, "moss", xm, gm + 0.12, L * 0.9, 0.3, z + t / 2.0 + 0.006, "#ffffff")
@@ -483,7 +483,7 @@ static func boundary_seg(H, F, a: float, b: float, z: float, style: String, h: f
 		H.col(F, xm, z, L, 0.2, 0, minf(g0, g1) - 0.5, maxf(g0, g1) + 1.3)
 	elif style == "hedge":
 		H.sloped_wall(F, a, b, z + 0.2, 0.28, 0.16, M.block, "#c9c7c0", 1.6, 0.8)
-		var hh := 1.05 + r.f() * 0.35
+		var hh = 1.05 + r.f() * 0.35
 		P.hedge(F, a + 0.05, b - 0.05, z - 0.12, hh, 0.55, r, "dark" if r.f() < 0.3 else "green", gy)
 		H.col(F, xm, z - 0.1, L, 0.6, 0, minf(g0, g1) - 0.5, maxf(g0, g1) + 1.3)
 	elif style == "lattice":
@@ -557,7 +557,7 @@ static func _garden_planting(H, F, o: Dictionary, r, gy: Callable, is_kept: Call
 		var x := -W / 2.0 + 0.6
 		while x < W / 2.0 - 0.5:
 			if not (in_park.call(x) or near_gate.call(x) or is_kept.call(x, z_in)) and not (z_in < hz1 + 0.4):
-				var t := r.f()
+				var t = r.f()
 				if t < 0.4:
 					P.bush(F, x, gy.call(x, z_in), z_in, 0.35 + r.f() * 0.15, r, {"pal": "green", "flowers": "azalea", "fn": 7})
 				elif t < 0.6:
@@ -575,7 +575,7 @@ static func _garden_planting(H, F, o: Dictionary, r, gy: Callable, is_kept: Call
 			if o.traditional or r.f() < 0.3:
 				P.pine(F, tx, gy.call(tx, tz), tz, 1.1 + r.f() * 0.5, r)
 			else:
-				var s := 1.0 + r.f() * 0.5
+				var s = 1.0 + r.f() * 0.5
 				P.tree(F, tx, gy.call(tx, tz), tz, s, r, pick(r, ["maple", "olive", "osmanthus", "camellia", "round"]))
 		if o.traditional and lod >= 2:
 			var lx := hcx - sx * 1.2
@@ -587,7 +587,7 @@ static func _garden_planting(H, F, o: Dictionary, r, gy: Callable, is_kept: Call
 	while x2 < hx1 - 0.4:
 		if not (absf(x2 - (hcx + du)) < 1.3 or in_park.call(x2) or is_kept.call(x2, base_z)) and not (base_z > fz - 0.4):
 			if r.f() < 0.55:
-				var rad := 0.28 + r.f() * 0.12
+				var rad = 0.28 + r.f() * 0.12
 				var pal := "green" if r.f() < 0.5 else "dark"
 				P.bush(F, x2, gy.call(x2, base_z), base_z, rad, r, {"pal": pal, "flowers": "azalea" if r.f() < 0.3 else null, "fn": 4})
 			elif lod >= 2 and r.f() < 0.4:
