@@ -861,7 +861,7 @@ func build(c):
 
 	# ------------------------------------------------------------------ per frame: train gust + resolution
 	var trains_r = Trains.create(ctx)
-	ctx.on_update(func(_dt, t):
+	var update := func(_dt, t):
 		var lst: Array = trains_r.read(t)
 		# stable slots: track A -> 0, track B -> 1 (the swirl petals are bound to a slot), extras -> 2, 3
 		var slots := [null, null, null, null]
@@ -885,11 +885,13 @@ func build(c):
 		if renderer != null and renderer.has_method("get_drawing_buffer_size"):
 			var sz: Vector2 = renderer.get_drawing_buffer_size()
 			var pr = ctx.quality.get("pixelRatio")
-			live.uResY = maxf(240.0, sz.y * (float(pr) if pr else 1.0)))
+			live.uResY = maxf(240.0, sz.y * (float(pr) if pr else 1.0))
+	ctx.on_update(update)
 
 	var counts := {"ground": G.count, "patches": patches.size(), "fall": fall.n, "soft": soft.n, "glint": far.n, "rafts": rafts.n,
 		"floating": singles.n, "gutterFloat": gutter_float}
 	counts.merge(plan_stats)
 	counts.merge({"surfaceTris": SI.count, "trees": trees.size()})
-	ctx.services["petals"] = {"counts": counts}
+	# update: the frame callback also registered with on_update, for a host that runs only the petals
+	ctx.services["petals"] = {"counts": counts, "update": update}
 	return null

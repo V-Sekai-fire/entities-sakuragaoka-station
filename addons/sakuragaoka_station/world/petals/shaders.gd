@@ -5,15 +5,14 @@
 # The build describes each material as a T.Mat of type "shader" (shader_kind "petals-fall",
 # "petals-soft", "petals-glint", "petals-rafts", "petals-floating") with its uniforms in
 # user_data.petals: {"shader": <file stem>, "uniforms": {...}, "shared": ctx.shared, "live": {...}}.
-# "shared" holds uTime / uWind / uGust / uSunDir (ctx.shared, advanced by the core each frame) and
+# "shared" holds uTime / uWind / uGust / uSunDir (ctx.shared, advanced by station.gd each frame) and
 # "live" holds uTr / uTr2 / uResY (written by the module's on_update). The instanced petals carry
 # per-instance vec4 attributes aA, aB, aC (and aD for floating petals) in geometry.attributes,
 # listed in geometry.user_data.instanced; the instance matrices are identity, as in the original.
 #
-# realize.gd does not map these yet. What it needs: for an InstancedMesh whose material has
-# user_data.petals, call node(o) below instead of its own MultiMesh path (it packs aA into
-# INSTANCE_CUSTOM, aB into COLOR, aC / aD into the instance transform, where the shaders read them),
-# and push the shared and live uniforms into the ShaderMaterial each frame (update(sm, m)).
+# realize.gd turns an InstancedMesh whose material has user_data.petals into node(o) below (aA into
+# INSTANCE_CUSTOM, aB into COLOR, aC / aD into the instance basis, where the shaders read them) and
+# lists it in live_shaders; station.gd pushes the shared and live uniforms each frame (update(sm, m)).
 extends RefCounted
 
 const T = preload("res://addons/sakuragaoka_station/core/three.gd")
@@ -95,7 +94,8 @@ static func update(sm: ShaderMaterial, m) -> void:
 
 
 ## An InstancedMesh with petal attributes as a MultiMeshInstance3D: aA -> INSTANCE_CUSTOM, aB -> COLOR,
-## aC -> (basis.x, origin.x), aD -> (basis.y, origin.y) of the instance transform.
+## aC -> (basis.x, basis.z.x), aD -> (basis.y, basis.z.y) of the instance transform; the origin stays
+## zero, so all sixteen numbers ride in the basis the shaders read back from MODEL_MATRIX.
 static func node(o) -> MultiMeshInstance3D:
 	var g: T.Geometry = o.geometry
 	var a := Mesh.ARRAY_MAX
@@ -134,8 +134,8 @@ static func node(o) -> MultiMeshInstance3D:
 		var k := i * 4
 		var bx := Vector3(C[k], C[k + 1], C[k + 2])
 		var by := Vector3(D[k], D[k + 1], D[k + 2]) if not D.is_empty() else Vector3(0, 1, 0)
-		var org := Vector3(C[k + 3], D[k + 3] if not D.is_empty() else 0.0, 0.0)
-		mm.set_instance_transform(i, Transform3D(Basis(bx, by, Vector3(0, 0, 1)), org))
+		var bz := Vector3(C[k + 3], D[k + 3] if not D.is_empty() else 0.0, 0.0)
+		mm.set_instance_transform(i, Transform3D(Basis(bx, by, bz), Vector3.ZERO))
 		mm.set_instance_color(i, Color(B[k], B[k + 1], B[k + 2], B[k + 3]))
 		mm.set_instance_custom_data(i, Color(A[k], A[k + 1], A[k + 2], A[k + 3]))
 	mm.custom_aabb = AABB(Vector3(-1e5, -1e5, -1e5), Vector3(2e5, 2e5, 2e5))  # frustumCulled = false

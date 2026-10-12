@@ -1,7 +1,7 @@
 // petals/shaders.js FALL_VERT / FALL_FRAG: every airborne petal kind (canopy emitters 0, near 1,
 // mid 2, far glints 3, resting 4, defocused 5, train swirl 6). All motion is a pure function of
 // uTime. Per-instance data (see petals/shaders.gd node()): aA = INSTANCE_CUSTOM, aB = COLOR,
-// aC = (MODEL_MATRIX[0].xyz, MODEL_MATRIX[3].x); the instance transform carries no transform.
+// aC = (MODEL_MATRIX[0].xyz, MODEL_MATRIX[2].x); the instance origin is zero.
 // Lighting: the original's hand-made toon lighting (4-band ramp, hemisphere ambient, translucency
 // and a backlit rim glow); its sun shadow-map lookup is not ported (petalShadow() = 1).
 
@@ -26,6 +26,9 @@ float groundAt(vec2 xz){
 	float hn = texture(uDens, (floor(uv * uDensSize) + 0.5) / uDensSize).g;
 	return abs(hl - hn) > 0.07 ? hn : hl;   // steps (curbs, platform edges) stay crisp, slopes stay smooth
 }
+// The camera's world position from VIEW_MATRIX: on the pinned precision=double engine
+// CAMERA_POSITION_WORLD (inv_view_matrix[3]) reads the negated position, VIEW_MATRIX is exact.
+vec3 cameraWorld(mat4 view){ return -(transpose(mat3(view)) * view[3].xyz); }
 vec3 rotAxis(vec3 v, vec3 k, float a){ float c = cos(a), s = sin(a); return v*c + cross(k, v)*s + k*dot(k, v)*(1.0 - c); }
 
 // wind drift + falling-leaf sway + spiral + coherent flow + travelling gust fronts
@@ -95,8 +98,8 @@ vec3 trainWake(vec3 P, vec4 s, float t, out float wsum, out float inside){
 void vertex(){
 	vec4 aA = INSTANCE_CUSTOM;
 	vec4 aB = COLOR;
-	vec4 aC = vec4(MODEL_MATRIX[0].xyz, MODEL_MATRIX[3].x);
-	vec3 cameraPosition = CAMERA_POSITION_WORLD;
+	vec4 aC = vec4(MODEL_MATRIX[0].xyz, MODEL_MATRIX[2].x);
+	vec3 cameraPosition = cameraWorld(VIEW_MATRIX);
 	float kind = aA.w; vec4 s = aB; float size = aC.x; float vFall = aC.y;
 	float t = uTime;
 	vec3 P; float fade = 1.0; float flyK = 1.0; float cov = 1.0;
@@ -230,7 +233,8 @@ void vertex(){
 	// ---------------- screen-size floor: far petals become tiny pink glints instead of vanishing
 	vec4 mc = VIEW_MATRIX * vec4(P, 1.0);
 	float dist = -mc.z;
-	float px = size * PROJECTION_MATRIX[1][1] * uResY * 0.5 / max(dist, 0.05);
+	// abs: Godot's rendering device projection flips y, so [1][1] is negative
+	float px = size * abs(PROJECTION_MATRIX[1][1]) * uResY * 0.5 / max(dist, 0.05);
 	float k = max(1.0, uMinPx / max(px, 1e-3));
 	cov = 1.0 / pow(k, 0.85);
 	vGlint = 1.0 - 1.0 / k;
@@ -259,7 +263,7 @@ float petalShadow(){ return 1.0; }
 float toonBand(float ndl){ return ndl < 0.0 ? 0.0 : (ndl < 0.12 ? 0.42 : (ndl < 0.42 ? 0.8 : 1.0)); }
 
 void fragment(){
-	vec3 cameraPosition = CAMERA_POSITION_WORLD;
+	vec3 cameraPosition = cameraWorld(VIEW_MATRIX);
 	vec4 tx = texture(uTex, vUv);
 #ifdef SOFT
 	float a = tx.a * uOpacity;
@@ -287,8 +291,11 @@ void fragment(){
 	col += uGlowCol * sun * tx.g * fwd * (0.35 + 0.65 * back) * 0.55;
 	col *= 1.0 + vGlint * 0.22;
 	ALBEDO = col;
+	ROUGHNESS = 0.7;  // the no-outline layer (core/composite.gd NO_OUTLINE_ROUGHNESS)
 	ALPHA = a;
 #ifndef SOFT
-	ALPHA_SCISSOR_THRESHOLD = 0.04;
+	// the original's alpha to coverage takes the alpha as the covered share of each pixel; Godot's
+	// alpha_to_coverage with a scissor writes alpha 1, so the share is drawn by alpha hashing
+	ALPHA_HASH_SCALE = 1.0;
 #endif
 }

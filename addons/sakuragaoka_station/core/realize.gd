@@ -16,6 +16,7 @@ const T = preload("res://addons/sakuragaoka_station/core/three.gd")
 const Svg = preload("res://addons/sakuragaoka_station/core/svg.gd")
 const SakuraTree = preload("res://addons/sakuragaoka_station/world/sakura/tree.gd")
 const Shaders = preload("res://addons/sakuragaoka_station/world/environment/shaders.gd")
+const PetalShaders = preload("res://addons/sakuragaoka_station/world/petals/shaders.gd")
 const SlugAtlas = preload("res://addons/sakuragaoka_station/core/slug/atlas.gd")
 const Baked = preload("res://addons/sakuragaoka_station/core/slug/baked.gd")
 const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
@@ -42,8 +43,11 @@ var stats := {"meshes": 0, "solids": 0, "surfaces": 0, "single": 0, "instanced":
 		"held": 0, "blob": 0, "batches": 0, "csg_in": 0, "csg_out": 0, "csg_failed": 0, "csg_raw": 0,
 		"manifold": 0, "open": 0, "colours": 0, "instance_tints_dropped": 0,
 		"slugged": 0, "fallback": 0, "mode_mesh": 0, "mode_slug": 0, "mode_mean": 0, "baked_cards": 0,
-		"baked_decals": 0, "baked_tris": 0, "decal_capped": 0, "ramps": 0, "bake_replaced": 0}
+		"baked_decals": 0, "baked_tris": 0, "decal_capped": 0, "ramps": 0, "bake_replaced": 0, "petal_shaders": 0}
 var _root: Node3D
+## [ShaderMaterial, T.Mat] of every petals/shaders.gd material realized: their time, wind and train
+## uniforms change every frame (station.gd feeds them through PetalShaders.update).
+var live_shaders: Array = []
 var _palette := {}
 var _palette_img: Image
 var _palette_tex: ImageTexture
@@ -246,6 +250,15 @@ func _solid(o, r: Dictionary, key: String) -> void:
 
 func _instanced(o) -> void:
 	var m = o.materials()[0]
+	if m != null and m.user_data.has("petals"):
+		# the petals' own vertex shaders place every instance from its attributes
+		var pn := PetalShaders.node(o)
+		pn.transform = o.matrix_world
+		_root.add_child(pn)
+		live_shaders.append([pn.material_override, m])
+		stats.petal_shaders += 1
+		_tally("petal shaders", o.geometry.triangle_count() * o.count)
+		return
 	if m == null:
 		m = T.Mat.new()
 	if absf(o.matrix_world.basis.determinant()) < 1e-12:

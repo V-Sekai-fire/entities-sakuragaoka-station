@@ -7,7 +7,7 @@
 # absolute difference of the two over every pixel and channel at full resolution (0..255).
 #   godot --path . --resolution 1920x1080 --script tools/realize_check.gd -- --shots=<dir>
 #       [--hammersley=8@-1,-11.4 | --cams="x,z,yaw,pitch;..."] [--original=<prefix>] [--modules=...]
-#       [--q=high|medium|low] [--ramp-control=<engine_floor.gd RAMP_CONTROLS name>]   ?q= level (core/quality.gd), default high
+#       [--t=<seconds>, the shaders' clock as shot.mjs --t] [--q=high|medium|low] [--ramp-control=<engine_floor.gd RAMP_CONTROLS name>]   ?q= level (core/quality.gd), default high
 extends SceneTree
 
 const Layout = preload("res://addons/sakuragaoka_station/world/layout.gd")
@@ -34,6 +34,7 @@ var _t0 := Time.get_ticks_msec()
 var _layout = Layout.new("")
 var _quality := "high"
 var _control := ""
+var _clock := -1.0
 
 
 func _initialize() -> void:
@@ -45,6 +46,8 @@ func _initialize() -> void:
 			_original = a.substr(11)
 		elif a.begins_with("--modules="):
 			mods = a.substr(10)
+		elif a.begins_with("--t="):
+			_clock = float(a.substr(4))
 		elif a.begins_with("--q="):
 			_quality = a.substr(4)
 		elif a.begins_with("--ramp-control="):
@@ -58,6 +61,7 @@ func _initialize() -> void:
 	if mods != "":
 		_st.modules = PackedStringArray(mods.split(","))
 	_st.quality = _quality
+	_st.clock = _clock
 	_st.built.connect(_on_built)
 	get_root().add_child(_st)
 
@@ -75,8 +79,8 @@ func _on_built(s: Dictionary) -> void:
 			",".join(s.modules), s.meshes, s.solids, s.surfaces, s.single, s.instanced, s.skipped])
 	print("realize: geometries %d manifold, %d open; CSG %d triangles in, %d out; %d cells kept raw, %d combiners failed" % [
 			s.manifold, s.open, s.csg_in, s.csg_out, s.csg_raw, s.csg_failed])
-	print("realize: %d palette colours; %d blossom masses; %d alpha-cut cards held (no Slug or mesh form); %d instance tints dropped" % [
-			s.colours, s.blob, s.held, s.instance_tints_dropped])
+	print("realize: %d palette colours; %d blossom masses; %d alpha-cut cards held (no Slug or mesh form); %d instance tints dropped; %d petal shader meshes" % [
+			s.colours, s.blob, s.held, s.instance_tints_dropped, s.petal_shaders])
 	var atlas = SlugAtlas.shared()
 	print("realize: canvas textures: %d surfaces drawn by Slug, %d on the mean-colour fallback; modes mesh %d, slug %d, mean %d" % [
 			s.slugged, s.fallback, s.mode_mesh, s.mode_slug, s.mode_mean])

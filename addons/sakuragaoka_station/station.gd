@@ -6,12 +6,14 @@ extends Node3D
 signal built(stats: Dictionary)
 
 const Ctx = preload("res://addons/sakuragaoka_station/core/ctx.gd")
+const T = preload("res://addons/sakuragaoka_station/core/three.gd")
 const Realize = preload("res://addons/sakuragaoka_station/core/realize.gd")
 const Kernels = preload("res://addons/sakuragaoka_station/core/slug/kernels.gd")
 const Guest = preload("res://addons/sakuragaoka_station/core/slug/guest.gd")
 const Quality = preload("res://addons/sakuragaoka_station/core/quality.gd")
 const SKY := preload("res://addons/sakuragaoka_station/core/sky.gdshader")
 const Composite := preload("res://addons/sakuragaoka_station/core/composite.gd")
+const PetalShaders = preload("res://addons/sakuragaoka_station/world/petals/shaders.gd")
 
 @export var world_seed := 1
 @export var modules := PackedStringArray(["environment", "station", "plaza", "sakura"])
@@ -19,6 +21,9 @@ const Composite := preload("res://addons/sakuragaoka_station/core/composite.gd")
 @export var with_environment := true
 ## The original's ?q= level (core/quality.gd): high is its desktop default, MSAA 4x.
 @export_enum("high", "medium", "low") var quality := "high"
+## main.js's clock in seconds for the shaders that move by it; below 0 it runs in real time. A fixed
+## value matches the original's shot.mjs --t.
+@export var clock := -1.0
 
 var stats := {}
 var sun_dir := Vector3.UP
@@ -26,6 +31,8 @@ var sun_dir := Vector3.UP
 var ctx
 var _sun: DirectionalLight3D
 var _fed := []
+var _live: Array = []
+var _time := 0.0
 
 
 ## The canvas-texture Sandboxes (slug.elf, slug_kernels.elf) go with the station.
@@ -41,6 +48,8 @@ func _ready() -> void:
 	sun_dir = ctx.sun_dir
 	if with_environment:
 		_environment()
+		ctx.sky = {"sun": {"color": T.color("#fff0dc"), "intensity": 2.75},
+			"hemi": {"color": T.color("#a9b3ee"), "groundColor": T.color("#d9c6c8"), "intensity": 1.62}}
 	var done := PackedStringArray()
 	for n in modules:
 		var path := "res://addons/sakuragaoka_station/world/%s.gd" % n
@@ -53,6 +62,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	r.finish()
+	_live = r.live_shaders
 	stats = r.stats.merged({"modules": done, "build_ms": t1 - t0, "realize_ms": Time.get_ticks_msec() - t1})
 	print("station: %s built in %d ms, realized in %d ms" % [",".join(done), stats.build_ms, stats.realize_ms])
 	built.emit(stats)
@@ -76,9 +86,28 @@ static func _lin(x: float) -> float:
 	return x / 12.92 if x <= 0.04045 else pow((x + 0.055) / 1.055, 2.4)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _sun != null:
 		_feed_sun()
+	if not _live.is_empty():
+		_animate(delta)
+
+
+## main.js's clock for the shaders that move by it (the petals): uTime, the core's gust, the petals'
+## per-frame update (train slots, drawing-buffer height), then their uniforms.
+func _animate(delta: float) -> void:
+	_time += delta
+	var t := _time if clock < 0.0 else clock
+	ctx.time = t
+	ctx.shared["uTime"] = t
+	ctx.shared["uGust"] = 0.5 + 0.28 * sin(t * 0.37) + 0.14 * sin(t * 1.13 + 1.7) + 0.08 * sin(t * 2.9 + 0.4)
+	var p = ctx.services.get("petals")
+	if p != null and p.get("update") != null:
+		p.update.call(delta, t)
+	var res_y := maxf(240.0, get_viewport().get_visible_rect().size.y)
+	for pair in _live:
+		PetalShaders.update(pair[0], pair[1])
+		pair[0].set_shader_parameter("uResY", res_y)
 
 
 ## three.js divides a light's irradiance by pi where Godot folds pi into the light, so the original's

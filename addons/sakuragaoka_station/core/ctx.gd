@@ -24,6 +24,9 @@ var dynamic_root := T.Group.new()
 var scene := T.Group.new()
 var time := 0.0
 var player := {"position": Vector3.ZERO}
+## src/core/sky.js's lights as main.js hands them to the modules (ctx.sky), linear colours:
+## {sun: {color, intensity}, hemi: {color, groundColor, intensity}}; null without a sky (tools).
+var sky = null
 var quality := {"name": "high", "pixelRatio": 1, "msaa": 4, "shadowMap": 4096, "shadowSize": 75, "petals": 1}
 var seed := 1
 var cache := Geo.Cache.new()
