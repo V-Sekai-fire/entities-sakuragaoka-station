@@ -4,7 +4,7 @@ A port of a procedurally generated, cel-shaded station town into the engine, reb
 
 ## What it is for
 
-The `sakuragaoka_station` addon reimplements the original's world modules, builds them at a seed, and realizes them as engine nodes, with vector signage drawn by a godot-sandbox guest. The gates under `tools/` compare the port against the original's own output, and each carries a control that must fail. RFD 2267 covers the port.
+The `sakuragaoka_station` addon reimplements the original's world modules, builds them at a seed, and realizes them as engine nodes, with vector signage drawn by a godot-sandbox guest. The gates under `tools/` compare the port against the original's own output, and each carries a control that must fail. RFD66606-2267 covers the port.
 
 ## Build and run
 
