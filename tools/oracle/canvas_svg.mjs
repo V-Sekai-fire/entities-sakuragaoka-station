@@ -25,7 +25,7 @@
 // Three-way verification per key: A = the real canvas, B = a direct 1:1 SVG of the recorded calls, C = the optimized
 // SVG; floor = d(A,B), emitter error = d(B,C), residual = d(A,C) (what pass/fail uses); see manifest.verification.
 // The browser records and renders; the scores come from Godot, tools/oracle/score_renders.gd, through the guest kernel
-// score_rgba (core/slug/kernels.gd -> slug_kernels.sgd), as RFD 2294 requires of heavy compute.
+// score_rgba (core/slug/kernels.gd -> slug_kernels.sgd), as RFD66606-2294 requires of heavy compute.
 // Text is converted to outlines with opentype.js (fetched once from jsdelivr) and the TTF subsets of the
 // Google Fonts families that index.html loads (fetched with text=<the characters drawn>); both are
 // cached under <os tmp>/sakuragaoka-canvas-svg-cache. Glyph positions come from the browser's own
