@@ -1,5 +1,5 @@
 # The station gate: the port against the original's oracle (tools/reference.json, from
-# V-Sekai-fire/sakuragaoka-station tools/reference.mjs at seed 1, t = 0).
+# original/tools/reference.mjs at seed 1, t = 0).
 #
 #   godot --headless --path . --script tools/gate_station.gd -- [--control=drop_lot|seed_2] [module ...]
 #

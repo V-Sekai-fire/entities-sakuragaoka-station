@@ -2,7 +2,7 @@
 // headless browser: per key, the alpha-weighted mean in linear RGB and the mean alpha. The port
 // colours the surfaces it cannot draw yet by these.
 // usage: node tools/oracle/texture_means.mjs --chrome <path> [--root <original>] [--only environment,station,plaza,sakura] [--out <json>]
-//   --root  the original's checkout, with npm ci run (default: the workspace's 3-interactor/sakuragaoka-station-upstream)
+//   --root  the original's checkout, with npm ci run (default: the vendored original/ in this repository)
 //   --out   default: addons/sakuragaoka_station/core/texture_means.json, made with the --only above
 import http from 'node:http';
 import fs from 'node:fs';
@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = {};
 for (let i = 2; i < process.argv.length; i++) { const a = process.argv[i]; if (a.startsWith('--')) { const k = a.slice(2); const v = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[++i] : '1'; args[k] = v; } }
-const root = path.resolve(args.root || path.join(here, '../../../../3-interactor/sakuragaoka-station-upstream'));
+const root = path.resolve(args.root || path.join(here, '../../original'));
 const puppeteer = createRequire(path.join(root, 'package.json'))('puppeteer-core');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json', '.css': 'text/css', '.png': 'image/png' };
 const server = http.createServer((req, res) => {

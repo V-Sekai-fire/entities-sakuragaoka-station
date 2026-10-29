@@ -6,7 +6,7 @@
 // <symbol>s (data-stamp-kind rect|ellipse|path|stroke) placed by affine matrices; see the stamping block in
 // emitCanvas() and manifest.stamping for the exact rules.
 // usage: node tools/oracle/canvas_svg.mjs --chrome <path> [--root <original>] [--only environment,station,plaza,sakura] [--out <dir>]
-//   --root   the original's checkout, with npm ci run (default: the workspace's 3-interactor/sakuragaoka-station-upstream)
+//   --root   the original's checkout, with npm ci run (default: the vendored original/ in this repository)
 //   --out    default: addons/sakuragaoka_station/slug/svg/ ; writes <key>.svg per keyed texture + manifest.json
 //   --keys   optional comma list: only emit these keys (debugging)
 //   --mae / --cov  failure thresholds (default 0.02 / 0.99, see FAIL below)
@@ -45,7 +45,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = {};
 for (let i = 2; i < process.argv.length; i++) { const a = process.argv[i]; if (a.startsWith('--')) { const k = a.slice(2); const v = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[++i] : '1'; args[k] = v; } }
-const root = path.resolve(args.root || path.join(here, '../../../../3-interactor/sakuragaoka-station-upstream'));
+const root = path.resolve(args.root || path.join(here, '../../original'));
 const outDir = path.resolve(args.out || path.join(here, '../../addons/sakuragaoka_station/slug/svg'));
 const STAMP = !args['no-stamp'], STAMP_MIN = Number(args['stamp-min'] || 8), STAMP_EPS = 0.01; // stamp fit tolerance, device px
 const ABLATE = args.ablate || ''; // sensitivity check of the score: drop all text / all tiny fills

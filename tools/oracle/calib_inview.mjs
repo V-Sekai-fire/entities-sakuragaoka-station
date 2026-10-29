@@ -9,7 +9,7 @@ import { makeShadowRoot, removeShadowRoot } from './shadow_root.mjs';
 const args = {};
 for (let i = 2; i < process.argv.length; i++) { const a = process.argv[i]; if (a.startsWith('--')) { const k = a.slice(2); const v = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[++i] : '1'; args[k] = v; } }
 const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(args.root || path.join(here, '../../../../3-interactor/sakuragaoka-station-upstream'));
+const root = path.resolve(args.root || path.join(here, '../../original'));
 if (!args.out) { console.log('usage: node tools/oracle/calib_inview.mjs [--placements <placements.json>] [--hide <prefix,...>] [--cams <list>] --out <prefix> [--runs 2]'); process.exit(2); }
 const placements = args.placements ? JSON.parse(fs.readFileSync(args.placements, 'utf8')) : { hammersley: '8@-1,-11.4', views: [] };
 const out = path.resolve(args.out);

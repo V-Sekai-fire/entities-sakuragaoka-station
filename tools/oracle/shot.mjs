@@ -2,7 +2,7 @@
 // original's tools/shot.mjs (Kenton-GMI/sakuragaoka-station 4112f57, MIT), serving the checkout at --root.
 // usage:
 //   node tools/oracle/shot.mjs --chrome <path> --hammersley 8@-1,-11.4 --out shots/original [--only environment,plaza]
-//   --root   the original's checkout, with npm ci run (default: the workspace's 3-interactor/sakuragaoka-station-upstream)
+//   --root   the original's checkout, with npm ci run (default: the vendored original/ in this repository)
 //   --chrome path to a Chrome, chrome-headless-shell or Edge binary (default: the Windows install paths)
 //   --angle  ANGLE backend: vulkan (default; metal on macOS), d3d11, warp (on the CPU), gl; the renderer must name it (--self-test)
 //   --only   comma list of world modules to build (omit = full scene)
@@ -39,7 +39,7 @@ if (args['self-test']) {
   console.log(`${cases.length} controls, ${bad} failed`);
   process.exit(bad ? 1 : 0);
 }
-const root = path.resolve(args.root || path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../../3-interactor/sakuragaoka-station-upstream'));
+const root = path.resolve(args.root || path.join(path.dirname(fileURLToPath(import.meta.url)), '../../original'));
 const puppeteer = createRequire(path.join(root, 'package.json'))('puppeteer-core');
 const W = Number(args.w || 1280), H = Number(args.h || 720);
 function radicalInverse2(n) { let v = 0, f = 0.5; while (n > 0) { v += (n & 1) * f; n >>= 1; f *= 0.5; } return v; }
