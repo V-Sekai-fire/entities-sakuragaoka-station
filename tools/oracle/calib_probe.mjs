@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const args = {};
 for (let i = 2; i < process.argv.length; i++) { const a = process.argv[i]; if (a.startsWith('--')) { const k = a.slice(2); const v = process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[++i] : '1'; args[k] = v; } }
 const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(args.root || path.join(here, '../../../../3-interactor/sakuragaoka-station-upstream'));
+const root = path.resolve(args.root || path.join(here, '../../original'));
 const puppeteer = createRequire(path.join(root, 'package.json'))('puppeteer-core');
 if (!args.candidates || !args.out) { console.log('usage: node tools/oracle/calib_probe.mjs --candidates <candidates.json> --out <file>'); process.exit(2); }
 const cand = JSON.parse(fs.readFileSync(args.candidates, 'utf8'));
